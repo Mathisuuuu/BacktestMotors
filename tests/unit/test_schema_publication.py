@@ -103,11 +103,14 @@ class TestSchemaAcceptsRealSpecifications:
             "crosses_above": {"type": "crosses_above", "fast": leaf, "slow": leaf},
             "crosses_below": {"type": "crosses_below", "fast": leaf, "slow": leaf},
             "position": {"type": "position", "field": "bars_held"},
+            "time": {"type": "time", "field": "weekday"},
+            "peer": {"type": "peer", "symbol": "NQ.v.0", "inner": leaf},
+            "rolling": {"type": "rolling", "stat": "mean", "window": 5, "inner": leaf},
         }
         assert set(instances) == {node.name for node in list_node_types()}
         for name, instance in instances.items():
             assert validator.is_valid(instance), name
-            assert build_signal(instance) is not None
+            assert build_signal(instance) is not None, name
 
     def test_the_version_may_be_omitted_or_pinned(self, validator: Draft202012Validator):
         assert validator.is_valid({"type": "constant", "value": 1.0})

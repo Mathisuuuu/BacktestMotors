@@ -25,10 +25,15 @@ from dataclasses import dataclass, field
 
 from pydantic import Field as PydField
 
-from rsl.data.feed import Context
+from rsl.data.feed import Context, MultiContext
 from rsl.engine.orders import Fill, Order, Side
 from rsl.errors import ConfigurationError
-from rsl.strategies.base import Strategy, StrategyParams, strategy
+from rsl.strategies.base import (
+    CrossSectionalStrategy,
+    Strategy,
+    StrategyParams,
+    strategy,
+)
 from rsl.strategies.signals import FALSE, Signal, SpecDict, build_signal, warmup_of
 
 
@@ -278,3 +283,67 @@ def _build_rule_strategy(params: StrategyParams) -> Strategy:
             "extra_warmup": params.extra_warmup,
         }
     )
+
+
+@dataclass(eq=False)
+class PanelRuleStrategy(CrossSectionalStrategy):
+    """Regles mono-instrument, evaluees sur un PANNEAU.
+
+    Meme logique que `RuleStrategy` - elle la delegue entierement - mais
+    executee par le runner transversal, ce qui donne acces aux autres
+    instruments via le noeud `peer`. C'est ce qu'il faut pour negocier UN
+    instrument en regardant les AUTRES : spread, ratio, couverture, filtre de
+    regime pris sur un indice.
+
+    Pourquoi un troisieme moule plutot qu'un drapeau sur `RuleStrategy`
+    -------------------------------------------------------------------
+    Ce n'est pas la logique de decision qui change - elle est identique, et
+    litteralement partagee - c'est la FORME D'EXECUTION : il faut un panneau,
+    donc un calendrier commun, donc l'autre runner. Le meme raisonnement que
+    pour les deux modes de runner (`docs/execution-model.md` §7) : une
+    abstraction unique servirait mal les deux.
+
+    Si son instrument ne cote pas a une ligne donnee, la strategie ne fait
+    rien. Elle ne peut ni evaluer ses regles ni etre executee sans barre.
+    """
+
+    inner: RuleStrategy
+
+    @property
+    def warmup_bars(self) -> int:
+        return self.inner.warmup_bars
+
+    @property
+    def symbol(self) -> str:
+        return self.inner.symbol
+
+    def reset(self) -> None:
+        self.inner.reset()
+
+    def on_fill(self, fill: Fill) -> None:
+        self.inner.on_fill(fill)
+
+    def on_rebalance(self, ctx: MultiContext) -> Sequence[Order]:
+        if self.inner.symbol not in ctx.symbols:
+            return ()
+        return self.inner.on_bar(ctx[self.inner.symbol])
+
+    def describe(self) -> SpecDict:
+        return {"class": type(self).__qualname__, "inner": self.inner.describe()}
+
+
+@strategy(
+    "panel_rules",
+    version=1,
+    params=RuleStrategyParams,
+    summary=(
+        "Regles mono-instrument evaluees sur un panneau : donne acces aux autres "
+        "instruments via le noeud `peer`."
+    ),
+    cross_sectional=True,
+)
+def _build_panel_rules(params: StrategyParams) -> CrossSectionalStrategy:
+    assert isinstance(params, RuleStrategyParams)
+    inner = _build_rule_strategy(params)
+    assert isinstance(inner, RuleStrategy)
+    return PanelRuleStrategy(inner=inner)

@@ -790,6 +790,33 @@
           },
           {
             "additionalProperties": false,
+            "description": "Evalue un sous-signal sur un AUTRE instrument, au meme instant.",
+            "properties": {
+              "inner": {
+                "$ref": "#/$defs/node"
+              },
+              "symbol": {
+                "description": "Symbole du panneau, ex. 'NQ.v.0'.",
+                "type": "string"
+              },
+              "type": {
+                "const": "peer"
+              },
+              "version": {
+                "const": 1,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "type",
+              "symbol",
+              "inner"
+            ],
+            "title": "peer@1",
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
             "description": "Feuille : ce que la strategie sait de SA propre position.",
             "properties": {
               "field": {
@@ -880,6 +907,77 @@
             ],
             "title": "primitive@1",
             "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "description": "Statistique glissante d'un sous-signal QUELCONQUE, pas d'un champ de prix.",
+            "properties": {
+              "inner": {
+                "$ref": "#/$defs/node"
+              },
+              "stat": {
+                "enum": [
+                  "mean",
+                  "stdev",
+                  "min",
+                  "max",
+                  "sum",
+                  "zscore"
+                ],
+                "type": "string"
+              },
+              "type": {
+                "const": "rolling"
+              },
+              "version": {
+                "const": 1,
+                "type": "integer"
+              },
+              "window": {
+                "minimum": 1,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "type",
+              "stat",
+              "window",
+              "inner"
+            ],
+            "title": "rolling@1",
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "description": "Feuille : un champ calendaire de la barre courante (UTC).",
+            "properties": {
+              "field": {
+                "default": "weekday",
+                "description": "weekday (lundi = 0), hour, minute, day, month, day_of_year, year. Toujours en UTC : le socle ne convertit aucun fuseau.",
+                "enum": [
+                  "weekday",
+                  "hour",
+                  "minute",
+                  "day",
+                  "month",
+                  "day_of_year",
+                  "year"
+                ],
+                "type": "string"
+              },
+              "type": {
+                "const": "time"
+              },
+              "version": {
+                "const": 1,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "type"
+            ],
+            "title": "time@1",
+            "type": "object"
           }
         ]
       }
@@ -944,6 +1042,41 @@
         }
       },
       "title": "MomentumParams",
+      "type": "object"
+    },
+    "panel_rules@1": {
+      "additionalProperties": false,
+      "description": "Parametres d'une strategie a regles, tels qu'ils arrivent d'un fichier.\n\n`rules` est un dictionnaire de specifications de noeuds - c'est la que se\ntrouve toute l'expressivite. Il n'est PAS valide par pydantic au-dela de sa\nforme : sa validation reelle est faite par `build_signal`, qui connait le\nregistre des noeuds et refuse un type inconnu, un operateur invalide ou une\nreference de primitive inexistante. Un schema pydantic fige ici\ndupliquerait ce registre et divergerait de lui.",
+      "properties": {
+        "allow_pyramiding": {
+          "default": false,
+          "title": "Allow Pyramiding",
+          "type": "boolean"
+        },
+        "extra_warmup": {
+          "default": 0,
+          "title": "Extra Warmup",
+          "type": "integer"
+        },
+        "quantity": {
+          "default": 1,
+          "title": "Quantity",
+          "type": "integer"
+        },
+        "rules": {
+          "additionalProperties": true,
+          "title": "Rules",
+          "type": "object"
+        },
+        "symbol": {
+          "title": "Symbol",
+          "type": "string"
+        }
+      },
+      "required": [
+        "symbol"
+      ],
+      "title": "RuleStrategyParams",
       "type": "object"
     },
     "ranking@1": {

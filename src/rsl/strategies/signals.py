@@ -27,9 +27,16 @@ from dataclasses import dataclass
 from enum import StrEnum
 from typing import ClassVar, Final, Protocol, runtime_checkable
 
+import numpy as np
+
 from rsl.data.feed import Context
-from rsl.data.schema import POSITION_FIELDS
-from rsl.errors import ConfigurationError, RegistryError
+from rsl.data.schema import POSITION_FIELDS, TIME_FIELDS, time_field
+from rsl.errors import (
+    ConfigurationError,
+    InsufficientHistoryError,
+    RegistryError,
+    SymbolNotAvailableError,
+)
 from rsl.primitives.base import BoundPrimitive
 from rsl.primitives.registry import get_primitive
 
@@ -559,6 +566,298 @@ class Position:
 def position(field: str = "quantity") -> Position:
     """Raccourci : `position("bars_held")`."""
     return Position(field)
+
+
+@signal_node(
+    "time",
+    summary="Feuille : un champ calendaire de la barre courante (UTC).",
+    fields=(
+        NodeField(
+            "field",
+            FieldKind.STRING,
+            required=False,
+            default="weekday",
+            choices=TIME_FIELDS,
+            description=(
+                "weekday (lundi = 0), hour, minute, day, month, day_of_year, year. "
+                "Toujours en UTC : le socle ne convertit aucun fuseau."
+            ),
+        ),
+    ),
+)
+@dataclass(frozen=True, slots=True)
+class Time:
+    """Champ calendaire de la barre courante.
+
+    Le calendrier n'est pas de l'information de marche. La date de la barre
+    courante est connue de tous, et meme connue a l'avance : l'exposer n'ouvre
+    aucune fuite, contrairement au PRIX de la barre suivante, qui n'existe pas
+    encore.
+
+    L'horodatage est celui de la CLOTURE (`ctx.ts`), pas de l'ouverture -
+    l'instant ou l'information devient disponible, comme partout ailleurs
+    (`docs/execution-model.md` §1.1). Une barre d'une minute ouverte a 23:59
+    le vendredi est donc datee du samedi.
+
+    Tout est en UTC. Le socle ne convertit aucun fuseau : « ne pas trader le
+    lundi » se lit en UTC, et sur des futures dont la seance ouvre le dimanche
+    soir a New York, ce n'est pas le meme lundi que celui du calendrier local.
+    """
+
+    NODE_TYPE: ClassVar[str] = "time"
+    NODE_VERSION: ClassVar[int] = 1
+
+    field: str = "weekday"
+
+    def __post_init__(self) -> None:
+        if self.field not in TIME_FIELDS:
+            raise ConfigurationError(
+                f"'time' : champ inconnu {self.field!r}. Attendus : {', '.join(TIME_FIELDS)}"
+            )
+
+    @property
+    def warmup_bars(self) -> int:
+        """Une barre : il en faut une pour avoir un horodatage."""
+        return 1
+
+    def __call__(self, ctx: Context) -> float | None:
+        return time_field(ctx.ts, self.field)
+
+    def describe(self) -> SpecDict:
+        return {"type": self.NODE_TYPE, "version": self.NODE_VERSION, "field": self.field}
+
+    @classmethod
+    def from_spec(cls, spec: SpecDict, build: Builder) -> Signal:
+        field_ = spec.get("field", "weekday")
+        if not isinstance(field_, str):
+            raise ConfigurationError(f"'time' : 'field' doit etre textuel, recu {field_!r}")
+        return cls(field_)
+
+
+@signal_node(
+    "peer",
+    summary="Evalue un sous-signal sur un AUTRE instrument, au meme instant.",
+    fields=(
+        NodeField(
+            "symbol",
+            FieldKind.STRING,
+            description="Symbole du panneau, ex. 'NQ.v.0'.",
+        ),
+        NodeField("inner", FieldKind.NODE),
+    ),
+)
+@dataclass(frozen=True, slots=True)
+class Peer:
+    """Sous-signal evalue sur un autre instrument du panneau.
+
+    C'est ce noeud qui rend exprimables les spreads, ratios et couvertures :
+
+        {"type": "arith", "op": "-",
+         "left":  {"type": "price", "field": "close"},
+         "right": {"type": "peer", "symbol": "NQ.v.0",
+                   "inner": {"type": "price", "field": "close"}}}
+
+    Le pair est resolu au MEME instant - meme ligne de panneau - et rendu sous
+    forme de `Context` ordinaire : ses propres gardes s'appliquent, et il ne
+    montre que des barres closes.
+
+    Un pair ABSENT a cet instant rend `None`, pas une exception. L'absence est
+    un etat legitime d'une coupe transversale, et « je ne sais pas » se propage
+    deja partout ailleurs dans ce module. Faire echouer le run priverait la
+    strategie du droit de dire « alors je ne fais rien ».
+
+    Hors panneau, ou sur un symbole qui n'appartient pas au panneau, c'est en
+    revanche une ERREUR de configuration qui remonte : une strategie qui lit
+    deux instruments ne peut pas tourner sur un seul, et le decouvrir en
+    silence serait pire que d'echouer. La distinction est faite par
+    `Context.peer`, qui leve deux exceptions differentes.
+    """
+
+    NODE_TYPE: ClassVar[str] = "peer"
+    NODE_VERSION: ClassVar[int] = 1
+
+    symbol: str
+    inner: Signal
+
+    def __post_init__(self) -> None:
+        if not self.symbol:
+            raise ConfigurationError("'peer' exige un `symbol` non vide")
+
+    @property
+    def warmup_bars(self) -> int:
+        return self.inner.warmup_bars
+
+    def __call__(self, ctx: Context) -> float | None:
+        try:
+            other = ctx.peer(self.symbol)
+        except SymbolNotAvailableError:
+            return None
+        try:
+            return self.inner(other)
+        except InsufficientHistoryError:
+            # Le pair existe mais n'a pas encore assez d'historique : c'est un
+            # « pas encore », pas une erreur. Un instrument qui demarre au
+            # milieu de l'echantillon passerait sinon par une exception a
+            # chacune de ses premieres barres.
+            return None
+
+    def describe(self) -> SpecDict:
+        return {
+            "type": self.NODE_TYPE,
+            "version": self.NODE_VERSION,
+            "symbol": self.symbol,
+            "inner": self.inner.describe(),
+        }
+
+    @classmethod
+    def from_spec(cls, spec: SpecDict, build: Builder) -> Signal:
+        symbol = spec.get("symbol")
+        if not isinstance(symbol, str):
+            raise ConfigurationError(f"'peer' exige un `symbol` textuel, recu {symbol!r}")
+        return cls(symbol, _child(spec, "inner", build))
+
+
+def when(field: str = "weekday") -> Time:
+    """Raccourci : `when("weekday")`."""
+    return Time(field)
+
+
+def peer(symbol: str, inner: Signal) -> Peer:
+    """Raccourci : `peer("NQ.v.0", price("close"))`."""
+    return Peer(symbol, inner)
+
+
+class RollingStat(StrEnum):
+    """Statistique appliquee a la fenetre."""
+
+    MEAN = "mean"
+    STDEV = "stdev"
+    MIN = "min"
+    MAX = "max"
+    SUM = "sum"
+    ZSCORE = "zscore"
+
+
+@signal_node(
+    "rolling",
+    summary="Statistique glissante d'un sous-signal QUELCONQUE, pas d'un champ de prix.",
+    fields=(
+        NodeField(
+            "stat",
+            FieldKind.STRING,
+            choices=tuple(s.value for s in RollingStat),
+        ),
+        NodeField("window", FieldKind.INTEGER, minimum=1),
+        NodeField("inner", FieldKind.NODE),
+    ),
+)
+@dataclass(frozen=True, slots=True)
+class Rolling:
+    """Eleve n'importe quel signal scalaire en statistique glissante.
+
+    Les primitives comme `sma` ou `zscore` ne travaillent que sur un CHAMP de
+    prix. Ce noeud leve cette limite : il applique la meme mecanique a une
+    expression arbitraire. C'est lui qui rend un spread negociable - un ecart
+    de prix brut ne se trade pas, son z-score si :
+
+        rolling(zscore, 100, arith(close, "-", peer("NQ.v.0", close)))
+
+    Comment la fenetre est constituee
+    ---------------------------------
+    Le sous-signal est reevalue sur `ctx.shifted(k)` pour k de 0 a window-1 -
+    donc uniquement sur des barres closes, et par la meme mecanique que le
+    reste du socle. Aucune memoire, aucun accumulateur : la valeur ne depend
+    que du contexte recu, et deux evaluations du meme instant donnent le meme
+    resultat.
+
+    Le prix a payer est assume : `window` evaluations du sous-arbre a chaque
+    barre. Sur une fenetre de 100 et un sous-arbre de trois primitives, cela
+    fait 300 calculs la ou une primitive dediee en ferait un. La correction
+    prime sur la vitesse a cette etape (`docs/execution-model.md`), et une
+    primitive dediee reste toujours possible quand un cas precis devient
+    couteux.
+
+    Une seule valeur indefinie dans la fenetre rend le tout indefini : une
+    moyenne sur une fenetre trouee ne serait pas la moyenne demandee.
+    """
+
+    NODE_TYPE: ClassVar[str] = "rolling"
+    NODE_VERSION: ClassVar[int] = 1
+
+    stat: RollingStat
+    window: int
+    inner: Signal
+
+    def __post_init__(self) -> None:
+        if self.window < 1:
+            raise ConfigurationError(f"window doit etre >= 1, recu {self.window}")
+        if self.stat in (RollingStat.STDEV, RollingStat.ZSCORE) and self.window < 2:
+            raise ConfigurationError(
+                f"'{self.stat.value}' exige window >= 2 : une seule observation n'a "
+                f"pas de dispersion"
+            )
+
+    @property
+    def warmup_bars(self) -> int:
+        return self.inner.warmup_bars + self.window - 1
+
+    def __call__(self, ctx: Context) -> float | None:
+        values: list[float] = []
+        for lag in range(self.window):
+            try:
+                value = self.inner(ctx.shifted(lag))
+            except InsufficientHistoryError:
+                return None
+            if value is None:
+                return None
+            values.append(value)
+
+        window = np.array(values, dtype=np.float64)
+        match self.stat:
+            case RollingStat.MEAN:
+                return float(np.mean(window))
+            case RollingStat.SUM:
+                return float(np.sum(window))
+            case RollingStat.MIN:
+                return float(np.min(window))
+            case RollingStat.MAX:
+                return float(np.max(window))
+            case RollingStat.STDEV:
+                return float(np.std(window, ddof=1))
+            case RollingStat.ZSCORE:
+                deviation = float(np.std(window, ddof=1))
+                if deviation <= 0.0:
+                    return None
+                # `values[0]` est la valeur COURANTE : `shifted(0)` est le
+                # present, et les lags croissants remontent le temps.
+                return (values[0] - float(np.mean(window))) / deviation
+
+    def describe(self) -> SpecDict:
+        return {
+            "type": self.NODE_TYPE,
+            "version": self.NODE_VERSION,
+            "stat": self.stat.value,
+            "window": self.window,
+            "inner": self.inner.describe(),
+        }
+
+    @classmethod
+    def from_spec(cls, spec: SpecDict, build: Builder) -> Signal:
+        raw = spec.get("stat")
+        if not isinstance(raw, str) or raw not in set(RollingStat):
+            raise ConfigurationError(
+                f"'rolling' : statistique invalide {raw!r}. "
+                f"Attendu l'un de {', '.join(s.value for s in RollingStat)}"
+            )
+        window = spec.get("window")
+        if not isinstance(window, int) or isinstance(window, bool):
+            raise ConfigurationError(f"'rolling' exige un `window` entier, recu {window!r}")
+        return cls(RollingStat(raw), window, _child(spec, "inner", build))
+
+
+def rolling(stat: str, window: int, inner: Signal) -> Rolling:
+    """Raccourci : `rolling("zscore", 100, spread)`."""
+    return Rolling(RollingStat(stat), window, inner)
 
 
 # ---------------------------------------------------------------------------

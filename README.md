@@ -314,13 +314,29 @@ OK   RSI sous 30
 OK   Bande de Bollinger haute
 OK   Pente de tendance positive
 
-NON  Spread ES/NQ (deux instruments)   -> le Context est mono-instrument
-NON  Ne trader que le lundi            -> aucun noeud calendaire
+OK   Spread ES/NQ (deux instruments)
+OK   Z-score du spread sur 120 barres
+OK   Ne trader que du lundi au vendredi
+OK   Couverture en ratio : 2 ES contre 1 NQ
+OK   Force relative contre un indice de reference
 ```
 
-Treize primitives, douze types de noeuds, deux moules descriptibles :
-`rules@1` pour les regles mono-instrument, `ranking@1` pour le classement
-transversal.
+Treize primitives, seize types de noeuds, trois moules descriptibles :
+`rules@1` pour les regles mono-instrument, `panel_rules@1` pour les regles qui
+lisent PLUSIEURS instruments, `ranking@1` pour le classement transversal.
+
+**`peer` et `rolling` vont ensemble.** Le premier donne acces a un autre
+instrument au meme instant ; le second eleve n'importe quelle expression en
+statistique glissante. L'un sans l'autre ne sert a rien : on saurait calculer
+un spread sans pouvoir le normaliser, et un niveau de spread brut ne se trade
+pas. Ensemble, une strategie de paires s'ecrit en JSON - voir
+`examples/paire_es_nq.json`, qui tourne sur ES/NQ reels.
+
+**`rolling` a un cout assume** : il reevalue son sous-arbre `window` fois par
+barre, via `ctx.shifted(k)`. Sur une fenetre de 120 et un sous-arbre de trois
+noeuds, cela fait 360 evaluations la ou une primitive dediee en ferait une. La
+correction prime sur la vitesse, et une primitive dediee reste possible quand
+un cas precis devient couteux.
 
 **`ranking@1` merite un mot.** `cross_sectional_momentum@1` etait
 parametrable mais pas descriptible : on pouvait changer `lookback`, pas le

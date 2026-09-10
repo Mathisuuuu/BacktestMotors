@@ -162,8 +162,8 @@ class TestNoSampleLengthLeak:
         ctx = advanced(ramp_store, 10)
         public = {name for name in dir(ctx) if not name.startswith("_")}
         assert public == {
-            "bar", "bar_at", "granularity", "history", "n_bars_seen", "position",
-            "shifted", "symbol", "ts", "ts_event", "value", "values",
+            "bar", "bar_at", "granularity", "history", "n_bars_seen", "peer", "peers",
+            "position", "shifted", "symbol", "ts", "ts_event", "value", "values",
         }
 
     def test_n_bars_seen_never_anticipates(self, ramp_store: BarStore):

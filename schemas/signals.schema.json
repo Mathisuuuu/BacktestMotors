@@ -255,6 +255,33 @@
         },
         {
           "additionalProperties": false,
+          "description": "Evalue un sous-signal sur un AUTRE instrument, au meme instant.",
+          "properties": {
+            "inner": {
+              "$ref": "#/$defs/node"
+            },
+            "symbol": {
+              "description": "Symbole du panneau, ex. 'NQ.v.0'.",
+              "type": "string"
+            },
+            "type": {
+              "const": "peer"
+            },
+            "version": {
+              "const": 1,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "type",
+            "symbol",
+            "inner"
+          ],
+          "title": "peer@1",
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
           "description": "Feuille : ce que la strategie sait de SA propre position.",
           "properties": {
             "field": {
@@ -344,6 +371,77 @@
             "ref"
           ],
           "title": "primitive@1",
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Statistique glissante d'un sous-signal QUELCONQUE, pas d'un champ de prix.",
+          "properties": {
+            "inner": {
+              "$ref": "#/$defs/node"
+            },
+            "stat": {
+              "enum": [
+                "mean",
+                "stdev",
+                "min",
+                "max",
+                "sum",
+                "zscore"
+              ],
+              "type": "string"
+            },
+            "type": {
+              "const": "rolling"
+            },
+            "version": {
+              "const": 1,
+              "type": "integer"
+            },
+            "window": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "type",
+            "stat",
+            "window",
+            "inner"
+          ],
+          "title": "rolling@1",
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Feuille : un champ calendaire de la barre courante (UTC).",
+          "properties": {
+            "field": {
+              "default": "weekday",
+              "description": "weekday (lundi = 0), hour, minute, day, month, day_of_year, year. Toujours en UTC : le socle ne convertit aucun fuseau.",
+              "enum": [
+                "weekday",
+                "hour",
+                "minute",
+                "day",
+                "month",
+                "day_of_year",
+                "year"
+              ],
+              "type": "string"
+            },
+            "type": {
+              "const": "time"
+            },
+            "version": {
+              "const": 1,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "title": "time@1",
           "type": "object"
         }
       ]

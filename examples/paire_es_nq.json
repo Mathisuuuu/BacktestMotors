@@ -1,0 +1,84 @@
+{
+  "name": "paire-es-nq-retour-a-la-moyenne",
+  "initial_cash": 1000000.0,
+  "seed": 0,
+  "data": [
+    {
+      "root": "ES",
+      "path": "C:/Users/Mathis/Desktop/Cotations/indices/ES_v0_1m.parquet",
+      "resample": "day",
+      "resample_min_bars": 200
+    },
+    {
+      "root": "NQ",
+      "path": "C:/Users/Mathis/Desktop/Cotations/indices/NQ_v0_1m.parquet",
+      "resample": "day",
+      "resample_min_bars": 200
+    }
+  ],
+  "execution": {
+    "fees": {"kind": "per_contract"},
+    "slippage": {"kind": "tick", "ticks": 1.0}
+  },
+  "risk": {"sizing": {"kind": "fixed", "contracts": 1}},
+  "strategy": {
+    "ref": "panel_rules@1",
+    "params": {
+      "symbol": "ES.v.0",
+      "quantity": 1,
+      "rules": {
+        "entry_long": {
+          "type": "compare",
+          "op": "<",
+          "left": {
+            "type": "rolling",
+            "stat": "zscore",
+            "window": 120,
+            "inner": {
+              "type": "arith",
+              "op": "/",
+              "left": {"type": "price", "field": "close"},
+              "right": {
+                "type": "peer",
+                "symbol": "NQ.v.0",
+                "inner": {"type": "price", "field": "close"}
+              }
+            }
+          },
+          "right": {"type": "constant", "value": -1.5}
+        },
+        "exit_long": {
+          "type": "any_of",
+          "operands": [
+            {
+              "type": "compare",
+              "op": ">",
+              "left": {
+                "type": "rolling",
+                "stat": "zscore",
+                "window": 120,
+                "inner": {
+                  "type": "arith",
+                  "op": "/",
+                  "left": {"type": "price", "field": "close"},
+                  "right": {
+                    "type": "peer",
+                    "symbol": "NQ.v.0",
+                    "inner": {"type": "price", "field": "close"}
+                  }
+                }
+              },
+              "right": {"type": "constant", "value": 0.0}
+            },
+            {
+              "type": "compare",
+              "op": ">=",
+              "left": {"type": "position", "field": "bars_held"},
+              "right": {"type": "constant", "value": 40.0}
+            }
+          ]
+        }
+      }
+    }
+  }
+}
