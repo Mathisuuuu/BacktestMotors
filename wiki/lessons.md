@@ -77,8 +77,8 @@ profondeurs
 
 `data/` en premiere ligne de `.gitignore` etait destine au repertoire de donnees
 a la racine. Il a aussi attrape `src/rsl/data/`, c'est-a-dire toute la couche
-donnees : jamais commitee, absente de la copie de travail, alors que dix modules
-l'importent et que le README la donne pour faite.
+donnees : jamais commitee, absente de la copie de travail, alors que 20 fichiers
+de `src/` et 27 de `tests/` l'importent et que le README la donne pour faite.
 
 **Consequence operationnelle :** un motif d'ignore destine a un chemin precis
 s'ecrit ancre — `/data/`, pas `data/`. Et apres tout ajout a `.gitignore`,
@@ -90,3 +90,23 @@ de configuration a silencieusement rendu le paquet central inexistant. Une
 affirmation du README n'est pas une preuve d'existence.
 
 Fonde sur [[reference/donnees]] · [[log]] (entree du 2026-09-10)
+
+## L6 -- Un outil qui signale un probleme de style peut decrire un probleme de code absent
+
+Avec `rsl.data` manquant, la chaine d'outils ne dit pas « il manque un paquet ».
+Elle dit autre chose, et l'autre chose est plausible :
+
+| Outil | Ce qu'il affiche | Ce que c'est vraiment |
+|---|---|---|
+| `ruff` | 28 × `I001 import block un-sorted`, « 28 fixable with `--fix` » | le chemin `src/rsl/data/` n'existe pas, donc `rsl.data` est classe en tiers. `src/` seul : `All checks passed` |
+| `mypy` | 35 × `module is installed, but missing library stubs or py.typed` | le module n'est pas installe du tout -- le message est trompeur |
+| `pytest` | `ImportError while loading conftest` | le seul des trois a nommer la vraie cause |
+
+**Consequence operationnelle :** sur un arbre dont on sait qu'il est incomplet,
+ne jamais lancer un correcteur automatique (`ruff --fix`, `--unsafe-fixes`, un
+quick-fix d'IDE). Il graverait le symptome dans le code, et le vrai correctif
+deviendrait ensuite une seconde vague de modifications en sens inverse. Corriger
+la cause, relancer, et ne traiter comme defaut que ce qui reste.
+
+Fonde sur [[reference/cli]] · [[Failed Ideas/ledger]] · [[log]] (2026-09-10)
+
