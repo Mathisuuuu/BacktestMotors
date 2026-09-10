@@ -47,6 +47,9 @@ from rsl.engine.runner import (
     SpecDict,
     _PendingOrder,
     _Protection,
+    _SinceEntry,
+    position_state,
+    track_positions,
     would_trigger,
 )
 from rsl.errors import ConfigurationError
@@ -211,6 +214,7 @@ class CrossSectionalRunner:
         pending: list[_PendingOrder] = []
         protections: list[_Protection] = []
         fills: list[Fill] = []
+        tracking: dict[str, _SinceEntry] = {}
 
         for mctx in PanelFeed(self.panel, warmup_rows=warmup, stop=self.config.stop):
             row = mctx._row
@@ -226,6 +230,12 @@ class CrossSectionalRunner:
 
             for fill in fills[fills_before:]:
                 strategy.on_fill(fill)
+
+            track_positions(tracking, portfolio, bars, row)
+            for symbol in bars:
+                mctx[symbol]._set_position(
+                    position_state(tracking, portfolio, symbol, row)
+                )
 
             if self.schedule.is_rebalance(row):
                 counters.n_rebalances += 1

@@ -293,6 +293,48 @@ fichier fait echouer la suite, avec la commande a lancer.
 Ce contrat est ce qui manquait pour qu'une machine produise une specification
 valide du premier coup, au lieu d'iterer sur des messages d'erreur.
 
+## Ce que le vocabulaire couvre
+
+Mesure sur un echantillon volontairement melange de seize idees de strategie :
+**quatorze s'expriment en JSON, deux non.**
+
+```
+OK   Donchian : cassure du plus haut 20
+OK   Bollinger : retour a la moyenne a -2 ecarts
+OK   Filtre de volume relatif (> 2x la moyenne)
+OK   Momentum 60 barres positif ET au-dessus de la SMA 200
+OK   Croisement MACD-like (EMA 12 croise EMA 26)
+OK   Compression de volatilite (ATR sous sa moyenne)
+OK   Stop a 2 ATR sous la cloture
+OK   Sortie si la cloture repasse sous le plus bas 10
+OK   Sortie apres 10 barres en position
+OK   Stop suiveur sur le plus haut atteint
+OK   Momentum ajuste de la volatilite (score de classement)
+OK   RSI sous 30
+OK   Bande de Bollinger haute
+OK   Pente de tendance positive
+
+NON  Spread ES/NQ (deux instruments)   -> le Context est mono-instrument
+NON  Ne trader que le lundi            -> aucun noeud calendaire
+```
+
+Treize primitives, douze types de noeuds, deux moules descriptibles :
+`rules@1` pour les regles mono-instrument, `ranking@1` pour le classement
+transversal.
+
+**`ranking@1` merite un mot.** `cross_sectional_momentum@1` etait
+parametrable mais pas descriptible : on pouvait changer `lookback`, pas le
+CRITERE de tri, ecrit en dur dans la classe. Avec `ranking@1` le critere est un
+signal, donc du JSON - « classe par momentum ajuste de la volatilite » s'ecrit
+sans toucher au code. Un test verifie que le moule reproduit exactement le
+momentum ecrit a la main, ordre par ordre, sur quatre jeux de parametres.
+
+**L'etat de position** est expose par le `Context` : quantite, barres depuis
+l'entree, prix d'entree, extremes atteints. C'est le runner qui le calcule, pas
+un noeud a memoire - un noeud a etat survivrait d'un run a l'autre et casserait
+le determinisme. Voir [`docs/no-lookahead.md`](docs/no-lookahead.md) §2.5, et le
+test de corruption du futur rejoue sur une strategie qui lit `bars_held`.
+
 ## Extension par ajout uniquement
 
 Le socle est ferme a la modification, ouvert a l'extension. Chaque registre est
@@ -367,7 +409,7 @@ python -m venv .venv
 .venv/Scripts/python.exe -m ruff check src tests && .venv/Scripts/python.exe -m mypy
 ```
 
-1 039 tests, `ruff` et `mypy --strict` sans exception.
+1 134 tests, `ruff` et `mypy --strict` sans exception.
 
 Marqueurs pytest : `adversarial` (tests qui attaquent une garantie du socle),
 `slow` (tests qui touchent aux donnees reelles).

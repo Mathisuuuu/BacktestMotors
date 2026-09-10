@@ -790,6 +790,37 @@
           },
           {
             "additionalProperties": false,
+            "description": "Feuille : ce que la strategie sait de SA propre position.",
+            "properties": {
+              "field": {
+                "default": "quantity",
+                "description": "quantity (signee), direction (-1/0/+1), bars_held (0 a l'entree), entry_price, high_since_entry, low_since_entry.",
+                "enum": [
+                  "quantity",
+                  "direction",
+                  "bars_held",
+                  "entry_price",
+                  "high_since_entry",
+                  "low_since_entry"
+                ],
+                "type": "string"
+              },
+              "type": {
+                "const": "position"
+              },
+              "version": {
+                "const": 1,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "type"
+            ],
+            "title": "position@1",
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
             "description": "Feuille : un champ OHLCV de la barre courante ou passee.",
             "properties": {
               "field": {
@@ -913,6 +944,44 @@
         }
       },
       "title": "MomentumParams",
+      "type": "object"
+    },
+    "ranking@1": {
+      "additionalProperties": false,
+      "description": "Parametres d'une strategie de classement.\n\n`score` est une specification de noeud - c'est la que reside toute\nl'expressivite. Sa validation est faite par `build_signal`, qui connait le\nregistre des noeuds ; le schema publie par `rsl schema` en donne le contrat.",
+      "properties": {
+        "extra_warmup": {
+          "default": 0,
+          "title": "Extra Warmup",
+          "type": "integer"
+        },
+        "long_short": {
+          "default": true,
+          "title": "Long Short",
+          "type": "boolean"
+        },
+        "n_long": {
+          "default": 3,
+          "title": "N Long",
+          "type": "integer"
+        },
+        "n_short": {
+          "default": 3,
+          "title": "N Short",
+          "type": "integer"
+        },
+        "quantity": {
+          "default": 1,
+          "title": "Quantity",
+          "type": "integer"
+        },
+        "score": {
+          "additionalProperties": true,
+          "title": "Score",
+          "type": "object"
+        }
+      },
+      "title": "RankingParams",
       "type": "object"
     },
     "rules@1": {

@@ -91,3 +91,33 @@ class ZScoreParams(FieldWindowParams):
                 f"window ({self.window}) doit etre > ddof ({self.ddof}) : "
                 f"sinon la variance n'est pas definie"
             )
+
+
+class DispersionParams(FieldWindowParams):
+    """Fenetre glissante avec correction de Bessel optionnelle."""
+
+    ddof: int = 1
+
+    def model_post_init(self, _context: object, /) -> None:
+        super().model_post_init(_context)
+        if self.ddof not in (0, 1):
+            raise ValueError(f"ddof doit valoir 0 ou 1, recu {self.ddof}")
+        if self.window <= self.ddof:
+            raise ValueError(
+                f"window ({self.window}) doit etre > ddof ({self.ddof}) : "
+                f"sinon la variance n'est pas definie"
+            )
+
+
+class VolatilityParams(DispersionParams):
+    """Volatilite des RENDEMENTS, a ne pas confondre avec l'ecart-type des prix.
+
+    L'ecart-type des prix se mesure en unites de prix : 40 points sur ES ne se
+    compare ni a 40 points sur NQ, ni a 40 points sur ES dix ans plus tot. La
+    volatilite des rendements est sans unite, donc comparable.
+    """
+
+    log: bool = False
+    annualise: float | None = None
+    """Si fourni, multiplie par `sqrt(annualise)`. A renseigner avec le nombre
+    de periodes par an MESURE sur l'echantillon, jamais suppose."""

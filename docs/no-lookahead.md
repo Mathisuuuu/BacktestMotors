@@ -99,6 +99,40 @@ ne produit pas de résultat dégradé, il ne produit pas de résultat.
 
 C'est le test adversarial n° 2.
 
+### 2.5 L'état de position, et pourquoi il ne rompt rien
+
+Le `Context` expose `position` : quantité détenue, barres écoulées depuis
+l'entrée, prix d'entrée, plus haut et plus bas atteints depuis l'entrée.
+
+C'est une entorse **apparente** à la pauvreté délibérée du §2.1. Elle est
+justifiée, et il faut dire précisément par quoi.
+
+**Ces valeurs décrivent le passé de la stratégie, pas l'avenir du marché.**
+Elles sont calculées à partir des fills — qui viennent de barres déjà closes —
+et des extrêmes des barres traversées depuis l'entrée. Aucune n'existe avant
+que la position n'existe. Une stratégie qui les lit n'apprend rien qu'elle
+n'ait elle-même provoqué.
+
+**C'est le runner qui les calcule, pas un nœud à mémoire.** La distinction
+n'est pas cosmétique. Un nœud de signal qui mémoriserait son état survivrait
+d'un run à l'autre : deux backtests identiques donneraient des résultats
+différents selon ce qui a tourné avant, et le test de corruption du futur
+perdrait son sens. Le runner, lui, repart de zéro à chaque `run()` par
+construction, et son suivi est une variable locale de la boucle.
+
+**Hors runner, la position est toujours à plat.** Un `Context` construit à la
+main ne peut pas inventer une position que personne n'a prise.
+
+Ce que cela rend exprimable : les sorties temporelles (« sortir après dix
+barres ») et les sorties calées sur un extrême atteint depuis l'entrée, dont le
+stop suiveur — **évalué à la clôture**, puis exécuté à la barre suivante. Un
+stop suiveur qui se déclenche *en cours* de barre reste une affaire de moteur,
+pas de signal ; les deux ne donnent pas le même prix de sortie sur une barre
+violente, et confondre les deux serait flatteur.
+
+Le test de corruption du futur est rejoué sur une stratégie qui lit
+`bars_held` : bruiter les barres après `k` ne change rien avant `k`.
+
 ---
 
 ## 3. Ordre temporel du runner

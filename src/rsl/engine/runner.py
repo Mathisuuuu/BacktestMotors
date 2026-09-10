@@ -27,7 +27,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from rsl.data.feed import BarContext, BarFeed
-from rsl.data.schema import Bar, BarStore, InstrumentSpec
+from rsl.data.schema import FLAT, Bar, BarStore, InstrumentSpec, PositionState
 from rsl.engine.execution import (
     ExecutionConfig,
     ExecutionEngine,
@@ -42,6 +42,63 @@ from rsl.strategies.base import Strategy
 
 SpecDict = dict[str, object]
 NS_PER_SECOND = 1_000_000_000
+
+
+@dataclass(slots=True)
+class _SinceEntry:
+    """Ce que seul le runner peut savoir : depuis quand, et jusqu'ou.
+
+    Le portefeuille connait la quantite et le prix moyen ; il ne voit pas les
+    barres. Les extremes traverses depuis l'entree ne peuvent donc etre
+    accumules que par la boucle, barre apres barre.
+    """
+
+    opened_bar: int
+    high: float
+    low: float
+
+
+def track_positions(
+    tracking: dict[str, _SinceEntry],
+    portfolio: Portfolio,
+    bars: dict[str, Bar],
+    index: int,
+) -> None:
+    """Met a jour le suivi apres les executions de la barre.
+
+    Appele APRES les fills : une position ouverte a la barre `i` compte `i`
+    comme sa barre d'entree, donc `bars_held = 0` sur cette barre-la.
+    """
+    for symbol, bar in bars.items():
+        held = portfolio.quantity_of(symbol)
+        if held == 0:
+            tracking.pop(symbol, None)
+            continue
+        current = tracking.get(symbol)
+        if current is None:
+            tracking[symbol] = _SinceEntry(opened_bar=index, high=bar.high, low=bar.low)
+        else:
+            current.high = max(current.high, bar.high)
+            current.low = min(current.low, bar.low)
+
+
+def position_state(
+    tracking: dict[str, _SinceEntry], portfolio: Portfolio, symbol: str, index: int
+) -> PositionState:
+    """Assemble l'etat expose a la strategie. Rien qui vienne d'apres `index`."""
+    held = portfolio.quantity_of(symbol)
+    if held == 0:
+        return FLAT
+    since = tracking.get(symbol)
+    if since is None:
+        return PositionState(quantity=held)
+    return PositionState(
+        quantity=held,
+        bars_held=index - since.opened_bar,
+        entry_price=portfolio.positions[symbol].avg_entry,
+        high_since_entry=since.high,
+        low_since_entry=since.low,
+    )
 
 
 def would_trigger(order: Order, bar: Bar) -> bool:
@@ -231,6 +288,7 @@ class SingleAssetRunner:
         pending: list[_PendingOrder] = []
         protections: list[_Protection] = []
         fills: list[Fill] = []
+        tracking: dict[str, _SinceEntry] = {}
         started = False
         last_marks: dict[str, float] = {}
 
@@ -250,6 +308,11 @@ class SingleAssetRunner:
 
             for fill in fills[fills_before:]:
                 strategy.on_fill(fill)
+
+            track_positions(tracking, portfolio, {self.spec.symbol: bar}, index)
+            ctx._set_position(
+                position_state(tracking, portfolio, self.spec.symbol, index)
+            )
 
             if not started:
                 strategy.on_start(ctx)

@@ -145,6 +145,14 @@ class TestNoSampleLengthLeak:
 
     FORBIDDEN = ("__len__", "total_bars", "n_bars", "end_date", "last_ts", "store", "df", "raw")
 
+    def test_position_state_describes_the_past_not_the_future(self, ramp_store: BarStore):
+        """`position` a rejoint la surface publique : elle decrit ce que la
+        strategie a FAIT, jamais ce que le marche fera."""
+        ctx = advanced(ramp_store, 10)
+        assert ctx.position.is_flat
+        assert ctx.position.bars_held == 0
+        assert ctx.position.entry_price == 0.0
+
     @pytest.mark.parametrize("attribute", FORBIDDEN)
     def test_context_does_not_expose_the_sample_length(self, ramp_store: BarStore, attribute):
         ctx = advanced(ramp_store, 10)
@@ -154,7 +162,7 @@ class TestNoSampleLengthLeak:
         ctx = advanced(ramp_store, 10)
         public = {name for name in dir(ctx) if not name.startswith("_")}
         assert public == {
-            "bar", "bar_at", "granularity", "history", "n_bars_seen",
+            "bar", "bar_at", "granularity", "history", "n_bars_seen", "position",
             "shifted", "symbol", "ts", "ts_event", "value", "values",
         }
 

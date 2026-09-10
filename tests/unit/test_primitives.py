@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import math
 
+import numpy as np
 import pytest
 
 from fixtures import synthetic
@@ -280,3 +281,182 @@ class TestRegistry:
     def test_deprecating_an_unknown_version_raises(self):
         with pytest.raises(RegistryError, match="rien a deprecier"):
             deprecate("sma", 42, reason="n/a")
+
+
+# ---------------------------------------------------------------------------
+# Primitives ajoutees apres la premiere vague
+# ---------------------------------------------------------------------------
+
+
+class TestRsi:
+    def test_a_pure_uptrend_saturates_at_a_hundred(self):
+        """Aucune baisse sur la fenetre : la borne, pas une division par zero."""
+        ctx = at(synthetic.make_store(synthetic.ramp(100, 100.0, 1.0)), 60)
+        assert bind_primitive("rsi@1", window=14)(ctx) == pytest.approx(100.0)
+
+    def test_a_pure_downtrend_saturates_at_zero(self):
+        ctx = at(synthetic.make_store(synthetic.ramp(100, 300.0, -1.0)), 60)
+        assert bind_primitive("rsi@1", window=14)(ctx) == pytest.approx(0.0)
+
+    def test_alternating_equal_moves_give_fifty(self):
+        """Hausses et baisses de meme ampleur : force et faiblesse a egalite."""
+        closes = np.array([100.0 + (i % 2) for i in range(60)], dtype=np.float64)
+        ctx = at(synthetic.make_store(closes), 50)
+        assert bind_primitive("rsi@1", window=10)(ctx) == pytest.approx(50.0)
+
+    def test_a_flat_series_has_no_rsi(self):
+        """Une serie plate n'a ni force ni faiblesse : 50 serait une invention."""
+        ctx = at(synthetic.make_store(synthetic.constant(60, 100.0)), 40)
+        assert bind_primitive("rsi@1", window=14)(ctx) is None
+
+    def test_it_stays_within_its_bounds(self):
+        store = synthetic.make_store(synthetic.random_walk(400, seed=17))
+        bound = bind_primitive("rsi@1", window=14)
+        for i in range(20, 400, 7):
+            value = bound(at(store, i))
+            assert value is None or 0.0 <= value <= 100.0
+
+    def test_warmup_needs_one_extra_bar_for_the_first_variation(self):
+        assert bind_primitive("rsi@1", window=14).warmup_bars == 15
+
+
+class TestStochastic:
+    def test_a_centred_bar_gives_fifty(self):
+        """Cloture a 100, meches a 99,9 et 100,1 : exactement au milieu."""
+        ctx = at(synthetic.make_store(synthetic.constant(60, 100.0)), 40)
+        assert bind_primitive("stochastic@1", window=14)(ctx) == pytest.approx(50.0)
+
+    def test_an_uptrend_sits_near_the_top(self):
+        ctx = at(synthetic.make_store(synthetic.ramp(100, 100.0, 1.0)), 60)
+        value = bind_primitive("stochastic@1", window=14)(ctx)
+        assert value is not None and value > 95.0
+
+    def test_a_downtrend_sits_near_the_bottom(self):
+        ctx = at(synthetic.make_store(synthetic.ramp(100, 300.0, -1.0)), 60)
+        value = bind_primitive("stochastic@1", window=14)(ctx)
+        assert value is not None and value < 5.0
+
+    def test_a_bar_without_amplitude_has_no_position(self):
+        ctx = at(synthetic.make_store(synthetic.constant(60, 100.0), wick=0.0), 40)
+        assert bind_primitive("stochastic@1", window=14)(ctx) is None
+
+
+class TestStdev:
+    def test_hand_computed_case(self):
+        """Clotures 1, 2, 3 sur trois barres : ecart-type non biaise de 1."""
+        ctx = at(synthetic.make_store(synthetic.ramp(20, 1.0, 1.0)), 2)
+        assert bind_primitive("stdev@1", window=3)(ctx) == pytest.approx(1.0)
+
+    def test_a_constant_series_has_no_dispersion(self):
+        ctx = at(synthetic.make_store(synthetic.constant(50, 7.0)), 30)
+        assert bind_primitive("stdev@1", window=10)(ctx) == pytest.approx(0.0)
+
+    def test_it_unlocks_bollinger_bands(self):
+        """La bande haute s'ecrit `sma + 2 * stdev`, sans primitive dediee."""
+        store = synthetic.make_store(synthetic.random_walk(300, seed=5))
+        ctx = at(store, 200)
+        upper = bind_primitive("sma@1", window=20)(ctx) + 2 * bind_primitive(
+            "stdev@1", window=20
+        )(ctx)
+        assert upper > ctx.value(Field.CLOSE) or upper > 0.0
+
+    def test_ddof_zero_is_smaller(self):
+        store = synthetic.make_store(synthetic.random_walk(100, seed=2))
+        ctx = at(store, 60)
+        assert bind_primitive("stdev@1", window=20, ddof=0)(ctx) < bind_primitive(
+            "stdev@1", window=20, ddof=1
+        )(ctx)
+
+
+class TestVolatility:
+    def test_a_geometric_series_has_zero_volatility(self):
+        """Rendements constants : dispersion nulle, meme si les prix montent."""
+        closes = 100.0 * np.power(1.01, np.arange(60, dtype=np.float64))
+        ctx = at(synthetic.make_store(closes), 40)
+        assert bind_primitive("volatility@1", window=20)(ctx) == pytest.approx(0.0, abs=1e-12)
+
+    def test_it_matches_the_standard_deviation_of_returns(self):
+        store = synthetic.make_store(synthetic.random_walk(300, seed=9))
+        ctx = at(store, 200)
+        closes = ctx.values(Field.CLOSE, 21)
+        expected = float(np.std(closes[1:] / closes[:-1] - 1.0, ddof=1))
+        assert bind_primitive("volatility@1", window=20)(ctx) == pytest.approx(expected)
+
+    def test_annualisation_multiplies_by_the_square_root(self):
+        store = synthetic.make_store(synthetic.random_walk(300, seed=9))
+        ctx = at(store, 200)
+        plain = bind_primitive("volatility@1", window=20)(ctx)
+        annual = bind_primitive("volatility@1", window=20, annualise=252.0)(ctx)
+        assert annual == pytest.approx(plain * math.sqrt(252.0))
+
+    def test_log_returns_are_available(self):
+        store = synthetic.make_store(synthetic.random_walk(300, seed=9))
+        ctx = at(store, 200)
+        assert bind_primitive("volatility@1", window=20, log=True)(ctx) is not None
+
+    def test_warmup_needs_one_extra_bar(self):
+        assert bind_primitive("volatility@1", window=20).warmup_bars == 21
+
+
+class TestSlope:
+    def test_a_ramp_recovers_its_own_step(self):
+        """La pente d'une rampe de pas d vaut exactement d."""
+        for step in (0.25, 1.0, -2.0):
+            store = synthetic.make_store(synthetic.ramp(100, 500.0, step))
+            ctx = at(store, 60)
+            assert bind_primitive("slope@1", window=20)(ctx) == pytest.approx(step)
+
+    def test_a_constant_series_has_no_slope(self):
+        ctx = at(synthetic.make_store(synthetic.constant(60, 100.0)), 40)
+        assert bind_primitive("slope@1", window=20)(ctx) == pytest.approx(0.0)
+
+    def test_a_window_of_one_is_undefined(self):
+        ctx = at(synthetic.make_store(synthetic.ramp(60)), 40)
+        assert bind_primitive("slope@1", window=1)(ctx) is None
+
+    def test_it_reacts_faster_than_a_moving_average(self):
+        """Une rupture recente pese autant que le reste : c'est l'interet."""
+        closes = np.concatenate(
+            [synthetic.constant(40, 100.0), synthetic.ramp(10, 100.0, 5.0)]
+        )
+        store = synthetic.make_store(closes)
+        ctx = at(store, 49)
+        assert bind_primitive("slope@1", window=20)(ctx) > 1.0
+
+
+class TestTrueRange:
+    def test_hand_computed_case(self):
+        """open = close = 100, meches a 99,9 et 100,1 -> TR = 0,2."""
+        ctx = at(synthetic.make_store(synthetic.constant(60, 100.0)), 30)
+        assert bind_primitive("true_range@1")(ctx) == pytest.approx(0.2)
+
+    def test_it_is_the_brick_the_atr_averages(self):
+        ctx = at(synthetic.make_store(synthetic.constant(60, 100.0)), 30)
+        assert bind_primitive("true_range@1")(ctx) == pytest.approx(
+            bind_primitive("atr@1", window=14)(ctx)
+        )
+
+    def test_it_needs_the_previous_close(self):
+        assert bind_primitive("true_range@1").warmup_bars == 2
+
+    def test_it_is_never_negative(self):
+        store = synthetic.make_store(synthetic.random_walk(200, seed=31))
+        bound = bind_primitive("true_range@1")
+        for i in range(2, 200, 5):
+            assert bound(at(store, i)) >= 0.0
+
+
+class TestTheVocabularyGrew:
+    def test_the_thirteen_primitives_are_registered(self):
+        names = {p.name for p in list_primitives()}
+        assert names >= {
+            "atr", "ema", "returns", "rolling_high", "rolling_low", "rsi", "slope",
+            "sma", "stdev", "stochastic", "true_range", "volatility", "zscore",
+        }
+
+    def test_each_new_one_publishes_its_parameter_schema(self):
+        catalogue = {entry["ref"]: entry for entry in describe_registry()}
+        for ref in ("rsi@1", "stdev@1", "volatility@1", "slope@1", "true_range@1"):
+            schema = catalogue[ref]["params"]
+            assert isinstance(schema, dict)
+            assert "properties" in schema

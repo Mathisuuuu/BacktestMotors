@@ -6,7 +6,7 @@ import numpy as np
 
 from rsl.data.feed import Context
 from rsl.data.schema import Field
-from rsl.primitives.base import WindowParams, window_warmup
+from rsl.primitives.base import NoParams, PrimitiveParams, WindowParams, window_warmup
 from rsl.primitives.builtin.params import HighWindowParams, LowWindowParams
 from rsl.primitives.registry import primitive
 
@@ -64,3 +64,27 @@ def rolling_high(ctx: Context, params: HighWindowParams) -> float | None:
 def rolling_low(ctx: Context, params: LowWindowParams) -> float | None:
     """Extreme bas glissant. Le defaut porte sur `low`, pas sur `close`."""
     return float(np.min(ctx.values(params.field, params.window)))
+
+
+@primitive(
+    "true_range",
+    version=1,
+    params=NoParams,
+    warmup=2,
+    summary="True Range de la barre courante, sans moyennage.",
+)
+def true_range(ctx: Context, params: PrimitiveParams) -> float | None:
+    """`max(high - low, |high - close_prec|, |low - close_prec|)`.
+
+    C'est la brique dont `atr` est la moyenne. Utile seule pour un stop cale
+    sur l'amplitude de la SEULE barre d'entree, la ou l'ATR lisserait sur
+    quatorze - et lisser, ici, c'est retarder.
+    """
+    previous_close = ctx.value(Field.CLOSE, lag=1)
+    high = ctx.value(Field.HIGH)
+    low = ctx.value(Field.LOW)
+    return max(
+        high - low,
+        abs(high - previous_close),
+        abs(low - previous_close),
+    )

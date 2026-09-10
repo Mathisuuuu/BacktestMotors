@@ -28,6 +28,7 @@ from enum import StrEnum
 from typing import ClassVar, Final, Protocol, runtime_checkable
 
 from rsl.data.feed import Context
+from rsl.data.schema import POSITION_FIELDS
 from rsl.errors import ConfigurationError, RegistryError
 from rsl.primitives.base import BoundPrimitive
 from rsl.primitives.registry import get_primitive
@@ -482,6 +483,82 @@ class Price:
         if not isinstance(lag, int) or isinstance(lag, bool):
             raise ConfigurationError(f"'price' : 'lag' doit etre un entier, recu {lag!r}")
         return cls(field, lag)
+
+
+@signal_node(
+    "position",
+    summary="Feuille : ce que la strategie sait de SA propre position.",
+    fields=(
+        NodeField(
+            "field",
+            FieldKind.STRING,
+            required=False,
+            default="quantity",
+            choices=POSITION_FIELDS,
+            description=(
+                "quantity (signee), direction (-1/0/+1), bars_held (0 a l'entree), "
+                "entry_price, high_since_entry, low_since_entry."
+            ),
+        ),
+    ),
+)
+@dataclass(frozen=True, slots=True)
+class Position:
+    """Etat de la position, lu depuis le `Context`.
+
+    C'est ce noeud qui rend exprimables les regles dependant du temps passe en
+    position - « sortir apres dix barres » - et les sorties calees sur un
+    extreme atteint depuis l'entree, dont le stop suiveur evalue a la cloture :
+
+        exit_long = close < high_since_entry - 2 * ATR(14)
+
+    Nuance a ne pas gommer : c'est un stop suiveur evalue A LA CLOTURE, puis
+    execute a la barre suivante. Un stop suiveur qui se declenche EN COURS de
+    barre reste une affaire de moteur, pas de signal ; les deux ne donnent pas
+    le meme prix de sortie sur une barre violente.
+
+    Hors d'un runner, la position est toujours a plat : un `Context` ne peut
+    pas inventer une position que personne n'a prise.
+    """
+
+    NODE_TYPE: ClassVar[str] = "position"
+    NODE_VERSION: ClassVar[int] = 1
+
+    field: str = "quantity"
+
+    def __post_init__(self) -> None:
+        if self.field not in POSITION_FIELDS:
+            raise ConfigurationError(
+                f"'position' : champ inconnu {self.field!r}. "
+                f"Attendus : {', '.join(POSITION_FIELDS)}"
+            )
+
+    @property
+    def warmup_bars(self) -> int:
+        """Zero : ce noeud ne lit aucun historique de prix."""
+        return 0
+
+    def __call__(self, ctx: Context) -> float | None:
+        return ctx.position.field(self.field)
+
+    def describe(self) -> SpecDict:
+        return {
+            "type": self.NODE_TYPE,
+            "version": self.NODE_VERSION,
+            "field": self.field,
+        }
+
+    @classmethod
+    def from_spec(cls, spec: SpecDict, build: Builder) -> Signal:
+        field_ = spec.get("field", "quantity")
+        if not isinstance(field_, str):
+            raise ConfigurationError(f"'position' : 'field' doit etre textuel, recu {field_!r}")
+        return cls(field_)
+
+
+def position(field: str = "quantity") -> Position:
+    """Raccourci : `position("bars_held")`."""
+    return Position(field)
 
 
 # ---------------------------------------------------------------------------
