@@ -12,7 +12,34 @@ from pathlib import Path
 import pytest
 
 from fixtures import synthetic
-from rsl.data.schema import BarStore
+from rsl.data.schema import BarStore, InstrumentSpec
+from rsl.engine.execution import ExecutionConfig, ZeroFee, ZeroSlippage
+
+TEST_SYMBOL = "TEST.v.0"
+
+
+@pytest.fixture
+def spec() -> InstrumentSpec:
+    """Instrument de test : multiplicateur et tick d'ES, frais volontairement ronds."""
+    return InstrumentSpec(
+        symbol=TEST_SYMBOL,
+        root="TEST",
+        name="Instrument de test",
+        exchange="CME",
+        currency="USD",
+        multiplier=50.0,
+        tick_size=0.25,
+        commission_per_contract=1.0,
+        exchange_fee_per_contract=1.0,
+        initial_margin=10_000.0,
+        maintenance_margin=9_000.0,
+    )
+
+
+@pytest.fixture
+def zero_cost() -> ExecutionConfig:
+    """Sans friction, DECLAREE. Reserve aux verifications analytiques."""
+    return ExecutionConfig(fees=ZeroFee(), slippage=ZeroSlippage())
 
 
 @pytest.fixture
@@ -33,6 +60,12 @@ def sine_store() -> BarStore:
 @pytest.fixture
 def walk_store() -> BarStore:
     return synthetic.make_store(synthetic.random_walk(500, seed=42), symbol="WALK.v.0")
+
+
+@pytest.fixture
+def test_store() -> BarStore:
+    """Marche aleatoire seedee, portant le symbole de `spec`."""
+    return synthetic.make_store(synthetic.random_walk(400, seed=2024), symbol=TEST_SYMBOL)
 
 
 @pytest.fixture

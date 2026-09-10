@@ -107,9 +107,9 @@ Une itération, dans cet ordre exact :
 
 ```
 1. avancer le curseur      -> la barre i est close, elle devient visible
-2. marquer le portefeuille -> equity(i) avec close(i)
-3. evaluer les stops armes -> contre OHLC(i)          [poses a une barre < i]
-4. remplir les ordres dus  -> contre OHLC(i)          [soumis a i - lag]
+2. evaluer les stops armes -> contre OHLC(i)          [poses a une barre < i]
+3. remplir les ordres dus  -> contre OHLC(i)          [soumis a i - lag]
+4. marquer le portefeuille -> equity(i) avec close(i)
 5. appeler on_bar(ctx)     -> nouveaux ordres, dus a i + lag
 6. enregistrer l'etat
 ```
@@ -119,6 +119,23 @@ ne peut affecter les étapes 1 à 4 de la même itération. C'est ce qui rend le
 lag structurel et non conventionnel.
 
 Le curseur n'avance qu'à l'étape 1 et nulle part ailleurs.
+
+Deux ordres relatifs comptent, et pour des raisons différentes.
+
+**Les stops (2) avant les fills (3).** Un stop attaché à un ordre rempli à la
+barre `i` ne doit pas être évalué contre cette même barre `i` : il est armé à
+partir de `i+1` (`execution-model.md` §2.2). Évaluer les stops avant les fills
+implémente cette règle sans code supplémentaire — au moment de l'étape 2, le
+stop de l'étape 3 n'existe pas encore.
+
+**Les fills (3) avant le marquage (4).** L'equity enregistrée à l'étape 6 doit
+refléter les exécutions de la barre. Marquer avant de remplir enregistrerait une
+equity périmée d'une barre, et l'invariante comptable serait vérifiée sur un
+état qui n'est celui d'aucun instant.
+
+*Note : cet ordre corrige celui de la première rédaction de ce document, qui
+plaçait le marquage en position 2. La propriété qui compte — `on_bar` en
+dernier — est inchangée.*
 
 ---
 

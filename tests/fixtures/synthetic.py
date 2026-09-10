@@ -8,7 +8,7 @@ seede.
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 import numpy as np
 import numpy.typing as npt
@@ -132,6 +132,39 @@ def make_frame(
             "close": closes_,
             "volume": np.full(n, volume, dtype=np.float64),
         }
+    )
+
+
+def make_gapped_store(
+    closes: FloatArray,
+    *,
+    gap_after: int,
+    gap: timedelta,
+    symbol: str = "GAP.v.0",
+    granularity: Granularity = MINUTE,
+    start: datetime = EPOCH,
+    wick: float = 0.001,
+    volume: float = 1_000.0,
+) -> BarStore:
+    """Serie reguliere, sauf un trou apres l'index `gap_after`.
+
+    Reproduit ce que sont vraiment les donnees de futures : une coupure de
+    maintenance, un week-end, un ferie (`docs/execution-model.md` §5).
+    """
+    opens, highs, lows, closes_ = ohlc_from_closes(closes, wick=wick)
+    n = closes_.shape[0]
+    ts_ns = timestamps(n, start=start, granularity=granularity).copy()
+    ts_ns[gap_after + 1 :] += int(gap.total_seconds() * NS_PER_SECOND)
+    return BarStore.build(
+        symbol=symbol,
+        granularity=granularity,
+        ts_event=ts_ns,
+        open_=opens,
+        high=highs,
+        low=lows,
+        close=closes_,
+        volume=np.full(n, volume, dtype=np.float64),
+        source_hash="synthetic-gapped",
     )
 
 
