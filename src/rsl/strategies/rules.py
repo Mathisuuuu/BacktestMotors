@@ -23,10 +23,12 @@ from __future__ import annotations
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 
+from pydantic import Field as PydField
+
 from rsl.data.feed import Context
 from rsl.engine.orders import Fill, Order, Side
 from rsl.errors import ConfigurationError
-from rsl.strategies.base import Strategy
+from rsl.strategies.base import Strategy, StrategyParams, strategy
 from rsl.strategies.signals import FALSE, Signal, SpecDict, build_signal, warmup_of
 
 
@@ -230,3 +232,49 @@ class FlatStrategy(Strategy):
 
     def describe(self) -> SpecDict:
         return {"class": type(self).__qualname__}
+
+
+class RuleStrategyParams(StrategyParams):
+    """Parametres d'une strategie a regles, tels qu'ils arrivent d'un fichier.
+
+    `rules` est un dictionnaire de specifications de noeuds - c'est la que se
+    trouve toute l'expressivite. Il n'est PAS valide par pydantic au-dela de sa
+    forme : sa validation reelle est faite par `build_signal`, qui connait le
+    registre des noeuds et refuse un type inconnu, un operateur invalide ou une
+    reference de primitive inexistante. Un schema pydantic fige ici
+    dupliquerait ce registre et divergerait de lui.
+    """
+
+    symbol: str
+    quantity: int = 1
+    rules: dict[str, object] = PydField(default_factory=dict)
+    allow_pyramiding: bool = False
+    extra_warmup: int = 0
+
+
+@strategy(
+    "rules",
+    version=1,
+    params=RuleStrategyParams,
+    summary=(
+        "Strategie a regles, decrite entierement par des signaux composes. "
+        "Aucune classe a ecrire."
+    ),
+)
+def _build_rule_strategy(params: StrategyParams) -> Strategy:
+    """Fabrique la strategie a partir de sa seule description.
+
+    C'est le chemin qui permet a une specification - ecrite a la main
+    aujourd'hui, produite par une machine demain - de devenir une strategie
+    executable sans qu'une ligne de code soit generee.
+    """
+    assert isinstance(params, RuleStrategyParams)
+    return RuleStrategy.from_spec(
+        {
+            "symbol": params.symbol,
+            "quantity": params.quantity,
+            "rules": params.rules,
+            "allow_pyramiding": params.allow_pyramiding,
+            "extra_warmup": params.extra_warmup,
+        }
+    )

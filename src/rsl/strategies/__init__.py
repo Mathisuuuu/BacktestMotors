@@ -8,7 +8,7 @@ catalogue.
 
 from __future__ import annotations
 
-from rsl.strategies import handwritten  # effet de bord : enregistrement
+from rsl.strategies import handwritten, rules  # effet de bord : enregistrement
 from rsl.strategies.base import (
     CrossSectionalStrategy,
     Strategy,
@@ -27,5 +27,6 @@ __all__ = [
     "get_strategy",
     "handwritten",
     "list_strategies",
+    "rules",
     "strategy",
 ]

@@ -21,6 +21,7 @@ from rsl.engine.execution import FlatFee, PerContractFee, TickSlippage, ZeroFee,
 from rsl.engine.risk import EquityFraction, FixedContracts, RiskFraction
 from rsl.errors import ConfigurationError
 from rsl.metrics.statistics import TrialLog
+from rsl.strategies.base import describe_strategies
 from rsl.report import run_backtest
 
 DAY = Granularity(timedelta(days=1), name="1d")
@@ -500,3 +501,168 @@ class TestCliVerify:
         assert code in (EXIT_OK, EXIT_CHECK_FAILED)
         if code == EXIT_CHECK_FAILED:
             assert "pas AILLEURS" in out
+
+
+# ---------------------------------------------------------------------------
+# Une strategie sans code
+# ---------------------------------------------------------------------------
+
+
+MEAN_REVERSION_RULES: dict[str, object] = {
+    "entry_long": {
+        "type": "all_of",
+        "operands": [
+            {
+                "type": "compare",
+                "op": ">",
+                "left": {"type": "price", "field": "close"},
+                "right": {"type": "primitive", "ref": "sma@1", "params": {"window": 100}},
+            },
+            {
+                "type": "compare",
+                "op": "<",
+                "left": {"type": "primitive", "ref": "zscore@1", "params": {"window": 50}},
+                "right": {"type": "constant", "value": -1.0},
+            },
+        ],
+    },
+    "exit_long": {
+        "type": "compare",
+        "op": ">",
+        "left": {"type": "primitive", "ref": "zscore@1", "params": {"window": 50}},
+        "right": {"type": "constant", "value": 0.5},
+    },
+    "stop_loss": {
+        "type": "arith",
+        "op": "-",
+        "left": {"type": "price", "field": "close"},
+        "right": {
+            "type": "arith",
+            "op": "*",
+            "left": {"type": "constant", "value": 2.0},
+            "right": {"type": "primitive", "ref": "atr@1", "params": {"window": 14}},
+        },
+    },
+}
+
+
+@pytest.fixture
+def trending_file(tmp_path: Path) -> Path:
+    """Tendance haussiere ET oscillations.
+
+    Il en faut les deux : l'entree exige d'etre au-dessus de la moyenne longue
+    (la tendance) ET sous le z-score court (le creux). Sur une sinusoide de
+    periode courte les deux conditions ne se rencontrent jamais - la meme
+    oscillation gouverne les deux fenetres, et elles se contredisent. Il faut
+    une oscillation LONGUE devant la fenetre de z-score : 120 barres contre 50.
+    Verifie : 54 declenchements sur cette serie.
+    """
+    closes = synthetic.ramp(800, 2000.0, 0.4) + synthetic.sine(800, 0.0, 120.0, 120)
+    return write_parquet(tmp_path / "ES_v0_1m.parquet", closes)
+
+
+def rules_spec(path: Path, rules: dict[str, object] | None = None) -> BacktestSpec:
+    return single_spec(
+        path,
+        strategy={
+            "ref": "rules@1",
+            "params": {
+                "symbol": "ES.v.0",
+                "quantity": 1,
+                "rules": rules if rules is not None else MEAN_REVERSION_RULES,
+            },
+        },
+    )
+
+
+class TestStrategyFromParametersAlone:
+    """Le chemin qui compte pour la suite : des parametres typés, aucune classe.
+
+    Cette strategie - retour a la moyenne a l'interieur d'une tendance - n'est
+    ecrite nulle part dans le depot. Elle n'existe que sous forme de donnees.
+    """
+
+    def test_it_is_reachable_from_a_configuration(self, trending_file: Path):
+        report = run_backtest(rules_spec(trending_file))
+        assert report.metrics.n_bars > 0
+
+    def test_it_actually_trades(self, trending_file: Path):
+        report = run_backtest(rules_spec(trending_file))
+        assert report.metrics.exposure > 0.0
+        assert report.metrics.n_trades > 0
+
+    def test_the_registry_exposes_it(self):
+        refs = {entry["ref"] for entry in describe_strategies()}
+        assert "rules@1" in refs
+
+    def test_changing_a_threshold_changes_the_result(self, trending_file: Path):
+        """La preuve qu'un parametre pilote vraiment le comportement."""
+        strict = run_backtest(rules_spec(trending_file))
+        loose_rules = json.loads(json.dumps(MEAN_REVERSION_RULES))
+        loose_rules["entry_long"]["operands"][1]["right"]["value"] = -0.1  # type: ignore[index]
+        loose = run_backtest(rules_spec(trending_file, loose_rules))
+        assert loose.result_fingerprint != strict.result_fingerprint
+        assert loose.metrics.exposure > strict.metrics.exposure
+
+    def test_an_unknown_node_type_is_refused_before_any_bar_is_read(self, es_file: Path):
+        with pytest.raises(Exception, match="inconnu"):
+            run_backtest(rules_spec(es_file, {"entry_long": {"type": "n_existe_pas"}}))
+
+    def test_an_unknown_primitive_is_refused(self, es_file: Path):
+        with pytest.raises(Exception, match="inconnue"):
+            run_backtest(
+                rules_spec(
+                    es_file,
+                    {"entry_long": {"type": "primitive", "ref": "n_existe_pas@1"}},
+                )
+            )
+
+    def test_an_invalid_operator_is_refused(self, es_file: Path):
+        with pytest.raises(Exception, match="operateur invalide"):
+            run_backtest(
+                rules_spec(
+                    es_file,
+                    {
+                        "entry_long": {
+                            "type": "compare",
+                            "op": "=>",
+                            "left": {"type": "constant", "value": 1.0},
+                            "right": {"type": "constant", "value": 2.0},
+                        }
+                    },
+                )
+            )
+
+    def test_a_misspelled_primitive_parameter_is_refused(self, es_file: Path):
+        """`windwo` au lieu de `window` : une erreur, jamais un defaut."""
+        with pytest.raises(Exception, match="windwo|extra"):
+            run_backtest(
+                rules_spec(
+                    es_file,
+                    {
+                        "entry_long": {
+                            "type": "primitive",
+                            "ref": "sma@1",
+                            "params": {"windwo": 20},
+                        }
+                    },
+                )
+            )
+
+    def test_a_rules_strategy_without_any_entry_is_refused(self, es_file: Path):
+        with pytest.raises(Exception, match="FlatStrategy"):
+            run_backtest(rules_spec(es_file, {}))
+
+    def test_the_specification_survives_a_round_trip(self, trending_file: Path):
+        """Ecrire le fichier, le relire, obtenir le meme resultat."""
+        spec = rules_spec(trending_file)
+        reloaded = BacktestSpec.model_validate_json(spec.model_dump_json())
+        assert run_backtest(reloaded).result_fingerprint == run_backtest(spec).result_fingerprint
+
+    def test_the_whole_thing_runs_from_the_command_line(
+        self, tmp_path: Path, es_file: Path, capsys
+    ):
+        config = tmp_path / "sans_code.json"
+        config.write_text(rules_spec(es_file).model_dump_json(), encoding="utf-8")
+        assert main(["run", str(config)]) == EXIT_OK
+        assert "rules@1" in capsys.readouterr().out
