@@ -44,6 +44,28 @@ SpecDict = dict[str, object]
 NS_PER_SECOND = 1_000_000_000
 
 
+def would_trigger(order: Order, bar: Bar) -> bool:
+    """Le niveau de l'ordre est-il atteint dans cette barre ?
+
+    Separe de `ExecutionEngine.try_fill` pour pouvoir arbitrer entre un stop et
+    un take-profit tous deux atteignables sans consommer de compteur
+    d'execution : les deux sont testes, un seul est execute.
+
+    Partage par les deux runners.
+    """
+    match order.order_type:
+        case OrderType.STOP:
+            stop = order.stop_price
+            assert stop is not None
+            return bar.high >= stop if order.side is Side.BUY else bar.low <= stop
+        case OrderType.LIMIT:
+            limit = order.limit_price
+            assert limit is not None
+            return bar.low <= limit if order.side is Side.BUY else bar.high >= limit
+        case OrderType.MARKET:
+            return True
+
+
 @dataclass(frozen=True, slots=True)
 class RunConfig:
     """Parametres d'un run. `execution` n'a pas de defaut : voir `execution.py`."""
@@ -295,8 +317,8 @@ class SingleAssetRunner:
                 else None
             )
 
-            stop_hit = stop_order is not None and self._would_trigger(stop_order, bar)
-            target_hit = target_order is not None and self._would_trigger(target_order, bar)
+            stop_hit = stop_order is not None and would_trigger(stop_order, bar)
+            target_hit = target_order is not None and would_trigger(target_order, bar)
 
             if stop_hit and target_hit:
                 counters.n_intrabar_ambiguous += 1
@@ -318,20 +340,6 @@ class SingleAssetRunner:
                 protection.quantity -= fill.quantity
                 if protection.quantity <= 0 or portfolio.quantity_of(protection.symbol) == 0:
                     protections.remove(protection)
-
-    def _would_trigger(self, order: Order, bar: Bar) -> bool:
-        """Teste le declenchement sans consommer de compteur d'execution."""
-        match order.order_type:
-            case OrderType.STOP:
-                stop = order.stop_price
-                assert stop is not None
-                return bar.high >= stop if order.side is Side.BUY else bar.low <= stop
-            case OrderType.LIMIT:
-                limit = order.limit_price
-                assert limit is not None
-                return bar.low <= limit if order.side is Side.BUY else bar.high >= limit
-            case OrderType.MARKET:
-                return True
 
     def _fill_due_orders(
         self,

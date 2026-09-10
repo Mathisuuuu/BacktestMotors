@@ -186,9 +186,32 @@ disponible, et l'événement est compté (`n_forced_liquidations`).
 ### 4.3 Rééchantillonnage causal
 
 Toute agrégation (minute → journalier, journalier → mensuel) obéit à la même
-règle : **une barre agrégée n'existe qu'une fois sa période terminée**, et son
-`ts_close` est le `ts_close` de sa dernière barre constituante. Une barre
-mensuelle partielle n'est jamais visible.
+règle : **une barre agrégée n'existe qu'une fois sa période terminée**. Une
+barre mensuelle partielle n'est jamais visible.
+
+**Quel instant porte la disponibilité.** `ts_close` d'une barre agrégée est la
+**frontière de période** — le premier instant de la période suivante — et non la
+clôture de sa dernière barre constituante.
+
+La première rédaction de ce document disait le contraire, et c'était une
+erreur. Mesuré sur les dix contrats du jeu de données : un mois où 6B imprime sa
+dernière barre à 23:56 et les autres à 00:00 produit **deux lignes de panneau au
+lieu d'une**, chacune avec un univers amputé. Le panneau mensuel comptait 181
+lignes pour 128 mois, dont 47 à un seul instrument. Un momentum transversal y
+classait 8 instruments sur 9 sans qu'aucune règle ne le demande — le tri était
+faussé par l'horaire de clôture d'une place, pas par un signal.
+
+La frontière de période est **postérieure ou égale** à toutes les clôtures
+constituantes. Elle est donc strictement plus conservatrice — elle n'anticipe
+rien — et elle fait coïncider exactement les instruments d'une même période.
+
+Conséquence assumée : la dernière barre agrégée d'un échantillon porte un
+`ts_close` postérieur à la dernière donnée disponible (une barre d'août 2026 est
+datée du 1er septembre). C'est un libellé de disponibilité, pas une prétention
+sur des données ; et l'erreur va dans le sens prudent.
+
+`close_stamp="last_bar"` rétablit l'ancien comportement pour l'analyse
+mono-instrument, où la question ne se pose pas.
 
 Le rééchantillonnage est effectué **une fois, en amont**, et produit un
 magasin de barres ordinaire. Il n'y a pas de rééchantillonnage à la volée

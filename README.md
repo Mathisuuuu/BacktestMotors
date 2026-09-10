@@ -48,11 +48,24 @@ for ctx in BarFeed(store, warmup_bars=signal.warmup_bars):
 | Documents de design | fait |
 | Couche donnees (schema, validation, loader, feed) | fait |
 | Registres versionnes, primitives, signaux composables | fait |
-| Moteur (portefeuille, execution, risque, runner) | a venir |
-| Buy & hold + test analytique | a venir |
-| SMA crossover, momentum 12-1 | a venir |
+| Moteur (portefeuille, execution, risque, runner mono-instrument) | fait |
+| Buy & hold + test analytique | fait |
+| Reechantillonnage causal, runner transversal | fait |
+| SMA crossover, momentum 12-1 | fait |
 | Metriques, Deflated Sharpe | a venir |
 | CLI et manifeste de run | a venir |
+
+## Les trois strategies de reference
+
+| Strategie | Famille | Ce qu'elle valide |
+|---|---|---|
+| `buy_and_hold@1` | triviale | Le P&L doit egaler une formule fermee calculee hors du moteur. Verifie a 0,00e+00 sur cinq series synthetiques et sur 500 000 barres reelles d'ES. |
+| `sma_crossover@1` | time-series | Entree, sortie, stop persistant, dimensionnement. Ecrite en code explicite, puis verifiee ordre par ordre contre sa traduction en noeuds de signaux : deux implementations independantes qui concordent. |
+| `cross_sectional_momentum@1` | transversale | Tri, rebalancement periodique, long-short. Univers recalcule a chaque date, sans biais de survie : un instrument entre quand il a assez d'historique, pas avant. |
+
+Les trois passent le test de corruption du futur : bruiter toutes les barres
+apres l'index `k` ne change rien a un backtest arrete a `k`, empreinte
+exhaustive comparee (courbe, fills, compteurs, trades, rapport JSON).
 
 ## Extension par ajout uniquement
 

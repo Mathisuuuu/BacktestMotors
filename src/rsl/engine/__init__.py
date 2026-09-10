@@ -2,6 +2,13 @@
 
 from __future__ import annotations
 
+from rsl.engine.cross_sectional import (
+    CrossSectionalRunner,
+    CrossSectionalRunResult,
+    EveryNRows,
+    EveryRow,
+    RebalanceSchedule,
+)
 from rsl.engine.execution import (
     BpsSlippage,
     ExecutionConfig,
@@ -22,7 +29,11 @@ from rsl.engine.runner import RunConfig, RunResult, SingleAssetRunner
 __all__ = [
     "AccountingError",
     "BpsSlippage",
+    "CrossSectionalRunResult",
+    "CrossSectionalRunner",
     "EquityFraction",
+    "EveryNRows",
+    "EveryRow",
     "ExecutionConfig",
     "ExecutionEngine",
     "Fill",
@@ -35,6 +46,7 @@ __all__ = [
     "PerContractFee",
     "Portfolio",
     "Position",
+    "RebalanceSchedule",
     "RiskFraction",
     "RiskManager",
     "RunConfig",
