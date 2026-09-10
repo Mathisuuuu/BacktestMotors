@@ -1,0 +1,32 @@
+{
+  "name": "momentum-12-1-dix-futures-mensuel",
+  "initial_cash": 1000000.0,
+  "seed": 0,
+  "risk_free_annual": 0.0,
+  "data": [
+    {"root": "NQ",   "path": "C:/Users/Mathis/Desktop/Cotations/indices/NQ_v0_1m.parquet",  "resample": "month", "resample_min_bars": 5000},
+    {"root": "ES",   "path": "C:/Users/Mathis/Desktop/Cotations/indices/ES_v0_1m.parquet",  "resample": "month", "resample_min_bars": 5000},
+    {"root": "YM",   "path": "C:/Users/Mathis/Desktop/Cotations/indices/YM_v0_1m.parquet",  "resample": "month", "resample_min_bars": 5000},
+    {"root": "FDAX", "path": "C:/Users/Mathis/Desktop/Cotations/indices/FDAX_v0_1m.parquet","resample": "month", "resample_min_bars": 5000},
+    {"root": "GC",   "path": "C:/Users/Mathis/Desktop/Cotations/metaux/GC_v0_1m.parquet",   "resample": "month", "resample_min_bars": 5000},
+    {"root": "CL",   "path": "C:/Users/Mathis/Desktop/Cotations/energie/CL_v0_1m.parquet",  "resample": "month", "resample_min_bars": 5000},
+    {"root": "6E",   "path": "C:/Users/Mathis/Desktop/Cotations/forex/6E_v0_1m.parquet",    "resample": "month", "resample_min_bars": 5000},
+    {"root": "6B",   "path": "C:/Users/Mathis/Desktop/Cotations/forex/6B_v0_1m.parquet",    "resample": "month", "resample_min_bars": 5000},
+    {"root": "6J",   "path": "C:/Users/Mathis/Desktop/Cotations/forex/6J_v0_1m.parquet",    "resample": "month", "resample_min_bars": 5000},
+    {"root": "6A",   "path": "C:/Users/Mathis/Desktop/Cotations/forex/6A_v0_1m.parquet",    "resample": "month", "resample_min_bars": 5000}
+  ],
+  "execution": {
+    "fees": {"kind": "per_contract"},
+    "slippage": {"kind": "tick", "ticks": 1.0},
+    "lag_bars": 1,
+    "intrabar_priority": "pessimistic",
+    "margin_policy": "reject"
+  },
+  "risk": {"sizing": {"kind": "fixed", "contracts": 1}},
+  "panel": {"align_policy": "drop"},
+  "rebalance": {"kind": "every_row"},
+  "strategy": {
+    "ref": "cross_sectional_momentum@1",
+    "params": {"lookback": 12, "skip": 1, "n_long": 3, "n_short": 3, "quantity": 1}
+  }
+}

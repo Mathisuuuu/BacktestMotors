@@ -53,7 +53,7 @@ for ctx in BarFeed(store, warmup_bars=signal.warmup_bars):
 | Reechantillonnage causal, runner transversal | fait |
 | SMA crossover, momentum 12-1 | fait |
 | Metriques, Deflated Sharpe | fait |
-| CLI et manifeste de run | a venir |
+| CLI, manifeste et rapport | fait |
 
 ## Les trois strategies de reference
 
@@ -106,6 +106,68 @@ Moments                       asymetrie -0.258, kurtosis 11.712, 2731 observatio
 Huit essais est une grille minuscule. Une vraie recherche en compte des
 centaines, et le meme Sharpe n'y survivrait pas - c'est precisement ce que le
 DSR sert a montrer.
+
+## Utilisation
+
+```bash
+rsl catalogue
+```
+
+```bash
+rsl example > ma-config.json
+```
+
+```bash
+rsl run ma-config.json --out runs/mon-run.json
+```
+
+```bash
+rsl verify ma-config.json
+```
+
+| Commande | Role |
+|---|---|
+| `rsl validate FICHIER...` | valide des fichiers de donnees ; la racine est deduite du nom (`ES_v0_1m` -> `ES`) |
+| `rsl instruments` | table des contrats : multiplicateur, tick, valeur du tick, frais, marge |
+| `rsl catalogue` | primitives, noeuds de signaux et strategies enregistres |
+| `rsl example` | specification d'exemple, a rediriger dans un fichier |
+| `rsl run CONFIG` | execute un backtest, affiche le rapport, ecrit le JSON |
+| `rsl verify CONFIG` | execute DEUX fois et compare les empreintes |
+
+Codes de sortie : `0` succes, `1` erreur d'usage ou d'execution, `2` verification
+echouee - donnees rejetees, empreintes divergentes, run non rejouable. Un script
+d'integration peut donc distinguer "je n'ai pas pu" de "j'ai pu, et c'est faux".
+
+`verify` existe comme commande a part entiere parce que l'exigence "deux runs
+identiques produisent des resultats bit-a-bit identiques" est facile a ecrire
+dans un document et facile a perdre dans le code.
+
+## Provenance : ce que chaque run enregistre
+
+```
+Horodatage   2026-09-10T13:32:30+00:00
+Config       5dfdefe68f787a59   graine 0
+Depot        d5df68836256 (master) - MODIFIE
+Plateforme   Python 3.11.9, Windows 10 (AMD64)
+Dependances  numpy 2.4.6, polars 1.44.2, pyarrow 25.0.1, pydantic 2.13.5
+Donnees      ES.v.0 [resample:day(2753 periodes, 564 ecartee(s))] 2753 barres 1d  17bdf284b5b8
+Rejouable    NON
+Avertissement  arbre de travail modifie (6 fichier(s) modifie(s)) : le commit
+               d5df6883 ne suffit PAS a rejouer ce run
+```
+
+Un backtest sans manifeste est une anecdote : six mois plus tard, un chiffre
+dans un carnet ne dit ni quelles donnees il a vues, ni quel code l'a produit.
+
+Le champ **Rejouable** est le seul qui compte vraiment. Il vaut `NON` des qu'une
+piece manque - arbre de travail modifie, fichier source sans empreinte, absence
+de depot - plutot que d'afficher un numero de commit qui laisserait croire a une
+tracabilite qui n'existe pas.
+
+L'**empreinte de resultat** est calculee separement, sur la courbe d'equity, les
+fills, les compteurs et la comptabilite. Jamais sur l'horodatage : deux runs
+identiques lances a dix minutes d'intervalle doivent avoir la meme empreinte,
+sinon l'exigence de reproductibilite serait inverifiable.
 
 ## Extension par ajout uniquement
 
@@ -180,6 +242,8 @@ python -m venv .venv
 ```bash
 .venv/Scripts/python.exe -m ruff check src tests && .venv/Scripts/python.exe -m mypy
 ```
+
+949 tests, `ruff` et `mypy --strict` sans exception.
 
 Marqueurs pytest : `adversarial` (tests qui attaquent une garantie du socle),
 `slow` (tests qui touchent aux donnees reelles).
