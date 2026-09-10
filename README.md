@@ -52,7 +52,7 @@ for ctx in BarFeed(store, warmup_bars=signal.warmup_bars):
 | Buy & hold + test analytique | fait |
 | Reechantillonnage causal, runner transversal | fait |
 | SMA crossover, momentum 12-1 | fait |
-| Metriques, Deflated Sharpe | a venir |
+| Metriques, Deflated Sharpe | fait |
 | CLI et manifeste de run | a venir |
 
 ## Les trois strategies de reference
@@ -66,6 +66,46 @@ for ctx in BarFeed(store, warmup_bars=signal.warmup_bars):
 Les trois passent le test de corruption du futur : bruiter toutes les barres
 apres l'index `k` ne change rien a un backtest arrete a `k`, empreinte
 exhaustive comparee (courbe, fills, compteurs, trades, rapport JSON).
+
+## Ce qu'un run rapporte
+
+```
+Echantillon  2753 barres, 10.65 an(s), 258.6 periodes/an (mesure)
+Rendement    total +57.12 %   CAGR +4.33 %
+Risque       vol +5.61 %   Sharpe 0.78   Sortino 1.12
+Drawdown     quotidien -10.01 % (720 j sous l'eau)
+             pleine granularite -10.01 %
+Activite     0 trades   hit n/d   profit factor n/d   exposition +99.96 %
+```
+
+Le pas d'annualisation est **mesure sur l'echantillon**, jamais suppose : a la
+minute, `sqrt(252 * 1440)` supposerait un marche ouvert 24/7/365 et gonflerait
+le Sharpe d'un facteur deux. Le drawdown est rapporte deux fois, a pleine
+granularite et au pas quotidien, parce que les deux valeurs different et que
+n'en montrer qu'une serait un choix.
+
+## Le compteur d'essais
+
+Un Sharpe ne dit pas s'il vaut quelque chose. Essayer assez de configurations
+sur un echantillon fixe finit toujours par en produire une qui brille : le
+maximum d'un ensemble de tirages n'est pas un tirage.
+
+`TrialLog` enregistre chaque essai au moment ou il est fait, et fournit au
+Deflated Sharpe Ratio les deux entrees qu'aucun backtest isole ne connait - le
+nombre d'essais et leur dispersion.
+
+```
+=== DEFLATED SHARPE du meilleur essai (SMA 5/20 sur ES quotidien) ===
+Sharpe observe (par periode)  0.0560
+Maximum attendu sous H0       0.0158 (8 essai(s), variance 0.00012)
+PSR (contre zero)             0.9981
+DSR (contre le maximum)       0.9810  SIGNIFICATIF
+Moments                       asymetrie -0.258, kurtosis 11.712, 2731 observations
+```
+
+Huit essais est une grille minuscule. Une vraie recherche en compte des
+centaines, et le meme Sharpe n'y survivrait pas - c'est precisement ce que le
+DSR sert a montrer.
 
 ## Extension par ajout uniquement
 
