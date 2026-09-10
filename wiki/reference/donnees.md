@@ -16,7 +16,19 @@ autorite: docs/no-lookahead.md §4 + src/rsl/data/
 > `src/rsl/data/`. Consequence verifiee : le paquet de la couche donnees n'a
 > jamais ete commite (`git log --all -- src/rsl/data` est vide, aucune stash),
 > et il est absent de cette copie de travail. `import rsl.data` leve
-> `ModuleNotFoundError`, alors que dix modules de `src/rsl/` l'importent.
+> `ModuleNotFoundError`, alors que tout le reste de `src/rsl/` l'importe.
+> **Etendue mesuree (2026-09-10)** : 6 modules absents -- `schema`, `feed`,
+> `loader`, `resample`, `validation`, `instruments` -- soit **42 symboles
+> publics**, importes par 20 fichiers de `src/` et 27 de `tests/`. Aucune copie
+> retrouvee sur la machine (pas d'install, pas de `.pyc`, pas d'egg-info).
+>
+> **Ce qui a survecu** : `tests/` n'etait pas ignore. Les fichiers qui
+> specifient directement ces modules sont intacts -- `test_schema.py` (19),
+> `test_feed.py` (29), `test_loader.py` (23), `test_resample.py` (26),
+> `test_validation.py` (31), soit ~128 tests, plus tout le reste de la suite qui
+> les exerce indirectement. Une reconstruction serait donc **pilotee par les
+> tests**, pas a l'aveugle.
+>
 > Voir [[hot]] § Next Actions. Les chemins `src/rsl/data/*` cites ci-dessous
 > sont ceux qu'attendent les imports, pas des fichiers existants.
 
