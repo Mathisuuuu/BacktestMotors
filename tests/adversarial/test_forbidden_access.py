@@ -40,6 +40,20 @@ class TestNegativeLagIsLookAhead:
         with pytest.raises(LookAheadError):
             ctx.bar_at(-1)
 
+    @pytest.mark.parametrize("lag", [-1, -50])
+    def test_shifted_view_cannot_look_forward(self, ramp_store: BarStore, lag):
+        ctx = advanced(ramp_store, 50)
+        with pytest.raises(LookAheadError):
+            ctx.shifted(lag)
+
+    def test_shifted_view_stays_in_the_past(self, ramp_store: BarStore):
+        ctx = advanced(ramp_store, 50)
+        past = ctx.shifted(10)
+        assert past.n_bars_seen == ctx.n_bars_seen - 10
+        assert past.value(Field.CLOSE) == pytest.approx(ctx.value(Field.CLOSE, lag=10))
+        with pytest.raises(InsufficientHistoryError):
+            past.history(past.n_bars_seen + 1)
+
     def test_look_ahead_error_is_not_swallowed_as_value_error(self, ramp_store: BarStore):
         ctx = advanced(ramp_store, 10)
         with pytest.raises(LookAheadError):
@@ -141,7 +155,7 @@ class TestNoSampleLengthLeak:
         public = {name for name in dir(ctx) if not name.startswith("_")}
         assert public == {
             "bar", "bar_at", "granularity", "history", "n_bars_seen",
-            "symbol", "ts", "ts_event", "value", "values",
+            "shifted", "symbol", "ts", "ts_event", "value", "values",
         }
 
     def test_n_bars_seen_never_anticipates(self, ramp_store: BarStore):

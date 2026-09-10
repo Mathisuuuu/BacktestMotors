@@ -47,7 +47,9 @@ select = ["E", "F", "W", "I", "N", "UP", "B", "A", "C4", "PT", "SIM", "RUF", "AN
 ignore = ["ANN401"]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/*" = ["ANN001", "ANN002", "ANN003", "ANN201", "ANN202"]
+# PT018 : `assert x is not None and x > 0` est le retrecissement de type
+# idiomatique ; le decouper en deux asserts perd le lien entre les deux.
+"tests/*" = ["ANN001", "ANN002", "ANN003", "ANN201", "ANN202", "PT018"]
 
 [tool.mypy]
 python_version = "3.11"
