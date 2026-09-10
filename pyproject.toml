@@ -1,0 +1,64 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "research-strategy-lab"
+version = "0.1.0"
+description = "Socle de backtest event-driven deterministe, sans look-ahead par construction."
+requires-python = ">=3.11"
+dependencies = [
+    "polars>=1.20",
+    "pydantic>=2.9",
+    "numpy>=2.0",
+    "pyarrow>=17",
+    "tzdata>=2024.1 ; sys_platform == 'win32'",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8",
+    "hypothesis>=6.100",
+    "ruff>=0.8",
+    "mypy>=1.13",
+]
+
+[project.scripts]
+rsl = "rsl.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q --strict-markers"
+markers = [
+    "adversarial: tests qui tentent activement de casser une garantie du socle",
+    "slow: tests qui touchent aux donnees reelles",
+]
+
+[tool.ruff]
+line-length = 100
+src = ["src", "tests"]
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "N", "UP", "B", "A", "C4", "PT", "SIM", "RUF", "ANN", "TID"]
+ignore = ["ANN401"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["ANN001", "ANN002", "ANN003", "ANN201", "ANN202"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+warn_unreachable = true
+disallow_any_generics = true
+# `disallow_any_explicit` est volontairement absent : `npt.NDArray[np.float64]`
+# se developpe en `ndarray[Any, dtype[float64]]`, et pydantic annote
+# `model_config` avec des `Any`. L'activer signalerait chaque ligne de typage
+# numpy correcte. `disallow_any_generics` reste actif et attrape ce qui compte :
+# un `np.ndarray` nu, un `dict` sans parametres.
+mypy_path = "src"
+packages = ["rsl"]
+
