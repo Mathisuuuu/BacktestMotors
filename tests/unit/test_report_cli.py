@@ -635,7 +635,7 @@ class TestStrategyFromParametersAlone:
 
     def test_a_misspelled_primitive_parameter_is_refused(self, es_file: Path):
         """`windwo` au lieu de `window` : une erreur, jamais un defaut."""
-        with pytest.raises(Exception, match="windwo|extra"):
+        with pytest.raises(Exception, match=r"windwo|extra"):
             run_backtest(
                 rules_spec(
                     es_file,
