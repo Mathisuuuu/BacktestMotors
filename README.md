@@ -54,6 +54,8 @@ for ctx in BarFeed(store, warmup_bars=signal.warmup_bars):
 | SMA crossover, momentum 12-1 | fait |
 | Metriques, Deflated Sharpe | fait |
 | CLI, manifeste et rapport | fait |
+| Runner walk-forward | fait |
+| PBO / CSCV | protocole seulement |
 
 ## Les trois strategies de reference
 
@@ -132,6 +134,7 @@ rsl verify ma-config.json
 | `rsl catalogue` | primitives, noeuds de signaux et strategies enregistres |
 | `rsl example` | specification d'exemple, a rediriger dans un fichier |
 | `rsl run CONFIG` | execute un backtest, affiche le rapport, ecrit le JSON |
+| `rsl walkforward CONFIG --train N --test N` | evalue la strategie sur des fenetres successives |
 | `rsl verify CONFIG` | execute DEUX fois et compare les empreintes |
 
 Codes de sortie : `0` succes, `1` erreur d'usage ou d'execution, `2` verification
@@ -168,6 +171,48 @@ L'**empreinte de resultat** est calculee separement, sur la courbe d'equity, les
 fills, les compteurs et la comptabilite. Jamais sur l'horodatage : deux runs
 identiques lances a dix minutes d'intervalle doivent avoir la meme empreinte,
 sinon l'exigence de reproductibilite serait inverifiable.
+
+## Walk-forward : la performance tient-elle sur toute la periode ?
+
+```bash
+rsl walkforward examples/sma_es_daily.json --train 500 --test 250
+```
+
+```
+  pli  0  barres    500-750    rendement   -0.54 %  Sharpe -0.26  DD -2.8 %  1 trades  expo 41.2 %
+  pli  1  barres    750-1000   rendement   -0.05 %  Sharpe +0.00  DD -2.8 %  2 trades  expo 59.6 %
+  pli  2  barres   1000-1250   rendement   -1.12 %  Sharpe -0.62  DD -2.1 %  1 trades  expo  2.0 %
+  pli  3  barres   1250-1500   rendement   +0.00 %  Sharpe   n/d  DD +0.0 %  0 trades  expo  0.0 %
+  pli  4  barres   1500-1750   rendement   -1.38 %  Sharpe -1.39  DD -1.5 %  1 trades  expo  1.6 %
+  pli  5  barres   1750-2000   rendement   +0.86 %  Sharpe +0.27  DD -2.8 %  2 trades  expo 51.6 %
+  pli  6  barres   2000-2250   rendement  +10.80 %  Sharpe +1.90  DD -4.6 %  1 trades  expo 82.8 %
+  pli  7  barres   2250-2500   rendement   +5.51 %  Sharpe +1.68  DD -1.7 %  1 trades  expo 28.8 %
+  pli  8  barres   2500-2750   rendement   +5.03 %  Sharpe +0.95  DD -3.6 %  1 trades  expo 34.4 %
+------------------------------------------------------------------------------
+Sharpe       moyen 0.32   median 0.13   dispersion 1.13
+Plis         9 au total, +44.44 % positifs
+Concentration 57 % du resultat vient d'un seul pli
+```
+
+La meme strategie mesuree sur l'echantillon entier affiche un Sharpe de 0,60.
+Decoupee en neuf fenetres, elle est positive dans quatre, et **57 % de son
+resultat vient d'un seul pli**. Un chiffre agrege ne distingue pas une
+performance repartie d'une performance concentree ; c'est ce que ce decoupage
+sert a voir.
+
+**Ce runner n'optimise rien.** L'optimisation de parametres est hors du
+perimetre de cette phase. La fenetre d'apprentissage sert d'HISTORIQUE - la
+strategie la traverse pour remplir ses fenetres glissantes, sans negocier.
+
+Consequence a ne pas masquer : tant que rien n'est optimise, un decoupage ancre
+et un decoupage glissant produisent exactement les memes plis. Les deux existent
+parce que le jour ou une selection de parametres s'inserera entre les deux
+fenetres, le choix comptera. Un test verifie cette egalite plutot que de laisser
+croire a deux mesures independantes.
+
+Chaque pli repart du capital initial et est liquide a sa derniere barre. Sans
+cela, le rendement d'un pli contiendrait un profit latent que le pli suivant
+n'herite pas.
 
 ## Extension par ajout uniquement
 
@@ -243,7 +288,7 @@ python -m venv .venv
 .venv/Scripts/python.exe -m ruff check src tests && .venv/Scripts/python.exe -m mypy
 ```
 
-949 tests, `ruff` et `mypy --strict` sans exception.
+982 tests, `ruff` et `mypy --strict` sans exception.
 
 Marqueurs pytest : `adversarial` (tests qui attaquent une garantie du socle),
 `slow` (tests qui touchent aux donnees reelles).

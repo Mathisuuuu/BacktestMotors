@@ -5,6 +5,7 @@
     rsl catalogue               primitives, noeuds et strategies enregistres
     rsl example                 specification d'exemple, a rediriger
     rsl run CONFIG              execute un backtest et ecrit son rapport
+    rsl walkforward CONFIG      evalue par fenetres successives
     rsl verify CONFIG           execute deux fois et compare les empreintes
 
 `verify` merite d'exister comme commande a part entiere. L'exigence "deux runs
@@ -29,10 +30,12 @@ from rsl.config import BacktestSpec
 from rsl.data.instruments import INSTRUMENTS, get_instrument
 from rsl.data.loader import validate_file
 from rsl.errors import RslError
+from rsl.metrics.statistics import AnchoredWalkForward, RollingWalkForward
 from rsl.primitives.registry import describe_registry
 from rsl.report import BacktestReport, run_backtest
 from rsl.strategies.base import describe_strategies
 from rsl.strategies.signals import describe_node_types
+from rsl.walkforward import run_walk_forward
 
 EXIT_OK = 0
 EXIT_ERROR = 1
@@ -118,6 +121,30 @@ def _build_parser() -> argparse.ArgumentParser:
     run.add_argument("--out", type=Path, help="ecrit le rapport JSON dans ce fichier")
     run.add_argument("--json", action="store_true", help="affiche le rapport JSON")
     run.set_defaults(handler=_cmd_run)
+
+    walk = sub.add_parser(
+        "walkforward", help="evalue la strategie par fenetres successives"
+    )
+    walk.add_argument("config", type=Path)
+    walk.add_argument("--train", type=int, required=True, help="barres d'apprentissage")
+    walk.add_argument("--test", type=int, required=True, help="barres de test par pli")
+    walk.add_argument("--step", type=int, help="pas entre plis (defaut : la taille du test)")
+    walk.add_argument(
+        "--anchored",
+        action="store_true",
+        help=(
+            "fenetre d'apprentissage ancree au debut. Sans selection de parametres, "
+            "donne les memes plis que le mode glissant."
+        ),
+    )
+    walk.add_argument(
+        "--keep-open",
+        action="store_true",
+        help="ne pas liquider les positions a la fin de chaque pli",
+    )
+    walk.add_argument("--out", type=Path, help="ecrit le rapport JSON dans ce fichier")
+    walk.add_argument("--json", action="store_true")
+    walk.set_defaults(handler=_cmd_walkforward)
 
     verify = sub.add_parser("verify", help="execute deux fois et compare les empreintes")
     verify.add_argument("config", type=Path)
@@ -214,6 +241,32 @@ def _cmd_run(args: argparse.Namespace) -> int:
     spec = _load_spec(args.config)
     report = run_backtest(spec)
     _emit(report, as_json=args.json, out=args.out)
+    return EXIT_OK
+
+
+def _cmd_walkforward(args: argparse.Namespace) -> int:
+    spec = _load_spec(args.config)
+    splitter = (
+        AnchoredWalkForward(initial_train_bars=args.train, test_bars=args.test)
+        if args.anchored
+        else RollingWalkForward(
+            train_bars=args.train, test_bars=args.test, step_bars=args.step
+        )
+    )
+    report = run_walk_forward(spec, splitter, liquidate_folds=not args.keep_open)
+
+    if args.json:
+        print(json.dumps(report.describe(), indent=2, ensure_ascii=False))
+    else:
+        print(report.render())
+    if args.out is not None:
+        args.out.parent.mkdir(parents=True, exist_ok=True)
+        args.out.write_text(
+            json.dumps(report.describe(), indent=2, sort_keys=True, ensure_ascii=False),
+            encoding="utf-8",
+        )
+        if not args.json:
+            print(f"\nRapport JSON ecrit dans {args.out}")
     return EXIT_OK
 
 

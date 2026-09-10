@@ -261,6 +261,14 @@ class BacktestSpec(StrictModel):
     rebalance: RebalanceSpec = RebalanceSpec()
     seed: int = 0
     stop: int | None = Field(default=None, ge=1)
+    min_warmup_bars: int = Field(
+        default=0,
+        ge=0,
+        description=(
+            'Plancher de prechauffage. Utilise par le walk-forward pour decrire '
+            'une fenetre de test qui commence a une barre donnee.'
+        ),
+    )
     liquidate_at_end: bool = False
     check_invariant: bool = True
     risk_free_annual: float = Field(default=0.0, ge=-0.5)
@@ -291,6 +299,7 @@ class BacktestSpec(StrictModel):
             liquidate_at_end=self.liquidate_at_end,
             check_invariant=self.check_invariant,
             stop=self.stop,
+            min_warmup_bars=self.min_warmup_bars,
         )
 
     def build_risk(self) -> RiskManager:

@@ -162,11 +162,7 @@ def run_backtest(spec: BacktestSpec, *, trial_log: TrialLog | None = None) -> Ba
     stores, instruments, sources = load_stores(spec)
     strategy = build_strategy(spec.strategy.as_dict())
 
-    result: AnyRunResult = (
-        _run_cross_sectional(spec, stores, instruments, strategy)
-        if entry.cross_sectional
-        else _run_single(spec, stores, instruments, strategy)
-    )
+    result = execute_run(spec, stores, instruments, strategy, entry.cross_sectional)
     symbols = tuple(sorted(stores))
 
     metrics = compute_performance(result, risk_free_annual=spec.risk_free_annual)
@@ -202,6 +198,23 @@ def run_backtest(spec: BacktestSpec, *, trial_log: TrialLog | None = None) -> Ba
         symbols=symbols,
         cross_sectional=entry.cross_sectional,
     )
+
+
+def execute_run(
+    spec: BacktestSpec,
+    stores: dict[str, BarStore],
+    instruments: dict[str, InstrumentSpec],
+    strategy: Strategy | CrossSectionalStrategy,
+    cross_sectional: bool,
+) -> AnyRunResult:
+    """Aiguille vers le runner qui convient.
+
+    Extrait de `run_backtest` pour que le walk-forward puisse enchainer
+    des fenetres sans recharger les donnees a chaque pli.
+    """
+    if cross_sectional:
+        return _run_cross_sectional(spec, stores, instruments, strategy)
+    return _run_single(spec, stores, instruments, strategy)
 
 
 def _parse_ref(ref: str) -> tuple[str, int | None]:

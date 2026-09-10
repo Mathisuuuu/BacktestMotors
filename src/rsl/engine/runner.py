@@ -75,10 +75,22 @@ class RunConfig:
     liquidate_at_end: bool = False
     check_invariant: bool = True
     stop: int | None = None
+    min_warmup_bars: int = 0
+    """Plancher de prechauffage, en plus de celui exigé par la strategie.
+
+    Sert au walk-forward : une fenetre de test qui commence a la barre
+    `k` se decrit comme `min_warmup_bars=k`. Les barres precedentes
+    alimentent l'historique sans etre negociees - c'est exactement ce que
+    veut dire "apprentissage" quand on ne cherche aucun parametre.
+    """
 
     def __post_init__(self) -> None:
         if self.initial_cash <= 0.0:
             raise ConfigurationError(f"initial_cash doit etre > 0, recu {self.initial_cash}")
+        if self.min_warmup_bars < 0:
+            raise ConfigurationError(
+                f"min_warmup_bars doit etre >= 0, recu {self.min_warmup_bars}"
+            )
 
     def describe(self) -> SpecDict:
         return {
@@ -86,6 +98,7 @@ class RunConfig:
             "liquidate_at_end": self.liquidate_at_end,
             "check_invariant": self.check_invariant,
             "stop": self.stop,
+            "min_warmup_bars": self.min_warmup_bars,
             "execution": self.execution.describe(),
         }
 
@@ -208,7 +221,9 @@ class SingleAssetRunner:
         self._execution.reset()
         self._next_order_id = 0
 
-        warmup = max(strategy.warmup_bars, self.risk.warmup_bars)
+        warmup = max(
+            strategy.warmup_bars, self.risk.warmup_bars, self.config.min_warmup_bars
+        )
         portfolio = Portfolio(self.config.initial_cash, {self.spec.symbol: self.spec})
         recorder = EquityRecorder()
         counters = RunCounters(warmup_bars=warmup)
