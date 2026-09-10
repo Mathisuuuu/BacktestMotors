@@ -21,8 +21,8 @@ from rsl.engine.execution import FlatFee, PerContractFee, TickSlippage, ZeroFee,
 from rsl.engine.risk import EquityFraction, FixedContracts, RiskFraction
 from rsl.errors import ConfigurationError
 from rsl.metrics.statistics import TrialLog
-from rsl.strategies.base import describe_strategies
 from rsl.report import run_backtest
+from rsl.strategies.base import describe_strategies
 
 DAY = Granularity(timedelta(days=1), name="1d")
 EPOCH = datetime(2016, 1, 4, tzinfo=UTC)
