@@ -17,7 +17,7 @@ generated: true
 | Indicateur | Valeur |
 |---|---|
 | Pages de wiki | 19 |
-| Entrees de log | 8 |
+| Entrees de log | 9 |
 | Derniere activite | 2026-09-10 |
 | Idees ecartees (ledger) | 8 |
 | Idees en attente (ledger) | 3 |
@@ -27,7 +27,7 @@ generated: true
 | Pages `reference/` | 5 |
 | Pages `research/` | 1 |
 
-**Activite par type :** note × 4, fix × 2, setup × 1, lint × 1
+**Activite par type :** note × 4, fix × 3, setup × 1, lint × 1
 
 ## Experiences
 
@@ -40,6 +40,7 @@ Le total des essais alimente le Deflated Sharpe : un essai non enregistre gonfle
 
 ## Derniere activite — 8 entree(s)
 
+- **2026-09-10** — fix | P5 : droits d'ecriture accordes, push reessaye | 3 commits pousses vers origin/main (26 fichiers, 1923 lignes) ; sync entre machines operationnelle
 - **2026-09-10** — note | chaine d'outils passee sur l'arbre incomplet | `src/` propre sous ruff ; 28 I001 dans `tests/` et 35 des 36 erreurs mypy sont des symptomes de P1 ; 1 erreur reelle (stubs numpy vs python_version 3.11) -> P4 ; piege `ruff --fix` consigne au ledger
 - **2026-09-10** — fix | P2 : venv Python 3.14.6 + `pip install -e ".[dev]"` | 29 paquets installes ; polars/pyarrow/pydantic identiques au manifeste du README, numpy 2.5.3 au lieu de 2.4.6
 - **2026-09-10** — note | audit « quels sont les problemes a regler » : etendue de la casse rsl.data mesuree, recuperation locale cherchee | 6 modules / 42 symboles perdus, aucune copie sur la machine, ~128 tests specificateurs intacts ; 3 problemes classes P1-P3
@@ -47,7 +48,6 @@ Le total des essais alimente le Deflated Sharpe : un essai non enregistre gonfle
 - **2026-09-10** — lint | premier passage : 20 pages, wikilinks et liens relatifs verifies | 0 orpheline, 1 lien mort reel (rsl.data) annote, placeholders de gabarits exclus
 - **2026-09-10** — fix | decouverte en verifiant les liens : `.gitignore:1` `data/` attrape aussi `src/rsl/data/` | paquet `rsl.data` jamais commite et absent du disque, `import rsl.data` leve ; signale, non corrige
 - **2026-09-10** — note | amorcage : 6 concepts, 4 routeurs, 2 experiences, 1 source a ingerer, 7 idees au ledger | tout tire du depot existant, aucune connaissance inventee
-- **2026-09-10** — setup | mise en place du wiki LLM (hubs, contenu, schema, hooks, Obsidian) | 5 hubs + 13 pages, generateur hot.md, hooks PowerShell, groupes de couleurs Obsidian
 
 ## Next Actions
 
@@ -71,6 +71,9 @@ Le total des essais alimente le Deflated Sharpe : un essai non enregistre gonfle
       `pyproject.toml` fixe `python_version = "3.11"`. Le manifeste archive du
       README cite numpy **2.4.6**. Trancher : epingler `numpy<2.5`, ou relever
       `python_version` a 3.12+. Seule erreur mypy non imputable a P1.
+- [x] **P5 resolu (2026-09-10)** -- droits d'ecriture obtenus sur
+      `Mathisuuuu/BacktestMotors`. Push reussi : 3 commits, 26 fichiers,
+      1923 lignes. La synchronisation entre machines est operationnelle.
 - [ ] **Ne pas lancer `ruff --fix`** tant que P1 est ouvert -- voir le ledger.
 - [ ] Relancer les deux experiences seminales une fois P1 leve, avec manifeste
       et empreinte archives.
