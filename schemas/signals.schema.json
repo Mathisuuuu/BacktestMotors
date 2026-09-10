@@ -1,0 +1,325 @@
+{
+  "$defs": {
+    "node": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "Conjonction : vrai si tous les sous-signaux sont vrais.",
+          "properties": {
+            "operands": {
+              "items": {
+                "$ref": "#/$defs/node"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "type": {
+              "const": "all_of"
+            },
+            "version": {
+              "const": 1,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "type",
+            "operands"
+          ],
+          "title": "all_of@1",
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Disjonction : vrai si au moins un sous-signal est vrai.",
+          "properties": {
+            "operands": {
+              "items": {
+                "$ref": "#/$defs/node"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "type": {
+              "const": "any_of"
+            },
+            "version": {
+              "const": 1,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "type",
+            "operands"
+          ],
+          "title": "any_of@1",
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Operation arithmetique entre deux sous-signaux.",
+          "properties": {
+            "left": {
+              "$ref": "#/$defs/node"
+            },
+            "op": {
+              "enum": [
+                "+",
+                "-",
+                "*",
+                "/"
+              ],
+              "type": "string"
+            },
+            "right": {
+              "$ref": "#/$defs/node"
+            },
+            "type": {
+              "const": "arith"
+            },
+            "version": {
+              "const": 1,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "type",
+            "op",
+            "left",
+            "right"
+          ],
+          "title": "arith@1",
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Comparaison de deux sous-signaux, resultat booleen.",
+          "properties": {
+            "left": {
+              "$ref": "#/$defs/node"
+            },
+            "op": {
+              "enum": [
+                ">",
+                ">=",
+                "<",
+                "<=",
+                "==",
+                "!="
+              ],
+              "type": "string"
+            },
+            "right": {
+              "$ref": "#/$defs/node"
+            },
+            "type": {
+              "const": "compare"
+            },
+            "version": {
+              "const": 1,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "type",
+            "op",
+            "left",
+            "right"
+          ],
+          "title": "compare@1",
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Valeur litterale, independante du contexte.",
+          "properties": {
+            "type": {
+              "const": "constant"
+            },
+            "value": {
+              "description": "La valeur rendue, telle quelle.",
+              "type": "number"
+            },
+            "version": {
+              "const": 1,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "type",
+            "value"
+          ],
+          "title": "constant@1",
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "`fast` passe au-dessus de `slow` entre t-1 et t.",
+          "properties": {
+            "fast": {
+              "$ref": "#/$defs/node"
+            },
+            "slow": {
+              "$ref": "#/$defs/node"
+            },
+            "type": {
+              "const": "crosses_above"
+            },
+            "version": {
+              "const": 1,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "type",
+            "fast",
+            "slow"
+          ],
+          "title": "crosses_above@1",
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "`fast` passe sous `slow` entre t-1 et t.",
+          "properties": {
+            "fast": {
+              "$ref": "#/$defs/node"
+            },
+            "slow": {
+              "$ref": "#/$defs/node"
+            },
+            "type": {
+              "const": "crosses_below"
+            },
+            "version": {
+              "const": 1,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "type",
+            "fast",
+            "slow"
+          ],
+          "title": "crosses_below@1",
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Evalue un sous-signal tel qu'il etait il y a `bars` barres.",
+          "properties": {
+            "bars": {
+              "description": "Toujours vers le passe.",
+              "minimum": 1,
+              "type": "integer"
+            },
+            "inner": {
+              "$ref": "#/$defs/node"
+            },
+            "type": {
+              "const": "lag"
+            },
+            "version": {
+              "const": 1,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "type",
+            "bars",
+            "inner"
+          ],
+          "title": "lag@1",
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Negation booleenne.",
+          "properties": {
+            "inner": {
+              "$ref": "#/$defs/node"
+            },
+            "type": {
+              "const": "not"
+            },
+            "version": {
+              "const": 1,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "type",
+            "inner"
+          ],
+          "title": "not@1",
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Feuille : un champ OHLCV de la barre courante ou passee.",
+          "properties": {
+            "field": {
+              "default": "close",
+              "enum": [
+                "open",
+                "high",
+                "low",
+                "close",
+                "volume"
+              ],
+              "type": "string"
+            },
+            "lag": {
+              "default": 0,
+              "description": "Barres en arriere. Un lag negatif viserait une barre non close.",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "type": {
+              "const": "price"
+            },
+            "version": {
+              "const": 1,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "title": "price@1",
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Feuille : une primitive du registre, parametres figes.",
+          "properties": {
+            "params": {
+              "description": "Parametres de la primitive. Leur schema depend de `ref` et ne peut donc pas etre fige ici : il est publie par le catalogue des primitives, une entree par reference.",
+              "type": "object"
+            },
+            "ref": {
+              "description": "Reference versionnee, ex. 'sma@1'. Sans version, la plus recente est prise - a n'utiliser qu'en exploration.",
+              "type": "string"
+            },
+            "type": {
+              "const": "primitive"
+            },
+            "version": {
+              "const": 1,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "type",
+            "ref"
+          ],
+          "title": "primitive@1",
+          "type": "object"
+        }
+      ]
+    }
+  },
+  "$ref": "#/$defs/node",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Expression evaluee sur un Context. Les feuilles sont des constantes, des champs de prix ou des primitives du registre ; les noeuds internes les combinent.",
+  "title": "Arbre de signaux rsl"
+}

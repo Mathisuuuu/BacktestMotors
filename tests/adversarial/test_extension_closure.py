@@ -36,6 +36,8 @@ from rsl.strategies.signals import (
     Builder,
     Compare,
     CompareOp,
+    FieldKind,
+    NodeField,
     SpecDict,
     build_signal,
     const,
@@ -191,7 +193,19 @@ class TestExtensionRequiresNoEdit:
     def test_a_new_node_type_plugs_into_the_builder_untouched(self, clean_registries):
         """`build_signal` ne connait aucun type de noeud : il delegue au registre."""
 
-        @signal_node("test_clamp", version=1, summary="Borne un sous-signal.")
+        @signal_node(
+            "test_clamp",
+            version=1,
+            summary="Borne un sous-signal.",
+            # Declarer ses champs fait partie du contrat : c'est de la meme
+            # declaration que viennent le schema publie et le refus des champs
+            # inconnus a la construction.
+            fields=(
+                NodeField("low", FieldKind.NUMBER),
+                NodeField("high", FieldKind.NUMBER),
+                NodeField("inner", FieldKind.NODE),
+            ),
+        )
         class Clamp:
             NODE_TYPE: ClassVar[str] = "test_clamp"
             NODE_VERSION: ClassVar[int] = 1
@@ -234,6 +248,16 @@ class TestExtensionRequiresNoEdit:
         assert build_signal(spec)(ctx) == 1.0
         assert build_signal(build_signal(spec).describe())(ctx) == 1.0
         assert any(e["type"] == "test_clamp" for e in describe_node_types())
+
+        # Le schema du noeud neuf est publie sans que rien d'autre ne bouge.
+        published = next(
+            e for e in describe_node_types() if e["type"] == "test_clamp"
+        )
+        assert published["schema"]["required"] == ["type", "low", "high", "inner"]
+
+        # Et le refus des champs inconnus vaut pour lui comme pour les autres.
+        with pytest.raises(Exception, match="inconnu"):
+            build_signal({**spec, "coquille": 1})
 
     def test_a_new_strategy_family_registers_without_touching_the_others(
         self, clean_registries

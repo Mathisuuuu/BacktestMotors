@@ -1,0 +1,993 @@
+{
+  "backtest_spec": {
+    "$defs": {
+      "AlignPolicy": {
+        "description": "Politique d'alignement multi-instruments (`docs/no-lookahead.md` §4.1).",
+        "enum": [
+          "drop",
+          "ffill",
+          "error"
+        ],
+        "title": "AlignPolicy",
+        "type": "string"
+      },
+      "CloseStamp": {
+        "description": "Quel horodatage porte la disponibilite d'une barre agregee.",
+        "enum": [
+          "period_end",
+          "last_bar"
+        ],
+        "title": "CloseStamp",
+        "type": "string"
+      },
+      "DataSpec": {
+        "additionalProperties": false,
+        "description": "Un instrument, son fichier, et son eventuelle agregation.",
+        "properties": {
+          "allow_non_positive_prices": {
+            "default": true,
+            "title": "Allow Non Positive Prices",
+            "type": "boolean"
+          },
+          "close_stamp": {
+            "$ref": "#/$defs/CloseStamp",
+            "default": "period_end"
+          },
+          "granularity_minutes": {
+            "default": 1,
+            "minimum": 1,
+            "title": "Granularity Minutes",
+            "type": "integer"
+          },
+          "max_gap_seconds": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Max Gap Seconds"
+          },
+          "path": {
+            "format": "path",
+            "title": "Path",
+            "type": "string"
+          },
+          "resample": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/Period"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Agregation calendaire appliquee apres chargement."
+          },
+          "resample_min_bars": {
+            "anyOf": [
+              {
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Resample Min Bars"
+          },
+          "root": {
+            "description": "Racine connue de la table d'instruments",
+            "minLength": 1,
+            "title": "Root",
+            "type": "string"
+          },
+          "timestamp_column": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Timestamp Column"
+          }
+        },
+        "required": [
+          "root",
+          "path"
+        ],
+        "title": "DataSpec",
+        "type": "object"
+      },
+      "ExecutionSpec": {
+        "additionalProperties": false,
+        "description": "Parametres d'execution. `fees` et `slippage` sont obligatoires.",
+        "properties": {
+          "fees": {
+            "$ref": "#/$defs/FeeSpec"
+          },
+          "intrabar_priority": {
+            "$ref": "#/$defs/IntrabarPriority",
+            "default": "pessimistic"
+          },
+          "lag_bars": {
+            "default": 1,
+            "minimum": 1,
+            "title": "Lag Bars",
+            "type": "integer"
+          },
+          "margin_policy": {
+            "$ref": "#/$defs/MarginPolicy",
+            "default": "reject"
+          },
+          "max_fill_gap_seconds": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Max Fill Gap Seconds"
+          },
+          "slippage": {
+            "$ref": "#/$defs/SlippageSpec"
+          }
+        },
+        "required": [
+          "fees",
+          "slippage"
+        ],
+        "title": "ExecutionSpec",
+        "type": "object"
+      },
+      "FeeSpec": {
+        "additionalProperties": false,
+        "description": "Modele de frais. Aucun defaut : le choix doit etre ecrit.",
+        "properties": {
+          "kind": {
+            "enum": [
+              "per_contract",
+              "flat",
+              "zero"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "per_contract": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Per Contract"
+          }
+        },
+        "required": [
+          "kind"
+        ],
+        "title": "FeeSpec",
+        "type": "object"
+      },
+      "IntrabarPriority": {
+        "enum": [
+          "pessimistic",
+          "optimistic"
+        ],
+        "title": "IntrabarPriority",
+        "type": "string"
+      },
+      "MarginPolicy": {
+        "enum": [
+          "reject",
+          "warn"
+        ],
+        "title": "MarginPolicy",
+        "type": "string"
+      },
+      "PanelSpec": {
+        "additionalProperties": false,
+        "properties": {
+          "align_policy": {
+            "$ref": "#/$defs/AlignPolicy",
+            "default": "drop"
+          },
+          "max_ffill_bars": {
+            "anyOf": [
+              {
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Max Ffill Bars"
+          }
+        },
+        "title": "PanelSpec",
+        "type": "object"
+      },
+      "Period": {
+        "description": "Periodes calendaires supportees.",
+        "enum": [
+          "day",
+          "week",
+          "month",
+          "quarter",
+          "year"
+        ],
+        "title": "Period",
+        "type": "string"
+      },
+      "RebalanceSpec": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "default": "every_row",
+            "enum": [
+              "every_row",
+              "every_n_rows"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "n": {
+            "default": 1,
+            "minimum": 1,
+            "title": "N",
+            "type": "integer"
+          },
+          "offset": {
+            "default": 0,
+            "minimum": 0,
+            "title": "Offset",
+            "type": "integer"
+          }
+        },
+        "title": "RebalanceSpec",
+        "type": "object"
+      },
+      "RiskSpec": {
+        "additionalProperties": false,
+        "properties": {
+          "max_gross_contracts": {
+            "anyOf": [
+              {
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Max Gross Contracts"
+          },
+          "sizing": {
+            "$ref": "#/$defs/SizingSpec",
+            "default": {
+              "atr_multiple": 2.0,
+              "atr_window": 14,
+              "contracts": null,
+              "fraction": null,
+              "kind": "none"
+            }
+          }
+        },
+        "title": "RiskSpec",
+        "type": "object"
+      },
+      "SizingSpec": {
+        "additionalProperties": false,
+        "properties": {
+          "atr_multiple": {
+            "default": 2.0,
+            "exclusiveMinimum": 0.0,
+            "title": "Atr Multiple",
+            "type": "number"
+          },
+          "atr_window": {
+            "default": 14,
+            "minimum": 1,
+            "title": "Atr Window",
+            "type": "integer"
+          },
+          "contracts": {
+            "anyOf": [
+              {
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Contracts"
+          },
+          "fraction": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Fraction"
+          },
+          "kind": {
+            "default": "none",
+            "enum": [
+              "none",
+              "fixed",
+              "equity_fraction",
+              "risk_fraction"
+            ],
+            "title": "Kind",
+            "type": "string"
+          }
+        },
+        "title": "SizingSpec",
+        "type": "object"
+      },
+      "SlippageSpec": {
+        "additionalProperties": false,
+        "description": "Modele de slippage. Aucun defaut, meme raison.",
+        "properties": {
+          "bps": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Bps"
+          },
+          "kind": {
+            "enum": [
+              "tick",
+              "bps",
+              "zero"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "ticks": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Ticks"
+          }
+        },
+        "required": [
+          "kind"
+        ],
+        "title": "SlippageSpec",
+        "type": "object"
+      },
+      "StrategySpec": {
+        "additionalProperties": false,
+        "properties": {
+          "params": {
+            "additionalProperties": true,
+            "title": "Params",
+            "type": "object"
+          },
+          "ref": {
+            "description": "Reference versionnee, ex. 'sma_crossover@1'",
+            "minLength": 1,
+            "title": "Ref",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ref"
+        ],
+        "title": "StrategySpec",
+        "type": "object"
+      }
+    },
+    "additionalProperties": false,
+    "description": "Tout ce qu'il faut pour lancer un run, et rien d'autre.",
+    "properties": {
+      "check_invariant": {
+        "default": true,
+        "title": "Check Invariant",
+        "type": "boolean"
+      },
+      "data": {
+        "items": {
+          "$ref": "#/$defs/DataSpec"
+        },
+        "minItems": 1,
+        "title": "Data",
+        "type": "array"
+      },
+      "execution": {
+        "$ref": "#/$defs/ExecutionSpec"
+      },
+      "initial_cash": {
+        "exclusiveMinimum": 0.0,
+        "title": "Initial Cash",
+        "type": "number"
+      },
+      "liquidate_at_end": {
+        "default": false,
+        "title": "Liquidate At End",
+        "type": "boolean"
+      },
+      "min_warmup_bars": {
+        "default": 0,
+        "description": "Plancher de prechauffage. Utilise par le walk-forward pour decrire une fenetre de test qui commence a une barre donnee.",
+        "minimum": 0,
+        "title": "Min Warmup Bars",
+        "type": "integer"
+      },
+      "name": {
+        "minLength": 1,
+        "title": "Name",
+        "type": "string"
+      },
+      "panel": {
+        "$ref": "#/$defs/PanelSpec",
+        "default": {
+          "align_policy": "drop",
+          "max_ffill_bars": null
+        }
+      },
+      "rebalance": {
+        "$ref": "#/$defs/RebalanceSpec",
+        "default": {
+          "kind": "every_row",
+          "n": 1,
+          "offset": 0
+        }
+      },
+      "risk": {
+        "$ref": "#/$defs/RiskSpec",
+        "default": {
+          "max_gross_contracts": null,
+          "sizing": {
+            "atr_multiple": 2.0,
+            "atr_window": 14,
+            "contracts": null,
+            "fraction": null,
+            "kind": "none"
+          }
+        }
+      },
+      "risk_free_annual": {
+        "default": 0.0,
+        "minimum": -0.5,
+        "title": "Risk Free Annual",
+        "type": "number"
+      },
+      "seed": {
+        "default": 0,
+        "title": "Seed",
+        "type": "integer"
+      },
+      "stop": {
+        "anyOf": [
+          {
+            "minimum": 1,
+            "type": "integer"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Stop"
+      },
+      "strategy": {
+        "$ref": "#/$defs/StrategySpec"
+      },
+      "with_data_hash": {
+        "default": true,
+        "description": "Calculer le SHA-256 des fichiers sources. Le desactiver accelere une exploration mais rend le manifeste incomplet, et le rapport le signale.",
+        "title": "With Data Hash",
+        "type": "boolean"
+      }
+    },
+    "required": [
+      "name",
+      "initial_cash",
+      "data",
+      "execution",
+      "strategy"
+    ],
+    "title": "BacktestSpec",
+    "type": "object"
+  },
+  "signals": {
+    "$defs": {
+      "node": {
+        "oneOf": [
+          {
+            "additionalProperties": false,
+            "description": "Conjonction : vrai si tous les sous-signaux sont vrais.",
+            "properties": {
+              "operands": {
+                "items": {
+                  "$ref": "#/$defs/node"
+                },
+                "minItems": 1,
+                "type": "array"
+              },
+              "type": {
+                "const": "all_of"
+              },
+              "version": {
+                "const": 1,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "type",
+              "operands"
+            ],
+            "title": "all_of@1",
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "description": "Disjonction : vrai si au moins un sous-signal est vrai.",
+            "properties": {
+              "operands": {
+                "items": {
+                  "$ref": "#/$defs/node"
+                },
+                "minItems": 1,
+                "type": "array"
+              },
+              "type": {
+                "const": "any_of"
+              },
+              "version": {
+                "const": 1,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "type",
+              "operands"
+            ],
+            "title": "any_of@1",
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "description": "Operation arithmetique entre deux sous-signaux.",
+            "properties": {
+              "left": {
+                "$ref": "#/$defs/node"
+              },
+              "op": {
+                "enum": [
+                  "+",
+                  "-",
+                  "*",
+                  "/"
+                ],
+                "type": "string"
+              },
+              "right": {
+                "$ref": "#/$defs/node"
+              },
+              "type": {
+                "const": "arith"
+              },
+              "version": {
+                "const": 1,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "type",
+              "op",
+              "left",
+              "right"
+            ],
+            "title": "arith@1",
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "description": "Comparaison de deux sous-signaux, resultat booleen.",
+            "properties": {
+              "left": {
+                "$ref": "#/$defs/node"
+              },
+              "op": {
+                "enum": [
+                  ">",
+                  ">=",
+                  "<",
+                  "<=",
+                  "==",
+                  "!="
+                ],
+                "type": "string"
+              },
+              "right": {
+                "$ref": "#/$defs/node"
+              },
+              "type": {
+                "const": "compare"
+              },
+              "version": {
+                "const": 1,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "type",
+              "op",
+              "left",
+              "right"
+            ],
+            "title": "compare@1",
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "description": "Valeur litterale, independante du contexte.",
+            "properties": {
+              "type": {
+                "const": "constant"
+              },
+              "value": {
+                "description": "La valeur rendue, telle quelle.",
+                "type": "number"
+              },
+              "version": {
+                "const": 1,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "type",
+              "value"
+            ],
+            "title": "constant@1",
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "description": "`fast` passe au-dessus de `slow` entre t-1 et t.",
+            "properties": {
+              "fast": {
+                "$ref": "#/$defs/node"
+              },
+              "slow": {
+                "$ref": "#/$defs/node"
+              },
+              "type": {
+                "const": "crosses_above"
+              },
+              "version": {
+                "const": 1,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "type",
+              "fast",
+              "slow"
+            ],
+            "title": "crosses_above@1",
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "description": "`fast` passe sous `slow` entre t-1 et t.",
+            "properties": {
+              "fast": {
+                "$ref": "#/$defs/node"
+              },
+              "slow": {
+                "$ref": "#/$defs/node"
+              },
+              "type": {
+                "const": "crosses_below"
+              },
+              "version": {
+                "const": 1,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "type",
+              "fast",
+              "slow"
+            ],
+            "title": "crosses_below@1",
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "description": "Evalue un sous-signal tel qu'il etait il y a `bars` barres.",
+            "properties": {
+              "bars": {
+                "description": "Toujours vers le passe.",
+                "minimum": 1,
+                "type": "integer"
+              },
+              "inner": {
+                "$ref": "#/$defs/node"
+              },
+              "type": {
+                "const": "lag"
+              },
+              "version": {
+                "const": 1,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "type",
+              "bars",
+              "inner"
+            ],
+            "title": "lag@1",
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "description": "Negation booleenne.",
+            "properties": {
+              "inner": {
+                "$ref": "#/$defs/node"
+              },
+              "type": {
+                "const": "not"
+              },
+              "version": {
+                "const": 1,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "type",
+              "inner"
+            ],
+            "title": "not@1",
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "description": "Feuille : un champ OHLCV de la barre courante ou passee.",
+            "properties": {
+              "field": {
+                "default": "close",
+                "enum": [
+                  "open",
+                  "high",
+                  "low",
+                  "close",
+                  "volume"
+                ],
+                "type": "string"
+              },
+              "lag": {
+                "default": 0,
+                "description": "Barres en arriere. Un lag negatif viserait une barre non close.",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "type": {
+                "const": "price"
+              },
+              "version": {
+                "const": 1,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "type"
+            ],
+            "title": "price@1",
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "description": "Feuille : une primitive du registre, parametres figes.",
+            "properties": {
+              "params": {
+                "description": "Parametres de la primitive. Leur schema depend de `ref` et ne peut donc pas etre fige ici : il est publie par le catalogue des primitives, une entree par reference.",
+                "type": "object"
+              },
+              "ref": {
+                "description": "Reference versionnee, ex. 'sma@1'. Sans version, la plus recente est prise - a n'utiliser qu'en exploration.",
+                "type": "string"
+              },
+              "type": {
+                "const": "primitive"
+              },
+              "version": {
+                "const": 1,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "type",
+              "ref"
+            ],
+            "title": "primitive@1",
+            "type": "object"
+          }
+        ]
+      }
+    },
+    "$ref": "#/$defs/node",
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "description": "Expression evaluee sur un Context. Les feuilles sont des constantes, des champs de prix ou des primitives du registre ; les noeuds internes les combinent.",
+    "title": "Arbre de signaux rsl"
+  },
+  "strategies": {
+    "buy_and_hold@1": {
+      "additionalProperties": false,
+      "properties": {
+        "quantity": {
+          "default": 1,
+          "title": "Quantity",
+          "type": "integer"
+        },
+        "symbol": {
+          "title": "Symbol",
+          "type": "string"
+        }
+      },
+      "required": [
+        "symbol"
+      ],
+      "title": "BuyAndHoldParams",
+      "type": "object"
+    },
+    "cross_sectional_momentum@1": {
+      "additionalProperties": false,
+      "properties": {
+        "long_short": {
+          "default": true,
+          "title": "Long Short",
+          "type": "boolean"
+        },
+        "lookback": {
+          "default": 12,
+          "title": "Lookback",
+          "type": "integer"
+        },
+        "n_long": {
+          "default": 3,
+          "title": "N Long",
+          "type": "integer"
+        },
+        "n_short": {
+          "default": 3,
+          "title": "N Short",
+          "type": "integer"
+        },
+        "quantity": {
+          "default": 1,
+          "title": "Quantity",
+          "type": "integer"
+        },
+        "skip": {
+          "default": 1,
+          "title": "Skip",
+          "type": "integer"
+        }
+      },
+      "title": "MomentumParams",
+      "type": "object"
+    },
+    "rules@1": {
+      "additionalProperties": false,
+      "description": "Parametres d'une strategie a regles, tels qu'ils arrivent d'un fichier.\n\n`rules` est un dictionnaire de specifications de noeuds - c'est la que se\ntrouve toute l'expressivite. Il n'est PAS valide par pydantic au-dela de sa\nforme : sa validation reelle est faite par `build_signal`, qui connait le\nregistre des noeuds et refuse un type inconnu, un operateur invalide ou une\nreference de primitive inexistante. Un schema pydantic fige ici\ndupliquerait ce registre et divergerait de lui.",
+      "properties": {
+        "allow_pyramiding": {
+          "default": false,
+          "title": "Allow Pyramiding",
+          "type": "boolean"
+        },
+        "extra_warmup": {
+          "default": 0,
+          "title": "Extra Warmup",
+          "type": "integer"
+        },
+        "quantity": {
+          "default": 1,
+          "title": "Quantity",
+          "type": "integer"
+        },
+        "rules": {
+          "additionalProperties": true,
+          "title": "Rules",
+          "type": "object"
+        },
+        "symbol": {
+          "title": "Symbol",
+          "type": "string"
+        }
+      },
+      "required": [
+        "symbol"
+      ],
+      "title": "RuleStrategyParams",
+      "type": "object"
+    },
+    "sma_crossover@1": {
+      "additionalProperties": false,
+      "properties": {
+        "atr_multiple": {
+          "default": 2.0,
+          "title": "Atr Multiple",
+          "type": "number"
+        },
+        "atr_window": {
+          "default": 14,
+          "title": "Atr Window",
+          "type": "integer"
+        },
+        "fast_window": {
+          "default": 20,
+          "title": "Fast Window",
+          "type": "integer"
+        },
+        "quantity": {
+          "default": 1,
+          "title": "Quantity",
+          "type": "integer"
+        },
+        "slow_window": {
+          "default": 100,
+          "title": "Slow Window",
+          "type": "integer"
+        },
+        "symbol": {
+          "title": "Symbol",
+          "type": "string"
+        }
+      },
+      "required": [
+        "symbol"
+      ],
+      "title": "SmaCrossoverParams",
+      "type": "object"
+    }
+  }
+}

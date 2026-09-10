@@ -3,6 +3,7 @@
     rsl validate FICHIER...     valide des fichiers de donnees
     rsl instruments             table des contrats
     rsl catalogue               primitives, noeuds et strategies enregistres
+    rsl schema                  JSON Schema du vocabulaire, a rediriger
     rsl example                 specification d'exemple, a rediriger
     rsl run CONFIG              execute un backtest et ecrit son rapport
     rsl walkforward CONFIG      evalue par fenetres successives
@@ -34,7 +35,7 @@ from rsl.metrics.statistics import AnchoredWalkForward, RollingWalkForward
 from rsl.primitives.registry import describe_registry
 from rsl.report import BacktestReport, run_backtest
 from rsl.strategies.base import describe_strategies
-from rsl.strategies.signals import describe_node_types
+from rsl.strategies.signals import describe_node_types, signal_json_schema
 from rsl.walkforward import run_walk_forward
 
 EXIT_OK = 0
@@ -112,6 +113,18 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     catalogue.add_argument("--json", action="store_true")
     catalogue.set_defaults(handler=_cmd_catalogue)
+
+    schema = sub.add_parser(
+        "schema", help="JSON Schema du vocabulaire (signaux, strategies, specification)"
+    )
+    schema.add_argument(
+        "--what",
+        choices=("signals", "strategies", "spec", "all"),
+        default="signals",
+        help="quelle partie publier (defaut : signals)",
+    )
+    schema.add_argument("--out", type=Path, help="ecrit dans ce fichier")
+    schema.set_defaults(handler=_cmd_schema)
 
     example = sub.add_parser("example", help="specification d'exemple")
     example.set_defaults(handler=_cmd_example)
@@ -229,6 +242,36 @@ def _cmd_catalogue(args: argparse.Namespace) -> int:
         "\nCe catalogue est le point de branchement de la phase suivante : un\n"
         "compilateur de specifications y lira ce qui existe deja."
     )
+    return EXIT_OK
+
+
+def _cmd_schema(args: argparse.Namespace) -> int:
+    """Publie le contrat que doit respecter une specification.
+
+    C'est ce qui permet de valider un fichier AVANT de l'executer - dans un
+    editeur, dans une chaine d'integration, ou dans la brique qui produira ces
+    fichiers a la place d'un humain. Les schemas sont engendres depuis les
+    registres : un type de noeud ou une strategie ajoutee y apparait sans que
+    rien d'autre soit touche.
+    """
+    parts: dict[str, object] = {}
+    if args.what in ("signals", "all"):
+        parts["signals"] = signal_json_schema()
+    if args.what in ("strategies", "all"):
+        parts["strategies"] = {
+            str(entry["ref"]): entry["params"] for entry in describe_strategies()
+        }
+    if args.what in ("spec", "all"):
+        parts["backtest_spec"] = BacktestSpec.model_json_schema()
+
+    payload = parts if args.what == "all" else next(iter(parts.values()))
+    rendered = json.dumps(payload, indent=2, ensure_ascii=False, sort_keys=True)
+    if args.out is not None:
+        args.out.parent.mkdir(parents=True, exist_ok=True)
+        args.out.write_text(rendered, encoding="utf-8")
+        print(f"Schema ecrit dans {args.out}")
+    else:
+        print(rendered)
     return EXIT_OK
 
 

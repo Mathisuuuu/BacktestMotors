@@ -132,6 +132,7 @@ rsl verify ma-config.json
 | `rsl validate FICHIER...` | valide des fichiers de donnees ; la racine est deduite du nom (`ES_v0_1m` -> `ES`) |
 | `rsl instruments` | table des contrats : multiplicateur, tick, valeur du tick, frais, marge |
 | `rsl catalogue` | primitives, noeuds de signaux et strategies enregistres |
+| `rsl schema [--what signals\|strategies\|spec\|all]` | JSON Schema du vocabulaire |
 | `rsl example` | specification d'exemple, a rediriger dans un fichier |
 | `rsl run CONFIG` | execute un backtest, affiche le rapport, ecrit le JSON |
 | `rsl walkforward CONFIG --train N --test N` | evalue la strategie sur des fenetres successives |
@@ -214,6 +215,84 @@ Chaque pli repart du capital initial et est liquide a sa derniere barre. Sans
 cela, le rendement d'un pli contiendrait un profit latent que le pli suivant
 n'herite pas.
 
+## Une strategie sans ecrire de code
+
+`rules@1` construit une strategie a partir de ses seuls parametres. Celle-ci -
+retour a la moyenne a l'interieur d'une tendance - n'est ecrite nulle part dans
+le depot :
+
+```json
+"strategy": {
+  "ref": "rules@1",
+  "params": {
+    "symbol": "ES.v.0", "quantity": 1,
+    "rules": {
+      "entry_long": {"type": "all_of", "operands": [
+        {"type": "compare", "op": ">",
+         "left":  {"type": "price", "field": "close"},
+         "right": {"type": "primitive", "ref": "sma@1", "params": {"window": 200}}},
+        {"type": "compare", "op": "<",
+         "left":  {"type": "primitive", "ref": "zscore@1", "params": {"window": 100}},
+         "right": {"type": "constant", "value": -1.5}}]},
+      "exit_long": {"type": "compare", "op": ">", "...": "..."},
+      "stop_loss": {"type": "arith", "op": "-", "...": "..."}
+    }
+  }
+}
+```
+
+```bash
+rsl run examples/retour_moyenne_dans_tendance.json
+```
+
+Aucune ligne de Python n'est ecrite NI GENEREE. C'est ce qui rend la phase
+suivante sure : du code qui n'est pas genere ne peut pas etre faux.
+
+## Le vocabulaire publie son contrat
+
+```bash
+rsl schema --out schemas/signals.schema.json
+```
+
+Le document est un JSON Schema recursif : un `$defs/node` enumere les onze
+types enregistres, et chaque champ de sous-noeud y pointe. Un validateur
+ordinaire verifie donc un arbre ENTIER, a n'importe quelle profondeur - avant
+d'ouvrir le moindre fichier de donnees.
+
+```json
+{
+  "title": "compare@1",
+  "type": "object",
+  "properties": {
+    "type":  {"const": "compare"},
+    "op":    {"type": "string", "enum": [">", ">=", "<", "<=", "==", "!="]},
+    "left":  {"$ref": "#/$defs/node"},
+    "right": {"$ref": "#/$defs/node"}
+  },
+  "required": ["type", "op", "left", "right"],
+  "additionalProperties": false
+}
+```
+
+Trois proprietes le rendent digne de confiance :
+
+**Il est engendre, pas saisi.** Chaque type de noeud declare ses champs une
+fois ; le schema en derive, et `build_signal` refuse tout champ non declare a
+partir de la meme declaration. Leur divergence est impossible par construction.
+
+**Il est verifie contre le constructeur.** Onze cas malformes - type inconnu,
+operateur invalide, champ en trop, champ manquant, lag negatif, operandes
+vides, erreur en profondeur - sont testes deux fois : le schema doit refuser,
+et `build_signal` aussi. Un schema plus permissif que le code laisserait passer
+ce qu'il pretend interdire ; un schema plus strict rejetterait du valide.
+
+**Il ne peut pas rouiller.** Les fichiers de `schemas/` sont compares au
+registre a chaque execution des tests. Un noeud ajoute sans regenerer le
+fichier fait echouer la suite, avec la commande a lancer.
+
+Ce contrat est ce qui manquait pour qu'une machine produise une specification
+valide du premier coup, au lieu d'iterer sur des messages d'erreur.
+
 ## Extension par ajout uniquement
 
 Le socle est ferme a la modification, ouvert a l'extension. Chaque registre est
@@ -288,7 +367,7 @@ python -m venv .venv
 .venv/Scripts/python.exe -m ruff check src tests && .venv/Scripts/python.exe -m mypy
 ```
 
-982 tests, `ruff` et `mypy --strict` sans exception.
+1 039 tests, `ruff` et `mypy --strict` sans exception.
 
 Marqueurs pytest : `adversarial` (tests qui attaquent une garantie du socle),
 `slow` (tests qui touchent aux donnees reelles).

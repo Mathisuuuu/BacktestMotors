@@ -61,6 +61,63 @@ class Signal(Protocol):
 Builder = Callable[[SpecDict], Signal]
 FromSpec = Callable[[SpecDict, Builder], Signal]
 
+NODE_REF: Final[str] = "#/$defs/node"
+
+
+class FieldKind(StrEnum):
+    """Nature d'un champ de noeud, du point de vue du schema."""
+
+    NUMBER = "number"
+    INTEGER = "integer"
+    STRING = "string"
+    BOOLEAN = "boolean"
+    OBJECT = "object"
+    NODE = "node"
+    """Un sous-noeud : recursion."""
+
+    NODE_LIST = "node_list"
+    """Une liste non vide de sous-noeuds."""
+
+
+@dataclass(frozen=True, slots=True)
+class NodeField:
+    """Un champ d'un type de noeud, decrit une seule fois.
+
+    Le schema JSON en est DERIVE, il n'est pas saisi a cote. Un schema
+    recopie a la main derive de son constructeur au premier changement, et un
+    schema faux est pire que pas de schema : une machine lui fait confiance.
+    Un test verifie en plus, pour chaque noeud enregistre, que son schema et
+    son `from_spec` acceptent et refusent les memes choses.
+    """
+
+    name: str
+    kind: FieldKind
+    required: bool = True
+    default: object | None = None
+    choices: tuple[str, ...] = ()
+    minimum: float | None = None
+    description: str = ""
+
+    def json_schema(self) -> SpecDict:
+        match self.kind:
+            case FieldKind.NODE:
+                schema: SpecDict = {"$ref": NODE_REF}
+            case FieldKind.NODE_LIST:
+                schema = {"type": "array", "items": {"$ref": NODE_REF}, "minItems": 1}
+            case FieldKind.OBJECT:
+                schema = {"type": "object"}
+            case _:
+                schema = {"type": self.kind.value}
+                if self.choices:
+                    schema["enum"] = list(self.choices)
+                if self.minimum is not None:
+                    schema["minimum"] = self.minimum
+        if self.description:
+            schema["description"] = self.description
+        if self.default is not None:
+            schema["default"] = self.default
+        return schema
+
 
 @dataclass(frozen=True, slots=True)
 class NodeType:
@@ -68,13 +125,39 @@ class NodeType:
     version: int
     from_spec: FromSpec
     summary: str
+    fields: tuple[NodeField, ...] = ()
+
+    @property
+    def ref(self) -> str:
+        return f"{self.name}@{self.version}"
+
+    def json_schema(self) -> SpecDict:
+        """Schema d'un noeud de ce type, references recursives comprises."""
+        properties: SpecDict = {
+            "type": {"const": self.name},
+            "version": {"type": "integer", "const": self.version},
+        }
+        for field_ in self.fields:
+            properties[field_.name] = field_.json_schema()
+        return {
+            "title": self.ref,
+            "description": self.summary,
+            "type": "object",
+            "properties": properties,
+            "required": ["type", *[f.name for f in self.fields if f.required]],
+            "additionalProperties": False,
+        }
 
 
 _NODES: Final[dict[tuple[str, int], NodeType]] = {}
 
 
 def signal_node(
-    name: str, *, version: int = 1, summary: str = ""
+    name: str,
+    *,
+    version: int = 1,
+    summary: str = "",
+    fields: tuple[NodeField, ...] = (),
 ) -> Callable[[type[Signal]], type[Signal]]:
     """Enregistre un type de noeud sous `(name, version)`.
 
@@ -82,6 +165,13 @@ def signal_node(
     jamais. Un comportement a corriger devient `version + 1`, et les
     specifications archivees qui epinglent l'ancienne continuent de se
     reconstruire a l'identique.
+
+    `fields` n'est pas facultatif en pratique. Il sert a deux choses a la fois :
+    engendrer le JSON Schema publie, et refuser dans `build_signal` tout champ
+    non declare. Un noeud qui ne declare rien publie donc un schema qui ment
+    par omission, ET voit ses propres champs rejetes a la construction. Les
+    deux effets viennent de la meme declaration, ce qui rend leur divergence
+    impossible.
     """
 
     def decorate(cls: type[Signal]) -> type[Signal]:
@@ -99,6 +189,7 @@ def signal_node(
             version=version,
             from_spec=builder,
             summary=summary or (cls.__doc__ or "").strip().split("\n")[0],
+            fields=fields,
         )
         # Les classes declarent deja NODE_TYPE / NODE_VERSION ; on les
         # reaffirme depuis le decorateur pour qu'une divergence entre les deux
@@ -129,15 +220,48 @@ def list_node_types() -> tuple[NodeType, ...]:
 
 
 def describe_node_types() -> list[SpecDict]:
-    """Catalogue machine des noeuds disponibles.
+    """Catalogue machine des noeuds disponibles, schemas compris.
 
     Point de branchement du futur compilateur de specifications ; aucune brique
     LLM n'est construite ici.
     """
     return [
-        {"type": n.name, "version": n.version, "summary": n.summary}
+        {
+            "type": n.name,
+            "version": n.version,
+            "summary": n.summary,
+            "schema": n.json_schema(),
+        }
         for n in list_node_types()
     ]
+
+
+def signal_json_schema() -> SpecDict:
+    """Schema complet d'un ARBRE de signaux, pas d'un noeud isole.
+
+    C'est le document qui a une valeur pratique : un `$defs/node` qui enumere
+    tous les types enregistres, et vers lequel chaque champ de sous-noeud
+    pointe. Un validateur JSON Schema ordinaire y verifie donc un arbre entier,
+    a n'importe quelle profondeur.
+
+    Il est engendre depuis le registre : un type de noeud ajoute apparait sans
+    que ce document soit touche.
+    """
+    return {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "title": "Arbre de signaux rsl",
+        "description": (
+            "Expression evaluee sur un Context. Les feuilles sont des constantes, "
+            "des champs de prix ou des primitives du registre ; les noeuds internes "
+            "les combinent."
+        ),
+        "$ref": NODE_REF,
+        "$defs": {
+            "node": {
+                "oneOf": [node.json_schema() for node in list_node_types()],
+            }
+        },
+    }
 
 
 def build_signal(spec: SpecDict) -> Signal:
@@ -156,6 +280,20 @@ def build_signal(spec: SpecDict) -> Signal:
     if raw_version is not None and not isinstance(raw_version, int):
         raise ConfigurationError(f"champ 'version' doit etre un entier, recu {raw_version!r}")
     node_type = get_node_type(raw_type, raw_version)
+
+    # Meme regle que partout ailleurs : un champ inconnu est une erreur, jamais
+    # un defaut silencieux. Sans cela, une coquille - `oprands` au lieu de
+    # `operands` - produirait un noeud amputé au lieu d'un message. C'est aussi
+    # ce qui fait coincider ce constructeur avec le schema publie, qui pose
+    # `additionalProperties: false` ; un schema plus strict que le code laisse
+    # passer a l'execution ce qu'il pretend interdire.
+    allowed = {"type", "version"} | {f.name for f in node_type.fields}
+    unknown = sorted(set(spec) - allowed)
+    if unknown:
+        raise ConfigurationError(
+            f"noeud '{raw_type}' : champ(s) inconnu(s) {', '.join(unknown)}. "
+            f"Attendus : {', '.join(sorted(allowed))}"
+        )
     return node_type.from_spec(spec, build_signal)
 
 
@@ -182,7 +320,13 @@ def _children(spec: SpecDict, key: str, build: Builder) -> tuple[Signal, ...]:
 # ---------------------------------------------------------------------------
 
 
-@signal_node("constant", summary="Valeur litterale, independante du contexte.")
+@signal_node(
+    "constant",
+    summary="Valeur litterale, independante du contexte.",
+    fields=(
+        NodeField("value", FieldKind.NUMBER, description="La valeur rendue, telle quelle."),
+    ),
+)
 @dataclass(frozen=True, slots=True)
 class Constant:
     """Constante. Sert de seuil dans les comparaisons."""
@@ -210,7 +354,30 @@ class Constant:
         return cls(float(raw))
 
 
-@signal_node("primitive", summary="Feuille : une primitive du registre, parametres figes.")
+@signal_node(
+    "primitive",
+    summary="Feuille : une primitive du registre, parametres figes.",
+    fields=(
+        NodeField(
+            "ref",
+            FieldKind.STRING,
+            description=(
+                "Reference versionnee, ex. 'sma@1'. Sans version, la plus recente est "
+                "prise - a n'utiliser qu'en exploration."
+            ),
+        ),
+        NodeField(
+            "params",
+            FieldKind.OBJECT,
+            required=False,
+            description=(
+                "Parametres de la primitive. Leur schema depend de `ref` et ne peut "
+                "donc pas etre fige ici : il est publie par le catalogue des "
+                "primitives, une entree par reference."
+            ),
+        ),
+    ),
+)
 @dataclass(frozen=True, slots=True)
 class PrimitiveSignal:
     """Primitive liee a ses parametres."""
@@ -252,7 +419,27 @@ class PrimitiveSignal:
         return cls(get_primitive(ref).bind(**params))
 
 
-@signal_node("price", summary="Feuille : un champ OHLCV de la barre courante ou passee.")
+@signal_node(
+    "price",
+    summary="Feuille : un champ OHLCV de la barre courante ou passee.",
+    fields=(
+        NodeField(
+            "field",
+            FieldKind.STRING,
+            required=False,
+            default="close",
+            choices=("open", "high", "low", "close", "volume"),
+        ),
+        NodeField(
+            "lag",
+            FieldKind.INTEGER,
+            required=False,
+            default=0,
+            minimum=0,
+            description="Barres en arriere. Un lag negatif viserait une barre non close.",
+        ),
+    ),
+)
 @dataclass(frozen=True, slots=True)
 class Price:
     """Champ OHLCV lu directement, sans passer par une primitive."""
@@ -302,7 +489,14 @@ class Price:
 # ---------------------------------------------------------------------------
 
 
-@signal_node("lag", summary="Evalue un sous-signal tel qu'il etait il y a `bars` barres.")
+@signal_node(
+    "lag",
+    summary="Evalue un sous-signal tel qu'il etait il y a `bars` barres.",
+    fields=(
+        NodeField("bars", FieldKind.INTEGER, minimum=1, description="Toujours vers le passe."),
+        NodeField("inner", FieldKind.NODE),
+    ),
+)
 @dataclass(frozen=True, slots=True)
 class Lag:
     """Decalage temporel d'une expression, toujours vers le passe.
@@ -353,7 +547,15 @@ class CompareOp(StrEnum):
     NE = "!="
 
 
-@signal_node("compare", summary="Comparaison de deux sous-signaux, resultat booleen.")
+@signal_node(
+    "compare",
+    summary="Comparaison de deux sous-signaux, resultat booleen.",
+    fields=(
+        NodeField("op", FieldKind.STRING, choices=(">", ">=", "<", "<=", "==", "!=")),
+        NodeField("left", FieldKind.NODE),
+        NodeField("right", FieldKind.NODE),
+    ),
+)
 @dataclass(frozen=True, slots=True)
 class Compare:
     """Comparaison. `None` d'un cote rend le resultat indefini, pas faux."""
@@ -415,7 +617,15 @@ class ArithOp(StrEnum):
     DIV = "/"
 
 
-@signal_node("arith", summary="Operation arithmetique entre deux sous-signaux.")
+@signal_node(
+    "arith",
+    summary="Operation arithmetique entre deux sous-signaux.",
+    fields=(
+        NodeField("op", FieldKind.STRING, choices=("+", "-", "*", "/")),
+        NodeField("left", FieldKind.NODE),
+        NodeField("right", FieldKind.NODE),
+    ),
+)
 @dataclass(frozen=True, slots=True)
 class Arith:
     """Arithmetique. Une division par zero rend `None`, jamais `inf`."""
@@ -466,7 +676,11 @@ class Arith:
         return cls(_child(spec, "left", build), ArithOp(raw), _child(spec, "right", build))
 
 
-@signal_node("all_of", summary="Conjonction : vrai si tous les sous-signaux sont vrais.")
+@signal_node(
+    "all_of",
+    summary="Conjonction : vrai si tous les sous-signaux sont vrais.",
+    fields=(NodeField("operands", FieldKind.NODE_LIST),),
+)
 @dataclass(frozen=True, slots=True)
 class AllOf:
     """Conjonction stricte.
@@ -512,7 +726,11 @@ class AllOf:
         return cls(_children(spec, "operands", build))
 
 
-@signal_node("any_of", summary="Disjonction : vrai si au moins un sous-signal est vrai.")
+@signal_node(
+    "any_of",
+    summary="Disjonction : vrai si au moins un sous-signal est vrai.",
+    fields=(NodeField("operands", FieldKind.NODE_LIST),),
+)
 @dataclass(frozen=True, slots=True)
 class AnyOf:
     """Disjonction stricte. Meme traitement de `None` que `all_of`."""
@@ -552,7 +770,11 @@ class AnyOf:
         return cls(_children(spec, "operands", build))
 
 
-@signal_node("not", summary="Negation booleenne.")
+@signal_node(
+    "not",
+    summary="Negation booleenne.",
+    fields=(NodeField("inner", FieldKind.NODE),),
+)
 @dataclass(frozen=True, slots=True)
 class Not:
     """Negation. `None` reste `None`."""
@@ -584,7 +806,11 @@ class Not:
         return cls(_child(spec, "inner", build))
 
 
-@signal_node("crosses_above", summary="`fast` passe au-dessus de `slow` entre t-1 et t.")
+@signal_node(
+    "crosses_above",
+    summary="`fast` passe au-dessus de `slow` entre t-1 et t.",
+    fields=(NodeField("fast", FieldKind.NODE), NodeField("slow", FieldKind.NODE)),
+)
 @dataclass(frozen=True, slots=True)
 class CrossesAbove:
     """Croisement haussier.
@@ -631,7 +857,11 @@ class CrossesAbove:
         return cls(_child(spec, "fast", build), _child(spec, "slow", build))
 
 
-@signal_node("crosses_below", summary="`fast` passe sous `slow` entre t-1 et t.")
+@signal_node(
+    "crosses_below",
+    summary="`fast` passe sous `slow` entre t-1 et t.",
+    fields=(NodeField("fast", FieldKind.NODE), NodeField("slow", FieldKind.NODE)),
+)
 @dataclass(frozen=True, slots=True)
 class CrossesBelow:
     """Croisement baissier. Symetrique de `crosses_above`."""
