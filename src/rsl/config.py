@@ -54,6 +54,7 @@ from rsl.engine.risk import (
     SizingRule,
 )
 from rsl.engine.runner import RunConfig
+from rsl.env import resolve_data_path
 from rsl.errors import ConfigurationError
 from rsl.manifest import DataSource
 
@@ -90,6 +91,29 @@ class DataSpec(StrictModel):
     @property
     def instrument(self) -> InstrumentSpec:
         return get_instrument(self.root)
+
+    @property
+    def resolved_path(self) -> Path:
+        """Chemin absolu reel du fichier, sur CETTE machine.
+
+        Un chemin relatif est resolu contre la racine declaree par
+        l'environnement (`RSL_DATA_DIR`, ou un `.env`). C'est la seule forme
+        portable : voir `rsl.env`.
+        """
+        return resolve_data_path(self.path)
+
+    def canonical_path(self) -> str:
+        """Forme du chemin qui entre dans le `config_hash`.
+
+        Un chemin relatif est conserve relatif, et normalise en separateurs
+        POSIX : c'est ce qui permet a deux machines de produire le MEME
+        `config_hash` pour le meme run. Un chemin absolu reste absolu - le
+        comportement d'origine, conserve pour les specifications anciennes,
+        au prix de sa non-portabilite.
+        """
+        if self.path.is_absolute():
+            return str(self.path.resolve())
+        return self.path.as_posix()
 
     @property
     def validation(self) -> ValidationConfig:
@@ -289,7 +313,7 @@ class BacktestSpec(StrictModel):
         """
         payload = self.model_dump(mode="json")
         for entry, source in zip(payload["data"], self.data, strict=True):
-            entry["path"] = str(source.path.resolve())
+            entry["path"] = source.canonical_path()
         return payload
 
     def build_run_config(self) -> RunConfig:
@@ -326,7 +350,7 @@ def load_stores(
     for entry in spec.data:
         instrument = entry.instrument
         store, _report = load_bar_store(
-            entry.path,
+            entry.resolved_path,
             symbol=instrument.symbol,
             granularity=Granularity.minutes(entry.granularity_minutes),
             timestamp_column=entry.timestamp_column,
@@ -356,7 +380,7 @@ def load_stores(
         sources.append(
             DataSource(
                 symbol=instrument.symbol,
-                path=str(entry.path.resolve()),
+                path=str(entry.resolved_path.resolve()),
                 source_hash=store.source_hash,
                 n_bars=store.n_bars,
                 granularity=str(store.granularity),

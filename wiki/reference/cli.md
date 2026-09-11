@@ -1,6 +1,6 @@
 ---
 type: reference
-updated: 2026-09-10
+updated: 2026-09-11
 autorite: src/rsl/cli.py + README.md
 ---
 
@@ -39,6 +39,13 @@ donnees, et le champ **Rejouable**. Ce dernier est le seul qui compte vraiment â
 voir [[concepts/determinisme]].
 
 ## Developpement
+
+Premiere etape sur une machine neuve : declarer ou sont les cotations. Sans
+`.env`, toute specification a chemin relatif leve. Voir [[reference/donnees]].
+
+```bash
+cp .env.example .env
+```
 
 ```bash
 python -m venv .venv

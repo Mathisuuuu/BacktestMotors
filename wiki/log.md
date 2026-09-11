@@ -51,3 +51,17 @@ grep "^## \[" wiki/log.md | tail -5
 ## [2026-09-11] note | defaut trouve dans `RunManifest.is_reproducible` : `all(())` vaut `True` | un run sans aucune source de donnees enregistree se declare `Rejouable oui` ; `test_missing_data_sources_are_flagged` echoue et a raison. Le champ que [[concepts/determinisme]] designe comme le seul qui compte ment par vacuite
 
 ## [2026-09-11] note | defaut trouve sur `rsl schema` redirige : sortie en CP1252, pas en UTF-8 | `ensure_ascii=False` + stdout Windows ; le `§` sort en octet 0xA7, le fichier est illisible en UTF-8. `--out` ecrit correctement en UTF-8 : le defaut ne touche que la redirection `>`
+
+## [2026-09-11] fix | chemins de donnees rendus portables : `RSL_DATA_DIR` + `.env`, et `config_hash` debarrasse du chemin absolu | nouveau `src/rsl/env.py` (103 l., zero dependance) ; 15 chemins absolus retires de `examples/` et `cli.py` ; 25 tests ajoutes ; les 4 empreintes de resultat sont INCHANGEES, seul le `config_hash` bouge -> voir [[lessons]] L7
+
+## [2026-09-11] note | durcissement trouve par un test que j'ecrivais : la remontee vers le `.env` sortait du depot | elle atteignait `C:\Users\Mathis\.env` (118 o, UTF-16), etranger au projet. Bornee aux marqueurs `.git` / `pyproject.toml`, et lecture UTF-8/UTF-16/CP1252 (PowerShell 5.1 redirige en UTF-16)
+
+## [2026-09-11] experiment | rsi-survendu-hors-lundi | `non-conclusif` : Sharpe 0,46 sur 2732 barres, 49 trades, 54 % du resultat dans un pli sur neuf ; le filtre calendaire n'a pas de temoin. Essai fait comme preuve qu'une strategie neuve s'ecrit en JSON seul -- compte quand meme au compteur (L2)
+
+## [2026-09-11] note | question « peut-on creer une strategie sans une ligne de code » : verifie au shell | OUI dans le vocabulaire (13 primitives x 15 noeuds composables, 3 moules) ; NON au-dela : une primitive ou un type de noeud absent est refuse avec rc=1 et l'enumeration de ce qui existe. Ecrire l'un des deux demande du Python et un enregistrement `@1`
+
+## [2026-09-11] note | P6 (`all(())` vaut `True`) est MASQUE, pas corrige | le test `test_missing_data_sources_are_flagged` passe desormais uniquement parce que l'arbre de travail est sale, ce qui met `git.is_reproducible` a `False`. Il redeviendra rouge au prochain commit propre
+
+## [2026-09-11] note | correction de l'entree `fix` ci-dessus (log append-only : on corrige par ajout) | `src/rsl/env.py` fait 128 lignes et non 103 -- le chiffre notait l'etat avant le durcissement (borne de depot + encodages) ; le nombre de tests ajoutes est 25
+
+## [2026-09-11] note | correction finale des chiffres de `src/rsl/env.py` (les deux entrees precedentes sont fausses toutes les deux) | chiffres verifies : **133 lignes**, **20 fonctions de test** dans `tests/unit/test_env.py` soit **23 tests collectes** (une est parametree sur 4 encodages). Total de la suite : 1180 -> 1203

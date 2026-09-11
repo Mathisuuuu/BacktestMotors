@@ -8,3 +8,6 @@ __pycache__/
 runs/
 *.egg-info/
 .hypothesis/
+
+# Racine des donnees propre a chaque machine. Motif ANCRE : voir lecon L5.
+/.env

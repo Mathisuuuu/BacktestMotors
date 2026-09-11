@@ -50,7 +50,7 @@ EXAMPLE_SPEC: dict[str, object] = {
     "data": [
         {
             "root": "ES",
-            "path": "C:/Users/Mathis/Desktop/Cotations/indices/ES_v0_1m.parquet",
+            "path": "indices/ES_v0_1m.parquet",
             "granularity_minutes": 1,
             "resample": "day",
             "resample_min_bars": 200,

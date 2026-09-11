@@ -7,8 +7,44 @@ autorite: docs/no-lookahead.md §4 + src/rsl/data/
 # Donnees — routeur
 
 > Page routeur. Le repertoire de donnees **n'est pas versionne** (`data/` est
-> dans `.gitignore`). Les tests d'integration le cherchent via la variable
-> d'environnement `RSL_DATA_DIR` et se sautent s'il est absent.
+> dans `.gitignore`). Autorite : [src/rsl/env.py](../../src/rsl/env.py).
+
+## Ou sont les cotations — `RSL_DATA_DIR`
+
+Les cotations ne vivent pas au meme endroit chez deux personnes. Une
+specification de backtest ne porte donc **jamais** de chemin absolu : elle porte
+un chemin **relatif a une racine**, et la racine est une propriete de la
+machine, pas du run.
+
+| | |
+|---|---|
+| Declaration | `RSL_DATA_DIR` dans un fichier `.env` a la racine du depot |
+| Modele versionne | [.env.example](../../.env.example) — a copier en `.env` |
+| Surcharge ponctuelle | la variable d'environnement l'emporte sur le fichier |
+| `.env` versionne ? | non : `/.env` dans `.gitignore`, motif **ancre** (lecon L5) |
+
+```bash
+cp .env.example .env
+```
+
+Une specification ecrit alors `"path": "indices/ES_v0_1m.parquet"`. Un chemin
+absolu reste accepte — les specifications anciennes ne changent pas de sens —
+mais il n'est pas portable, et il entre tel quel dans le `config_hash`.
+
+Trois garde-fous, tous couverts par `tests/unit/test_env.py` :
+
+- **Pas de repli silencieux.** Un chemin relatif sans racine declaree leve une
+  `ConfigurationError` qui nomme le remede. Resoudre contre le repertoire
+  courant ferait dependre le run de l'endroit d'ou la commande est lancee.
+- **La recherche du `.env` ne sort pas du depot.** Elle s'arrete au premier
+  repertoire portant `.git` ou `pyproject.toml`. Sans cette borne, le `.env`
+  d'un projet voisin — ou celui du repertoire personnel — imposerait sa racine.
+- **L'encodage est tolere.** PowerShell 5.1 ecrit ses redirections en UTF-16 :
+  un `.env` cree avec `"CLE=valeur" > .env` depuis une console Windows n'est pas
+  de l'UTF-8. UTF-8, UTF-16 et CP1252 sont lus.
+
+Le `config_hash` porte la forme **relative et normalisee en `/`** : deux
+machines produisent le meme hash pour le meme run. Voir [[lessons]] L7.
 
 > [!WARNING] Le paquet `rsl.data` existe sur le disque mais n'est **pas versionne** (2026-09-11)
 > Etat au 2026-09-11 : les 6 modules sont **revenus** dans la copie de travail
@@ -59,6 +95,7 @@ autorite: docs/no-lookahead.md §4 + src/rsl/data/
 | Chargement et validation | `src/rsl/data/loader.py` — `load_bar_store` rend aussi un rapport |
 | Iteration a curseur | `src/rsl/data/feed.py` — voir [[concepts/context-curseur]] |
 | Politique de donnees manquantes | [docs/no-lookahead.md](../../docs/no-lookahead.md) §4 |
+| Racine des cotations, `.env` | `src/rsl/env.py` |
 | Valider des fichiers en ligne de commande | `rsl validate FICHIER...` — la racine est deduite du nom (`ES_v0_1m` → `ES`) |
 | Table des contrats | `rsl instruments` — multiplicateur, tick, valeur du tick, frais, marge |
 | Reechantillonnage causal | couche donnees + `rsl run` (champ `resample` de la config) |

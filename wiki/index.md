@@ -1,6 +1,6 @@
 ---
 type: hub
-updated: 2026-09-10
+updated: 2026-09-11
 ---
 
 # Index
@@ -40,6 +40,7 @@ d'essais du Deflated Sharpe.
 
 - [[experiments/sma-es-daily-walkforward|SMA ES quotidien — walk-forward 9 plis]] — Sharpe 0,60 agrege contre 57 % du resultat dans un seul pli. Verdict : `fragile`.
 - [[experiments/dsr-grille-sma-8-essais|Deflated Sharpe — grille SMA, 8 essais]] — DSR `SIGNIFICATIF`, sans portee a 8 essais. Verdict : `non-conclusif`.
+- [[experiments/rsi-survendu-hors-lundi|RSI survendu hors lundi — ES quotidien]] — Sharpe 0,46 ; 54 % du resultat dans un pli sur neuf. Sert de preuve qu'une strategie neuve s'ecrit en JSON seul. Verdict : `non-conclusif`.
 
 ## Concepts — `concepts/`
 

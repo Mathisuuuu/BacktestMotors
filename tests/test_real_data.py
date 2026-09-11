@@ -8,7 +8,6 @@ rejetteraient des donnees saines).
 
 from __future__ import annotations
 
-import os
 from pathlib import Path
 
 import numpy as np
@@ -17,8 +16,10 @@ import pytest
 from rsl.data.instruments import get_instrument, known_roots
 from rsl.data.loader import build_panel, load_bar_store, validate_file
 from rsl.data.schema import ABSENT, AlignPolicy, Granularity
+from rsl.env import data_root
 
-DATA_ROOT = Path(os.environ.get("RSL_DATA_DIR", r"C:\Users\Mathis\Desktop\Cotations"))
+_ROOT = data_root()
+DATA_ROOT = _ROOT if _ROOT is not None else Path("cotations-absentes")
 
 RELATIVE_PATHS = {
     "NQ": "indices/NQ_v0_1m.parquet",

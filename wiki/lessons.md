@@ -1,6 +1,6 @@
 ---
 type: hub
-updated: 2026-09-10
+updated: 2026-09-11
 ---
 
 # Lecons
@@ -110,3 +110,30 @@ la cause, relancer, et ne traiter comme defaut que ce qui reste.
 
 Fonde sur [[reference/cli]] · [[Failed Ideas/ledger]] · [[log]] (2026-09-10)
 
+## L7 -- Un chemin absolu dans une empreinte rend l'empreinte incomparable
+
+`BacktestSpec.canonical()` resolvait les chemins de donnees en absolu avant de
+les hacher, pour qu'une meme commande lancee depuis deux repertoires differents
+donne le meme `config_hash`. L'intention etait juste, la portee trop courte :
+deux **machines** dont les cotations ne sont pas au meme endroit produisaient
+deux `config_hash` differents pour le meme run.
+
+Mesure du 2026-09-11, meme strategie et meme fichier a deux emplacements :
+
+| | machine A | machine B |
+|---|---|---|
+| `config_hash` | `80c7c6c6fe8ecb02` | `df38f197b3943c35` |
+| empreinte de resultat | `96e230f1197c040b...` | `96e230f1197c040b...` |
+
+L'empreinte de resultat, elle, etait deja portable : elle ne porte que des
+fills, des trades et des compteurs. Le defaut ne touchait donc pas le
+determinisme du moteur -- il touchait la capacite de **deux personnes a
+constater qu'elles ont lance le meme run**.
+
+**Consequence operationnelle :** ce qui entre dans une empreinte destinee a etre
+comparee entre machines ne doit contenir aucune coordonnee de machine -- ni
+chemin absolu, ni nom d'utilisateur, ni separateur dependant du systeme. La
+forme canonique d'un chemin relatif est normalisee en `/` pour cette raison
+precise : sans cela, Windows hacherait `indices\ES` et Linux `indices/ES`.
+
+Fonde sur [[reference/donnees]] · [[concepts/determinisme]] · [[reference/cli]]
