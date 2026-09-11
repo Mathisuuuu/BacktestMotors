@@ -58,20 +58,26 @@ d'origine :
 
 Un `BarContext` porte exactement QUATRE choses : `_store`, `_i`, `_position`
 et `_peers`. La cle en couvre deux. Les deux autres ne sont atteignables que
-par les noeuds `peer` et `position` - et `shifted` les laisse tels quels.
-Concretement, dans `rolling(zscore, 120, close / peer(NQ, close))`, le terme
-NQ vaut la barre COURANTE pour les 120 decalages : la valeur a la barre `j`
-n'est donc pas la meme selon la barre depuis laquelle on la regarde.
+par les noeuds `peer` et `position`, et aucun des deux n'est une fonction de
+`(serie, barre)` :
+
+- `_peers` designe un PANNEAU, que la cle n'identifie pas. Deux panneaux
+  partageant le meme magasin d'ES donneraient des valeurs differentes a la
+  meme cle ;
+- `_position` est l'etat COURANT, recopie tel quel par `shifted` - le runner
+  ne conserve aucun historique de positions a reculer.
 
 D'ou la regle, qui n'est pas une precaution mais une demonstration : un
 sous-arbre est memoisable si et seulement s'il ne contient ni `peer` ni
 `position`. La liste est COMPLETE parce que la liste des attributs d'un
 `BarContext` l'est.
 
-(Au passage, cela met au jour une semantique de `peer` sous `rolling` qui
-merite d'etre connue : le terme distant ne glisse pas avec la fenetre. Ce
-n'est pas un defaut introduit ici, et le corriger changerait une empreinte
-archivee - c'est une decision a prendre a part.)
+Ce travail a mis au jour un defaut qui lui preexistait : le terme distant ne
+glissait pas avec la fenetre. **Corrige le meme jour** - `shifted` recule
+desormais aussi le resolveur de pairs. Le critere ci-dessus ne change pas pour
+autant : la valeur d'un `peer` depend maintenant de `(serie, barre, PANNEAU)`,
+et la cle de memoisation n'identifie pas le panneau. Le refus subsiste, pour
+une raison plus nette qu'avant.
 
 Les deux autres gardes
 ----------------------

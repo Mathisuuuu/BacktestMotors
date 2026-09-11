@@ -16,24 +16,25 @@ generated: true
 
 | Indicateur | Valeur |
 |---|---|
-| Pages de wiki | 22 |
-| Entrees de log | 91 |
+| Pages de wiki | 23 |
+| Entrees de log | 96 |
 | Derniere activite | 2026-09-11 |
 | Idees ecartees (ledger) | 17 |
 | Idees en attente (ledger) | 3 |
 | Pages `Failed Ideas/` | 1 |
 | Pages `concepts/` | 6 |
-| Pages `experiments/` | 3 |
+| Pages `experiments/` | 4 |
 | Pages `reference/` | 7 |
 | Pages `research/` | 1 |
 
-**Activite par type :** note × 46, fix × 18, feat × 12, decision × 10, setup × 1, lint × 1, experiment × 1, audit × 1, refactor × 1
+**Activite par type :** note × 49, fix × 19, feat × 12, decision × 10, experiment × 2, setup × 1, lint × 1, audit × 1, refactor × 1
 
 ## Experiences
 
 | Experience | Statut | Verdict | Essais | Maj |
 |---|---|---|---|---|
 | [[experiments/dsr-grille-sma-8-essais]] | `termine` | `non-conclusif` | 8 | 2026-09-10 |
+| [[experiments/paire-es-nq-retour-a-la-moyenne]] | `termine` | `non-conclusif` | 1 | 2026-09-11 |
 | [[experiments/rsi-survendu-hors-lundi]] | `termine` | `non-conclusif` | 1 | 2026-09-11 |
 | [[experiments/sma-es-daily-walkforward]] | `termine` | `fragile` | 1 | 2026-09-10 |
 
@@ -41,14 +42,14 @@ Le total des essais alimente le Deflated Sharpe : un essai non enregistre gonfle
 
 ## Derniere activite — 8 entree(s)
 
+- **2026-09-11** — experiment | paire ES/NQ : premiers chiffres ou le terme distant compte | Sharpe 0,61, 149 trades, profit factor 1,77 sur 2633 barres quotidiennes. **A ne pas lire comme une amelioration** : l'ancien 0,24 venait d'une strategie DIFFERENTE, qui ne regardait pas NQ. Un seul echantillon, aucun walk-forward, seuils herites de l'epoque ou le signal etait inerte, roulement non ajuste. Verdict `non-conclusif` -> [[experiments/paire-es-nq-retour-a-la-moyenne]]
+- **2026-09-11** — note | mon premier test de la correction echouait sur du code juste, pour la meme raison mathematique que le defaut | montage : `A = 100 + k` et `B = 1000 + 10k`, dont le ratio vaut 0,1 pour TOUT k. Deux rampes proportionnelles sont un cas degenere qui annule le terme a verifier. Corrige en prenant `B = 500 + 7k`
+- **2026-09-11** — note | ce qui ne pouvait pas voir ce defaut, et pourquoi les empreintes en font partie | tests unitaires (chaque noeud pris seul est juste), `mypy`/`ruff` (rien d'incorrect), corruption du futur (aucune fuite : `NQ[t]` lu en `t` est du passe), relecture (`sub._set_peers(self._peers)` est la ligne qu'on ecrit) -- et les EMPREINTES, qui garantissent qu'un resultat ne change pas, jamais qu'il est juste. Un defaut deterministe leur est transparent par construction -> [[lessons]] L18
+- **2026-09-11** — note | l'empreinte de `paire_es_nq` change et son `config_hash` non, ce qui est exactement la signature attendue | `ed5fdfcb2b74cfd2` -> `479348a0ff34b8e3`, 15 -> 149 trades. Le `config_hash` reste `c686c31fa61e36d2` : la specification n'a pas bouge, le moteur si. C'est la distinction que `tests/test_integration_reelle.py` avait ete ecrit pour rendre lisible -- et c'est LUI qui a signale le changement, une heure apres avoir ete ecrit. `tests/fixtures/empreintes_attendues.json` regenere DELIBEREMENT, ancienne valeur conservee dans cette entree
+- **2026-09-11** — fix | `peer` sous une fenetre glissante : le terme distant etait INERTE, pas seulement mal defini | `shifted` recopiait le resolveur de pairs sans le reculer, donc `rolling(zscore, 120, close / peer(NQ, close))` divisait les 120 clotures d'ES par la MEME cloture de NQ. Le z-score etant invariant d'echelle, le terme distant n'avait AUCUN effet : ecart maximum **2,08e-14** avec un z-score d'ES seul. L'exemple phare du depot, presente comme une strategie de paires, negociait ES tout court. Corrige : `shifted` recule aussi les pairs, par les regles du PANNEAU (un absent le reste, un report borne le reste) et non par lecture directe du magasin, qui aurait rendu un « dernier prix connu »
 - **2026-09-11** — note | fausse alerte de performance, tranchee par une mesure temoin | la suite rapide passait de 33 a 51 s apres le decoupage, ce qui aurait pu signifier une memoisation desactivee en silence -- plus lent, jamais faux, donc invisible aux tests. Verifie : `sma@1`, un chemin que le decoupage ne touche pas, etait AUSSI deux fois plus lent (10,65 contre 5,43 us). La machine tournait au ralenti, pas le code. Une mesure sans temoin ne tranche rien
 - **2026-09-11** — note | la facade a perdu un nom pendant le decoupage, et seule la suite l'a dit | `ruff --fix` retire un import qui ne sert qu'a etre reexporte : `_NODES` a disparu, et `test_extension_closure.py` a echoue a la collecte. Corrige en pointant ce test vers `noeuds.contrat`, son module REEL -- un nom prive qui transite par une facade est un nom prive qu'on croit public. Et `test_couches.py` verifie desormais que tout ce que les familles DEFINISSENT passe par la facade, verification elle-meme validee en retirant `Rolling` et en constatant l'echec
 - **2026-09-11** — refactor | A-P3.3 : `signals.py`, 1 949 lignes, devient une facade de 168 | le code vit dans `rsl/strategies/noeuds/` : `contrat` (ce qu'est un noeud), `feuilles` (ce qui lit le monde), `fenetres` (ce qui regarde plusieurs barres), `operateurs` (ce qui combine), `raccourcis`. Les quatre familles importent `contrat`, jamais l'inverse, et un test le verifie par analyse d'AST. Aucun import du depot ne change. Verifie : 7 empreintes inchangees, et les TROIS contrats engendres (squelette, schema des signaux, schema complet) identiques au fichier pres -- `list_node_types()` triant, l'ordre d'enregistrement n'entre nulle part
-- **2026-09-11** — feat | A-P3.2 : la non-regression de bout en bout cesse d'etre verifiee A LA MAIN | depuis le debut de la session je relançais les exemples et comparais les empreintes a l'oeil. `tests/test_integration_reelle.py` le fait desormais : les 7 empreintes de resultat, les 7 hash de configuration, le nombre de trades, le determinisme de deux runs, l'equivalence avec et sans memoisation (dans un interpreteur separe, `RSL_NO_MEMO` etant lu a l'import), et les 136 primitives sur une VRAIE serie -- trouee, avec des week-ends de 49 h, ou le synthetique ne va pas. Marqueur `slow` : 12 tests avant, 183 apres. `tests/fixtures/empreintes_attendues.json` devient la verite terrain
-- **2026-09-11** — fix | A-P3.1 : la teinte des cartes du tableau de bord cesse d'etre greffee sur un widget | `app.py` posait `valeur.teinte = teinte` sur un `tk.Label` puis la relisait par `getattr(etiquette, "teinte", "neutre")`. Deux defauts : une greffe sur un objet d'une bibliotheque tierce, que `mypy` ne couvrait que par un `type: ignore` ; et un defaut `"neutre"` qui rendait l'echec MUET -- une cle mal orthographiee peignait tout en noir sans qu'aucun test ni aucun lint ne le voie. La table `TEINTES` est desormais DERIVEE de `GROUPES`, ou la teinte etait deja declaree, et une cle inconnue leve
-- **2026-09-11** — note | `Context.data_token` rejoint la surface publique, et ce qu'il a fallu pour que ce soit acceptable | premiere version : le jeton ETAIT le magasin, ce qui donnait l'historique complet -- futur inclus -- a qui sait le caster. `test_forbidden_access.py` l'a refuse, et il avait raison. Corrige : le jeton est un `object()` NU porte par `BarStore`, sans aucun attribut. Ni le magasin (fuite), ni un entier d'identite (reattribue apres ramassage, donc deux series confondues en silence)
-- **2026-09-11** — note | semantique de `peer` sous `rolling`, mise au jour par le travail sur la memoisation | dans `rolling(zscore, 120, close / peer(NQ, close))`, le terme NQ vaut la barre COURANTE pour les 120 decalages : il ne glisse pas avec la fenetre. Ce n'est ni documente ni evidemment voulu. NON corrige ici -- le changer modifierait l'empreinte archivee de `examples/paire_es_nq.json`, donc c'est une decision a prendre a part
-- **2026-09-11** — fix | la memoisation a change une empreinte avant d'etre corrigee, et c'est ce qui l'a rendue sure | `examples/paire_es_nq.json` passait a 634 remplissages au lieu de 30. Cause : `BarContext.shifted` recopie le resolveur de pairs et l'etat de position, donc un sous-arbre contenant `peer` ou `position` ne depend PAS que de `(serie, barre)`. Regle demontree et non supposee : un `BarContext` porte exactement quatre attributs, la cle en couvre deux, les deux autres ne s'atteignent que par ces deux noeuds. Ces sous-arbres ne sont donc pas memoises -> [[lessons]] L17
 
 ## Next Actions
 
@@ -140,11 +141,21 @@ suivante, qui viennent de l'audit fonctionnel du 2026-09-10.
       verifiee. `ruff check src tests` rend `All checks passed!` sans qu'aucun
       fichier de test ait ete touche : les 28 `I001` ont bien disparu d'
       elles-memes au retour de `rsl.data`.
-- [ ] **Decision a prendre : la semantique de `peer` sous `rolling`.** Le terme
-      distant vaut la barre COURANTE pour tous les decalages de la fenetre - il
-      ne glisse pas avec elle. Mis au jour par le travail sur la memoisation, ni
-      documente ni evidemment voulu. Le corriger changerait l'empreinte archivee
-      de `examples/paire_es_nq.json`.
+- [x] **`peer` sous `rolling` : CORRIGE (2026-09-11).** Ce n'etait pas une
+      convention mais un defaut : le terme distant restait a l'instant courant,
+      donc constant sur la fenetre, donc - z-score etant invariant d'echelle -
+      **sans aucun effet** (ecart 2,08e-14 avec un z-score du seul numerateur).
+      `shifted` recule maintenant aussi le resolveur de pairs, par les REGLES DU
+      PANNEAU : un instrument absent le reste. L'empreinte de `paire_es_nq`
+      change (15 -> 149 trades), son `config_hash` non. Essai enregistre en
+      [[experiments/paire-es-nq-retour-a-la-moyenne]] ; ce qu'il ne faut PAS en
+      conclure y est ecrit. Cout : le run passe de 3,6 a 5,4 s, le pair etant
+      desormais reellement resolu 120 fois par barre ([[lessons]] L18).
+- [ ] **Limite restante, de la meme famille** : `position` sous une vue reculee
+      rend l'etat COURANT - le runner ne garde aucun historique de positions.
+      `rolling(mean, 20, position("bars_held"))` lit donc vingt fois la meme
+      valeur, en silence. La lever demanderait au runner de conserver cet
+      historique.
 - [ ] Relancer les deux experiences seminales **avec manifeste et empreinte
       archives** -- l'audit a montre qu'elles se reproduisent
       (`sma_es_daily` : Sharpe 0,60, empreinte `e96832fb121b91fb`,

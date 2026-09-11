@@ -277,6 +277,29 @@ s'y applique pas ; le refus est fait par `RuleStrategy.from_spec`, et le schema
 publie porte desormais la meme contrainte. Meme regle que pour les champs d'un
 noeud, ou `build_signal` refuse deja `oprands` au lieu de `operands`.
 
+## `peer` et `position` sous une fenetre : ce que voit une vue reculee
+
+`rolling`, `lag`, `bars_since`, `cumulative` et les deux `crosses_*` evaluent
+leur sous-arbre sur `ctx.shifted(k)`. Deux noeuds se comportent alors
+differemment, et il faut le savoir avant d'ecrire un signal :
+
+| Noeud | Ce que voit `shifted(k)` | Pourquoi |
+|---|---|---|
+| `peer` | l'autre instrument **a l'instant recule** | corrige le 2026-09-11 ; le panneau porte tout l'historique, donc reculer est possible |
+| `position` | l'etat **courant**, pas celui d'il y a `k` barres | le runner ne conserve que l'etat courant : il n'existe aucun historique a reculer |
+
+Consequence pratique : `rolling(mean, 20, position("bars_held"))` lit vingt
+fois la meme valeur. Ce n'est pas un bug de plus, c'est une limite du socle -
+mais elle est silencieuse, et c'est pour cela qu'elle est ecrite ici.
+
+Le cas `peer`, lui, **etait** un bug. Le terme distant restait a l'instant
+courant, donc constant sur toute la fenetre ; un z-score etant invariant
+d'echelle, il n'avait aucun effet - ecart 2,08e-14 avec un z-score du seul
+numerateur. L'empreinte de [examples/paire_es_nq.json](../../examples/paire_es_nq.json)
+change avec la correction, et son `config_hash` non : le moteur a change, pas
+la specification. Voir [[lessons]] L18 et
+[[experiments/paire-es-nq-retour-a-la-moyenne]].
+
 ## Ou vit le code
 
 `rsl/strategies/signals.py` est une **facade** depuis le 2026-09-11 : elle ne

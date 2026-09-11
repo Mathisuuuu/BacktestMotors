@@ -459,9 +459,62 @@ l'air suffisante » est une fuite qui attend. Et garder l'interrupteur : ce
 n'est pas un reglage, c'est l'instrument qui rend l'equivalence verifiable a
 tout moment.
 
-Effet de bord a connaitre, decouvert en chemin : la semantique de `peer` sous
-`rolling` - le terme distant ne glisse pas avec la fenetre - n'est ni
-documentee ni evidemment voulue. Elle n'est pas modifiee ici : la corriger
-changerait une empreinte archivee, et c'est une decision a prendre a part.
+Effet de bord decouvert en chemin, et **corrige le meme jour** : le terme
+distant ne glissait pas avec la fenetre. Voir [[lessons]] L18 - c'etait un
+defaut, pas une convention, et il etait invisible pour une raison
+mathematique.
 
 Fonde sur [[Failed Ideas/ledger]] · [[concepts/determinisme]] · [[log]] (2026-09-11)
+
+
+---
+
+## L18 -- Une symetrie du calcul peut rendre un defaut STRICTEMENT invisible
+
+`BarContext.shifted(lag)` recopiait le resolveur de pairs sans le reculer :
+une expression evaluee « telle qu'elle etait il y a `lag` barres » voyait les
+autres instruments a l'instant COURANT. Dans
+
+    rolling(zscore, 120, close / peer(NQ, close))
+
+les 120 clotures d'ES etaient donc divisees par la MEME cloture de NQ.
+
+**Le z-score est invariant par changement d'echelle.** Diviser toute une
+fenetre par une constante ne le change pas. Le terme distant ne modifiait donc
+rien du tout - mesure : ecart maximum **2,08e-14** avec un z-score d'ES seul,
+c'est-a-dire l'erreur d'arrondi. L'exemple phare du depot, presente comme une
+strategie de paires, negociait ES tout court.
+
+Ce qui rend ce defaut instructif est la liste de ce qui NE pouvait pas le
+voir :
+
+| Garde | Pourquoi elle ne voit rien |
+|---|---|
+| Tests unitaires | chaque noeud pris isolement est juste |
+| `mypy --strict`, `ruff` | rien d'incorrect a signaler |
+| Corruption du futur | aucune fuite : `NQ[t]` lu a l'instant `t` est du passe |
+| Empreintes de resultat | stables - un comportement faux et CONSTANT le reste |
+| Relecture du code | `sub._set_peers(self._peers)` est la ligne qu'on ecrit |
+
+Les empreintes sont le point le plus contre-intuitif : elles garantissent
+qu'un resultat ne CHANGE pas, jamais qu'il est juste. Un defaut deterministe
+leur est transparent par construction.
+
+Ce qui l'a trouve est un raisonnement sur le CONTENU du contexte, mene pour
+une autre raison : la memoisation exigeait d'enumerer ce que porte un
+`BarContext` et de montrer que la cle le couvre. Deux attributs n'etaient pas
+couverts ; regarder pourquoi a montre que l'un des deux ne devrait pas l'etre.
+
+**Consequence operationnelle :** pour un signal compose, verifier qu'un terme
+COMPTE, et pas seulement qu'il est present. Le test s'ecrit en une ligne -
+comparer l'expression a la meme expression privee de ce terme, et exiger
+qu'elles different. Une invariance du calcul (echelle, translation, monotonie)
+peut annuler un terme entier sans qu'aucun outil ne s'en apercoive.
+
+Corollaire pour les mesures : deux rampes PROPORTIONNELLES sont un montage de
+test degenere. Le premier test ecrit pour cette correction prenait
+`A = 100 + k` et `B = 1000 + 10k`, dont le ratio vaut 0,1 pour tout `k` - il
+echouait sur du code juste, pour la meme raison mathematique que le defaut
+qu'il devait attraper.
+
+Fonde sur [[experiments/paire-es-nq-retour-a-la-moyenne]] · [[log]] (2026-09-11)

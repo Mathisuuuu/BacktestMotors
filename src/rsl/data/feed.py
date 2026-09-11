@@ -50,6 +50,24 @@ class PeerResolver(Protocol):
 
     def peer_symbols(self) -> tuple[str, ...]: ...
 
+    def at_instant(self, ts_close_ns: int) -> PeerResolver:
+        """Le meme resolveur, fige a un instant ANTERIEUR ou egal.
+
+        C'est ce qui permet a `shifted` de tenir sa promesse. Sans cela, une
+        vue reculee de `lag` barres continuait de voir ses pairs a l'instant
+        COURANT : `rolling(zscore, 120, close / peer(NQ, close))` divisait les
+        120 clotures d'ES par la MEME cloture de NQ. Le z-score etant
+        invariant d'echelle, le terme distant n'avait alors aucun effet -
+        mesure le 2026-09-11, ecart maximum 2,08e-14 avec un z-score d'ES seul.
+
+        La ligne visee est cherchee dans le calendrier du panneau, et le pair
+        y est resolu par les REGLES DU PANNEAU : un instrument absent le reste,
+        un report borne le reste. Remonter directement dans le magasin du pair
+        court-circuiterait ces regles et rendrait un « dernier prix connu » que
+        `docs/no-lookahead.md` §4.1 refuse.
+        """
+        ...
+
 
 @runtime_checkable
 class Context(Protocol):
@@ -307,11 +325,20 @@ class BarContext:
         index = self._require_index(lag)
         sub = BarContext(self._store)
         sub._seek(index)
-        # L'etat de position suit la vue : une expression evaluee 'telle qu'elle
-        # etait' doit voir la position telle qu'elle est, pas une position
-        # remise a plat par accident.
+        # L'etat de position suit la vue. C'est une LIMITE connue, pas un
+        # choix : le runner ne conserve que l'etat courant, il n'existe nulle
+        # part d'historique de positions a reculer. Consequence a connaitre -
+        # `rolling(mean, 20, position("bars_held"))` lit vingt fois la meme
+        # valeur. Voir [[reference/vocabulaire-signaux]].
         sub._set_position(self._position)
-        sub._set_peers(self._peers)
+        # Les pairs, eux, RECULENT : ils le peuvent, puisque le panneau porte
+        # tout leur historique. Jusqu'au 2026-09-11 ils restaient a l'instant
+        # courant, ce qui rendait le terme distant constant sur toute une
+        # fenetre glissante - donc sans effet sur un z-score.
+        sub._set_peers(
+            None if self._peers is None
+            else self._peers.at_instant(int(self._store.ts_close[index]))
+        )
         return sub
 
     def history(self, n: int) -> BarWindow:
@@ -473,9 +500,100 @@ class MultiContext:
     def peer_symbols(self) -> tuple[str, ...]:
         return self.symbols
 
+    def at_instant(self, ts_close_ns: int) -> PeerResolver:
+        """Implemente `PeerResolver.at_instant`.
+
+        Rend un resolveur FIGE, et non ce `MultiContext` recule : celui-ci est
+        un curseur unique que le feed avance, et le reculer ici corromprait la
+        ligne en cours d'evaluation.
+        """
+        return FrozenPeers(self._panel, ts_close_ns)
+
     def is_stale(self, symbol: str) -> bool:
         """True si la barre visible pour cet instrument provient d'un report explicite."""
         return bool(self._panel.is_stale[symbol][self._row])
+
+
+def _row_at(panel: Panel, ts_close_ns: int) -> int:
+    """Derniere ligne du panneau dont la cloture est <= `ts_close_ns`.
+
+    Recherche et non arithmetique : le calendrier est l'UNION des clotures, il
+    n'a donc pas de pas regulier. `side="right"` puis `-1` donne bien la
+    derniere ligne <= l'instant, y compris quand il tombe exactement dessus.
+    """
+    ligne = int(np.searchsorted(panel.ts_close, ts_close_ns, side="right")) - 1
+    if ligne < 0:
+        raise InsufficientHistoryError(
+            f"aucune ligne de panneau a {ts_close_ns} ou avant : le calendrier "
+            f"commence plus tard. Declarez un `warmup_bars` suffisant."
+        )
+    return ligne
+
+
+class FrozenPeers:
+    """Resolveur de pairs fige a une ligne du panneau.
+
+    Existe pour `shifted` : une vue reculee doit voir les autres instruments
+    tels qu'ils etaient a SON instant, pas a l'instant courant.
+
+    Passe par le panneau et non par les magasins : c'est ce qui fait qu'un
+    instrument absent le reste, et qu'un report borne le reste. Lire
+    directement le magasin du pair rendrait le dernier prix connu, ce que
+    `docs/no-lookahead.md` §4.1 refuse explicitement.
+    """
+
+    __slots__ = ("_instant", "_panel", "_row")
+
+    def __init__(self, panel: Panel, ts_close_ns: int) -> None:
+        self._panel = panel
+        self._instant = ts_close_ns
+        self._row = -1  # cherche a la PREMIERE demande, pas ici
+
+    @property
+    def row(self) -> int:
+        """La ligne visee, cherchee paresseusement.
+
+        `shifted` construit un resolveur a CHAQUE decalage, y compris pour les
+        sous-arbres qui ne contiennent aucun `peer` - et ils sont la majorite.
+        Chercher la ligne dans le constructeur ferait payer un `searchsorted`
+        par decalage a `rolling(mean, 20, close)` sur un panneau, pour rien.
+        """
+        if self._row < 0:
+            self._row = _row_at(self._panel, self._instant)
+        return self._row
+
+    def resolve_peer(self, symbol: str) -> BarContext:
+        """Memes deux refus que `MultiContext.resolve_peer`, meme distinction.
+
+        Hors panneau : faute de specification. Absent a cet instant : etat de
+        marche legitime.
+        """
+        if symbol not in self._panel.stores:
+            raise ConfigurationError(
+                f"'{symbol}' ne fait pas partie du panneau. Presents : "
+                f"{', '.join(self._panel.symbols)}"
+            )
+        ligne = self.row
+        index = int(self._panel.row_index[symbol][ligne])
+        if index == ABSENT:
+            raise SymbolNotAvailableError(
+                f"{symbol} ne cote pas a "
+                f"{ns_to_datetime(int(self._panel.ts_close[ligne])).isoformat()}. "
+                f"Absent ne signifie pas 'dernier prix connu'."
+            )
+        ctx = BarContext(self._panel.stores[symbol])
+        ctx._seek(index)
+        # Le pair peut lui-meme atteindre les autres, au MEME instant fige :
+        # `peer(A, peer(B, ...))` doit rester coherent.
+        ctx._set_peers(self)
+        return ctx
+
+    def peer_symbols(self) -> tuple[str, ...]:
+        return self._panel.present_symbols(self.row)
+
+    def at_instant(self, ts_close_ns: int) -> PeerResolver:
+        """Reculer encore depuis une vue deja reculee reste possible."""
+        return FrozenPeers(self._panel, ts_close_ns)
 
 
 class PanelFeed:
