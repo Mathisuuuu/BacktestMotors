@@ -389,3 +389,140 @@ def _build_panel_rules(params: StrategyParams) -> CrossSectionalStrategy:
     inner = _build_rule_strategy(params)
     assert isinstance(inner, RuleStrategy)
     return PanelRuleStrategy(inner=inner)
+
+
+class MultiRuleParams(StrategyParams):
+    """Un jeu de regles PAR instrument, dans un portefeuille commun.
+
+    `books` associe un symbole a ses parametres - `quantity`, `rules`,
+    `allow_pyramiding`, `extra_warmup` - exactement ceux de `rules@1`, moins
+    `symbol` qui est deja la cle. Comme pour `rules@1`, le contenu de `rules`
+    n'est pas valide par pydantic au-dela de sa forme : `build_signal` s'en
+    charge, et dupliquer le registre ici le ferait diverger de lui.
+    """
+
+    books: dict[str, dict[str, object]] = PydField(default_factory=dict)
+    extra_warmup: int = 0
+
+
+@dataclass(slots=True)
+class MultiRuleStrategy(CrossSectionalStrategy):
+    """Plusieurs instruments, chacun ses regles, un seul portefeuille.
+
+    `rules@1` et `panel_rules@1` ne negocient qu'UN symbole : le second voit
+    les autres par `peer`, mais n'y prend pas position. Pour tenir ES sur une
+    logique et NQ sur une autre, il fallait deux runs - donc deux equity
+    separees, deux drawdowns sans rapport, et aucune contrainte de risque
+    commune. Ce moule supprime cette limite.
+
+    Ce qu'il ne change PAS, volontairement :
+
+    - chaque livre est une `RuleStrategy` ordinaire, litteralement la meme
+      classe. La logique de decision n'est pas dupliquee ;
+    - chaque livre recoit `ctx[symbole]`, donc le noeud `peer` continue de
+      fonctionner a l'interieur : un livre peut regarder les autres ;
+    - un livre dont l'instrument ne cote pas a cette ligne ne fait rien, comme
+      dans `panel_rules@1` - on ne decide pas sans barre.
+
+    Les livres sont parcourus dans l'ordre TRIE des symboles, jamais dans
+    l'ordre d'insertion du dictionnaire : deux specifications identiques a
+    l'ordre des cles pres doivent produire la meme suite d'ordres, donc la
+    meme empreinte.
+    """
+
+    books: tuple[RuleStrategy, ...]
+    extra_warmup: int = 0
+
+    def __post_init__(self) -> None:
+        if not self.books:
+            raise ConfigurationError(
+                "`books` est vide : une strategie multi-instruments a besoin d'au "
+                "moins un livre."
+            )
+        if self.extra_warmup < 0:
+            raise ConfigurationError(
+                f"extra_warmup doit etre >= 0, recu {self.extra_warmup}"
+            )
+        symboles = [livre.symbol for livre in self.books]
+        doublons = {s for s in symboles if symboles.count(s) > 1}
+        if doublons:
+            raise ConfigurationError(
+                f"symbole(s) en double dans `books` : {sorted(doublons)}. Deux jeux "
+                f"de regles sur le meme instrument se marcheraient dessus - leurs "
+                f"positions ne sont pas separables dans un portefeuille commun."
+            )
+
+    @property
+    def warmup_bars(self) -> int:
+        """Le plus exigeant des livres.
+
+        Un warmup par livre serait plus fin, mais le runner transversal n'en
+        expose qu'un : mieux vaut attendre trop que decider sur un indicateur
+        pas encore defini.
+        """
+        return max(livre.warmup_bars for livre in self.books) + self.extra_warmup
+
+    def reset(self) -> None:
+        for livre in self.books:
+            livre.reset()
+
+    def on_fill(self, fill: Fill) -> None:
+        """Diffuse a tous les livres.
+
+        Chacun filtre deja sur `fill.symbol == self.symbol` : router ici
+        dupliquerait ce filtrage, donc une occasion de le faire differemment.
+        """
+        for livre in self.books:
+            livre.on_fill(fill)
+
+    def on_rebalance(self, ctx: MultiContext) -> Sequence[Order]:
+        orders: list[Order] = []
+        for livre in self.books:
+            if livre.symbol not in ctx.symbols:
+                continue
+            orders.extend(livre.on_bar(ctx[livre.symbol]))
+        return orders
+
+    def describe(self) -> SpecDict:
+        return {
+            "class": type(self).__qualname__,
+            "extra_warmup": self.extra_warmup,
+            "books": {livre.symbol: livre.describe() for livre in self.books},
+        }
+
+
+@strategy(
+    "multi_rules",
+    version=1,
+    params=MultiRuleParams,
+    summary=(
+        "Un jeu de regles PAR instrument, dans un portefeuille commun. "
+        "Aucune classe a ecrire."
+    ),
+    cross_sectional=True,
+)
+def _build_multi_rules(params: StrategyParams) -> CrossSectionalStrategy:
+    assert isinstance(params, MultiRuleParams)
+    if not params.books:
+        raise ConfigurationError("`books` est vide : declarer au moins un instrument")
+
+    livres: list[RuleStrategy] = []
+    for symbole in sorted(params.books):
+        # Le type de `books` garantit deja que chaque valeur est un objet :
+        # pydantic rejette le reste avant d'arriver ici.
+        brut = params.books[symbole]
+        if "symbol" in brut:
+            raise ConfigurationError(
+                f"books['{symbole}'] porte un champ `symbol` : le symbole est deja "
+                f"la cle. En declarer un second ouvrirait la porte a ce que les deux "
+                f"divergent."
+            )
+        # Un livre EST un jeu de parametres `rules@1` moins le symbole : on
+        # passe par le meme modele, donc les memes defauts et la meme
+        # validation. Construire a la main dupliquerait les deux, et les ferait
+        # diverger au premier changement.
+        livre = RuleStrategyParams.model_validate({**brut, "symbol": symbole})
+        construit = _build_rule_strategy(livre)
+        assert isinstance(construit, RuleStrategy)
+        livres.append(construit)
+    return MultiRuleStrategy(books=tuple(livres), extra_warmup=params.extra_warmup)

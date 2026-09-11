@@ -1401,6 +1401,27 @@
       "title": "MomentumParams",
       "type": "object"
     },
+    "multi_rules@1": {
+      "additionalProperties": false,
+      "description": "Un jeu de regles PAR instrument, dans un portefeuille commun.\n\n`books` associe un symbole a ses parametres - `quantity`, `rules`,\n`allow_pyramiding`, `extra_warmup` - exactement ceux de `rules@1`, moins\n`symbol` qui est deja la cle. Comme pour `rules@1`, le contenu de `rules`\nn'est pas valide par pydantic au-dela de sa forme : `build_signal` s'en\ncharge, et dupliquer le registre ici le ferait diverger de lui.",
+      "properties": {
+        "books": {
+          "additionalProperties": {
+            "additionalProperties": true,
+            "type": "object"
+          },
+          "title": "Books",
+          "type": "object"
+        },
+        "extra_warmup": {
+          "default": 0,
+          "title": "Extra Warmup",
+          "type": "integer"
+        }
+      },
+      "title": "MultiRuleParams",
+      "type": "object"
+    },
     "panel_rules@1": {
       "additionalProperties": false,
       "description": "Parametres d'une strategie a regles, tels qu'ils arrivent d'un fichier.\n\n`rules` est un dictionnaire de specifications de noeuds - c'est la que se\ntrouve toute l'expressivite. Il n'est PAS valide par pydantic au-dela de sa\nforme : sa validation reelle est faite par `build_signal`, qui connait le\nregistre des noeuds et refuse un type inconnu, un operateur invalide ou une\nreference de primitive inexistante. Un schema pydantic fige ici\ndupliquerait ce registre et divergerait de lui.",

@@ -17,7 +17,7 @@ generated: true
 | Indicateur | Valeur |
 |---|---|
 | Pages de wiki | 22 |
-| Entrees de log | 64 |
+| Entrees de log | 66 |
 | Derniere activite | 2026-09-11 |
 | Idees ecartees (ledger) | 16 |
 | Idees en attente (ledger) | 3 |
@@ -27,7 +27,7 @@ generated: true
 | Pages `reference/` | 7 |
 | Pages `research/` | 1 |
 
-**Activite par type :** note × 37, fix × 9, decision × 8, feat × 7, setup × 1, lint × 1, experiment × 1
+**Activite par type :** note × 38, fix × 9, feat × 8, decision × 8, setup × 1, lint × 1, experiment × 1
 
 ## Experiences
 
@@ -41,14 +41,14 @@ Le total des essais alimente le Deflated Sharpe : un essai non enregistre gonfle
 
 ## Derniere activite — 8 entree(s)
 
+- **2026-09-11** — note | deux defauts de conception trouves par les tests, pas par relecture | (1) je construisais chaque livre en appelant `RuleStrategy.from_spec` directement, ce qui contournait les defauts et la validation de `RuleStrategyParams` -- un livre sans `quantity` levait un message obscur. Corrige en passant par le modele. (2) une verification `isinstance(brut, dict)` etait du code mort : l'annotation `dict[str, dict[str, object]]` rejette deja la valeur avant le constructeur. Retiree, et le test dit maintenant ce qui se passe vraiment
+- **2026-09-11** — feat | `multi_rules@1` : un jeu de regles PAR instrument, dans un portefeuille commun | leve la brique 2 des trois manques trouves en comparant le moteur au vocabulaire. Un livre est un jeu de parametres `rules@1` moins le symbole, VALIDE par le meme modele -- memes defauts, meme `extra=forbid`. Livres tries par symbole pour que l'ordre des cles JSON n'entre pas dans l'empreinte. `peer` continue de fonctionner dans chaque livre. Essai reel : ES en 20/100 et NQ en 10/40 quantite double, 46 trades, Sharpe 0,85. Suite 1494 -> 1512 tests
 - **2026-09-11** — note | comment ce manque a ete trouve, et deux autres avec lui | en comparant ce que le MOTEUR accepte a ce que le VOCABULAIRE sait produire, pas en lisant la documentation. Les deux autres ecarts restent ouverts : une strategie a regles ne traite qu'un seul symbole, et les sorties sont tout ou rien (pas d'allegement) -> [[lessons]] L13
 - **2026-09-11** — decision | un prix d'entree indefini ABANDONNE l'entree, il ne retombe pas sur un ordre au marche | retomber changerait silencieusement le type d'ordre, donc le comportement, au moment precis ou l'on en sait le moins. Meme regle que partout : « je ne sais pas » n'est pas une raison d'agir
 - **2026-09-11** — note | semantique a connaitre : un ordre a limite vaut pour la SEULE barre d'execution | mesure sur ES quotidien, limite a 1 ATR sous la cloture : 1 trade contre 18 au marche, et 0 pour un stop a 1 ATR au-dessus. Les abandons sont visibles (`n_orders_cancelled_unfilled: 17` sur `n_orders_submitted: 19`) mais rien ne previent -- d'ou un paragraphe dedie dans [[reference/vocabulaire-signaux]]. Ce n'est pas un ordre au carnet
 - **2026-09-11** — feat | `entry_limit` et `entry_stop` : le vocabulaire atteint enfin les ordres a limite et a seuil | le moteur les implementait deja entierement (declenchement, gap, slippage par type, compteurs) mais aucun moule ne les emettait -- `grep order_type src/rsl/strategies/` rendait le vide. Deux cles exclusives dans `rules`, chacune un noeud donnant un prix. Sans elles, ordre au marche : les empreintes des exemples sont inchangees. `panel_rules@1` en herite, il enveloppe `RuleStrategy`. Suite 1485 -> 1494 tests
 - **2026-09-11** — note | les deux murs restants ne sont pas des manques | optimisation de parametres et noeuds a memoire sont au ledger avec leur mecanisme : ils cassent respectivement le perimetre declare du runner et la reproductibilite bit-a-bit. Les lever couterait ce que le depot protege. La table de [[reference/vocabulaire-signaux]] distingue desormais « leve » de « debout, par decision »
 - **2026-09-11** — decision | deux garde-fous rendus DECLARABLES plutot que supprimes | l'unicite du symbole devient l'unicite du NOM publie (un alias distingue une duplication voulue d'un accident), et l'homogeneite des granularites reste le defaut mais s'ouvre par `allow_mixed_granularity`. Motif : le second protege les strategies transversales, ou comparer un rendement hebdomadaire a un rendement quotidien n'a pas de sens. Constate au passage : `Panel.granularity` n'a AUCUN consommateur dans le depot ; il vaut desormais la granularite la plus fine, pour ne pas mentir
-- **2026-09-11** — note | le multi-timeframe est LE piege de look-ahead du backtest : verifie, pas suppose | `tests/adversarial/test_multi_timeframe_closure.py`, 10 tests. Aucune ligne ne voit une barre hebdomadaire cloturant apres elle ; la barre vue est la plus RECENTE close (voir plus ancien serait un autre defaut, aussi silencieux) ; corrompre le futur ne change rien avant la coupure ; le report est borne et marque `is_stale`
-- **2026-09-11** — feat | les deux murs STRUCTURELS du « sans code » sont tombes | (1) `sizing.kind: "signal"` : la taille devient une expression du vocabulaire, avec `max_contracts` obligatoire -- une expression arbitraire n'est pas bornee. `engine.risk` depend du protocole `SupportsSignal`, pas de `strategies.signals` : la dependance continue d'aller de strategies vers engine. (2) `data[].alias` + `panel.allow_mixed_granularity` : le meme instrument a deux granularites, chacune sous son nom. Essai reel : ES quotidien filtre par SMA hebdo, Sharpe 1,14, 90 trades. Suite 1462 -> 1485 tests
 
 ## Next Actions
 

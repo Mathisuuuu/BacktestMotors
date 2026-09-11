@@ -44,6 +44,7 @@ nature :
 | Deux granularites du MEME symbole | **leve** : `data[].alias` publie la serie sous un nom distinct, et `panel.allow_mixed_granularity` autorise le melange. Causalite verifiee par `tests/adversarial/test_multi_timeframe_closure.py` |
 | Taille fonction d'un signal | **leve** : `sizing.kind: "signal"` prend un noeud quelconque, avec un `max_contracts` obligatoire |
 | Ordres autres qu'au marche | **leve** : `entry_limit` et `entry_stop` dans `rules`. Lire la semantique ci-dessous AVANT de s'en servir |
+| Un seul instrument par strategie a regles | **leve** : `multi_rules@1` prend un jeu de regles PAR instrument, dans un portefeuille commun |
 | Optimisation de parametres | **debout, par decision** : hors perimetre declare du runner ([[Failed Ideas/ledger]]) |
 | Noeud a memoire entre barres | **debout, par decision** : casserait la reproductibilite bit-a-bit |
 | Primitive vraiment nouvelle | ~30 lignes de Python et un enregistrement `@1` |
@@ -54,6 +55,42 @@ des garanties. Les lever couterait ce que le depot protege.
 Astuce utile : `rolling` n'offre que l'EMA (`alpha = 2/(w+1)`), pas le lissage
 de Wilder (`alpha = 1/n`). Les deux coincident pour `w = 2n - 1` - l'amorce
 differe, les series convergent.
+
+## Plusieurs instruments, chacun ses regles : `multi_rules@1`
+
+`rules@1` et `panel_rules@1` ne negocient qu'UN symbole - le second voit les
+autres par `peer`, mais n'y prend pas position. Tenir ES sur une logique et NQ
+sur une autre demandait donc deux runs : deux equity separees, deux drawdowns
+sans rapport, aucune contrainte de risque commune.
+
+```json
+"strategy": {
+  "ref": "multi_rules@1",
+  "params": { "books": {
+    "ES.v.0": { "quantity": 1, "rules": { "entry_long": {...}, "exit_long": {...} } },
+    "NQ.v.0": { "quantity": 2, "rules": { "entry_long": {...}, "exit_long": {...} } }
+  } }
+}
+```
+
+Un **livre** est un jeu de parametres `rules@1` moins le symbole, qui est deja
+la cle - il est d'ailleurs valide par le meme modele, donc memes defauts et
+meme refus d'un champ inconnu. Declarer un `symbol` dans un livre leve : deux
+sources pour la meme information finiraient par diverger.
+
+Trois proprietes a connaitre :
+
+- **l'ordre des livres est TRIE par symbole**, jamais celui des cles JSON. Deux
+  specifications identiques a l'ordre pres doivent donner la meme suite
+  d'ordres, donc la meme empreinte ;
+- **`peer` fonctionne a l'interieur d'un livre** : chacun recoit `ctx[symbole]`.
+  On peut negocier ES en regardant NQ, tout en negociant NQ separement ;
+- **un instrument absent de la coupe ne produit rien** - on ne decide pas sans
+  barre, meme regle que `panel_rules@1`.
+
+Le warmup retenu est celui du livre le plus exigeant : le runner transversal
+n'en expose qu'un, et mieux vaut attendre trop que decider sur un indicateur
+pas encore defini.
 
 ## Type d'ordre a l'entree : `entry_limit` et `entry_stop`
 

@@ -1311,6 +1311,7 @@
           "choix": [
             "buy_and_hold@1",
             "cross_sectional_momentum@1",
+            "multi_rules@1",
             "panel_rules@1",
             "ranking@1",
             "rules@1",
@@ -1372,6 +1373,19 @@
         }
       },
       "resume": "Momentum transversal 12-1, long-short, rebalance a chaque periode.",
+      "transversale": true
+    },
+    "multi_rules@1": {
+      "params": {
+        "books": {
+          "type": "objet"
+        },
+        "extra_warmup": {
+          "defaut": 0,
+          "type": "entier"
+        }
+      },
+      "resume": "Un jeu de regles PAR instrument, dans un portefeuille commun. Aucune classe a ecrire.",
       "transversale": true
     },
     "panel_rules@1": {
