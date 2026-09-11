@@ -185,3 +185,32 @@ pas la duree de vie. Ici, une methode `_apres_fenetre()` appelee par notre
 Meme famille que L3 : preferer ce qui ne peut pas etre silencieusement defait.
 
 Fonde sur [[reference/tableau-de-bord]] · `tests/unit/test_gui_charts.py`
+
+## L10 -- Un numero de version n'est pas un nom de variante
+
+`get_primitive` resout une reference **sans version** vers la plus recente
+(`registry.py:124`). La consequence est mecanique et facile a manquer :
+enregistrer une variante d'un indicateur sous le numero suivant change le sens
+de toute specification qui ne l'epingle pas - sans modifier une ligne de la
+primitive d'origine, et sans que rien ne le signale.
+
+Les docstrings de `atr@1` et `rsi@1` proposent justement d'enregistrer la
+variante de Wilder en `@2`. Suivi a la lettre, ce conseil ferait qu'une
+specification ecrite `"ref": "atr"` passerait d'une moyenne arithmetique a une
+moyenne exponentielle au prochain `git pull`. Elles ont ete publiees sous
+`atr_wilder@1` et `rsi_wilder@1`.
+
+**Consequence operationnelle :** `@n+1` est reserve a la **correction** d'un
+comportement juge faux. Un comportement different mais legitime prend un **nom
+different**. La question a se poser : « une specification existante voudrait-elle
+ce nouveau comportement sans rien changer ? » Si oui, c'est une correction. Si
+non, c'est une variante, et elle a besoin de son propre nom.
+
+Corollaire : une extension purement **additive** d'un noeud publie - six
+statistiques de plus sur `rolling@1` - ne demande pas de nouvelle version. Une
+specification archivee continue de se reconstruire a l'identique, ce qui se
+verifie et s'est verifie : les cinq empreintes d'exemples sont inchangees apres
+l'ajout. La regle protege la rejouabilite, pas le numero.
+
+Fonde sur [[concepts/registre-versionne]] · [[Failed Ideas/ledger]] ·
+[[reference/vocabulaire-signaux]]

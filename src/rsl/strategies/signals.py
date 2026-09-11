@@ -22,6 +22,7 @@ pas fausse. C'est le meme raisonnement que le refus des `NaN` dans le
 
 from __future__ import annotations
 
+import math
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from enum import StrEnum
@@ -728,7 +729,14 @@ def peer(symbol: str, inner: Signal) -> Peer:
 
 
 class RollingStat(StrEnum):
-    """Statistique appliquee a la fenetre."""
+    """Statistique appliquee a la fenetre.
+
+    `ema` est la plus consequente des six ajoutees en second temps : elle leve
+    la seule limite structurelle du vocabulaire. Avant elle, un lissage
+    exponentiel n'existait que comme primitive sur un CHAMP de prix, donc
+    impossible a appliquer a une expression - la ligne de signal d'un MACD,
+    par exemple, etait inexprimable.
+    """
 
     MEAN = "mean"
     STDEV = "stdev"
@@ -736,6 +744,16 @@ class RollingStat(StrEnum):
     MAX = "max"
     SUM = "sum"
     ZSCORE = "zscore"
+    EMA = "ema"
+    MEDIAN = "median"
+    VAR = "var"
+    SLOPE = "slope"
+    RANK = "rank"
+    COUNT_TRUE = "count_true"
+
+
+DISPERSION_STATS = (RollingStat.STDEV, RollingStat.ZSCORE, RollingStat.VAR, RollingStat.SLOPE)
+"""Statistiques exigeant au moins deux observations."""
 
 
 @signal_node(
@@ -791,10 +809,10 @@ class Rolling:
     def __post_init__(self) -> None:
         if self.window < 1:
             raise ConfigurationError(f"window doit etre >= 1, recu {self.window}")
-        if self.stat in (RollingStat.STDEV, RollingStat.ZSCORE) and self.window < 2:
+        if self.stat in DISPERSION_STATS and self.window < 2:
             raise ConfigurationError(
                 f"'{self.stat.value}' exige window >= 2 : une seule observation n'a "
-                f"pas de dispersion"
+                f"ni dispersion ni pente"
             )
 
     @property
@@ -831,6 +849,37 @@ class Rolling:
                 # `values[0]` est la valeur COURANTE : `shifted(0)` est le
                 # present, et les lags croissants remontent le temps.
                 return (values[0] - float(np.mean(window))) / deviation
+            case RollingStat.VAR:
+                return float(np.var(window, ddof=1))
+            case RollingStat.MEDIAN:
+                return float(np.median(window))
+            case RollingStat.EMA:
+                # Amorcee sur la valeur la PLUS ANCIENNE de la fenetre, puis
+                # parcourue vers le present. Contrairement a `ema@1`, il n'y a
+                # pas d'historique tronque plus long : la fenetre EST tout ce
+                # que le noeud voit. Le poids residuel de l'amorce vaut
+                # `(1 - alpha)^(window-1)` ; a window=9 il pese encore 13 %,
+                # ce qui est assume et documente plutot que masque.
+                alpha = 2.0 / (self.window + 1.0)
+                courant = values[-1]
+                for valeur in reversed(values[:-1]):
+                    courant = alpha * valeur + (1.0 - alpha) * courant
+                return courant
+            case RollingStat.SLOPE:
+                # En unites par barre, du passe vers le present : `values` est
+                # ordonne du present vers le passe, on le retourne.
+                abscisses = np.arange(self.window, dtype=np.float64)
+                ordonnees = window[::-1]
+                pente = np.polyfit(abscisses, ordonnees, 1)[0]
+                return float(pente)
+            case RollingStat.RANK:
+                # Rang de la valeur COURANTE dans sa fenetre, dans [0, 1].
+                # 1.0 = plus haute des `window` dernieres, 0.0 = plus basse.
+                return float(np.mean(window <= values[0]))
+            case RollingStat.COUNT_TRUE:
+                # Les booleens du vocabulaire valent 1.0 ou 0.0 : compter les
+                # valeurs strictement positives compte donc les "vrai".
+                return float(np.count_nonzero(window > 0.0))
 
     def describe(self) -> SpecDict:
         return {
@@ -1307,3 +1356,322 @@ def any_of(*operands: Signal) -> AnyOf:
 def warmup_of(signals: Sequence[Signal]) -> int:
     """Warmup d'un ensemble de signaux : le maximum, 0 si l'ensemble est vide."""
     return max((s.warmup_bars for s in signals), default=0)
+
+
+# ---------------------------------------------------------------------------
+# Noeuds ajoutes en second temps : conditionnel, arithmetique unaire,
+# extremes n-aires, et recherche dans le passe recent.
+# ---------------------------------------------------------------------------
+
+
+@signal_node(
+    "if_then_else",
+    summary="Choisit entre deux sous-signaux selon une condition.",
+    fields=(
+        NodeField("condition", FieldKind.NODE),
+        NodeField("then", FieldKind.NODE),
+        NodeField("otherwise", FieldKind.NODE),
+    ),
+)
+@dataclass(frozen=True, slots=True)
+class IfThenElse:
+    """Expression conditionnelle.
+
+    Sans elle, "le stop vaut 2 ATR en tendance et 1 ATR sinon" n'est pas
+    exprimable : il faut ecrire deux strategies. Les deux branches sont
+    construites - le warmup est celui du plus large des sous-arbres, pas celui
+    de la branche retenue - parce qu'un warmup dependant de la condition
+    dependrait du moment, donc ne serait pas calculable a l'avance.
+
+    `otherwise` et non `else` : `else` est un mot reserve de Python, et un
+    champ JSON qui ne peut pas devenir un attribut est une chausse-trappe.
+    """
+
+    NODE_TYPE: ClassVar[str] = "if_then_else"
+    NODE_VERSION: ClassVar[int] = 1
+
+    condition: Signal
+    then: Signal
+    otherwise: Signal
+
+    @property
+    def warmup_bars(self) -> int:
+        return warmup_of((self.condition, self.then, self.otherwise))
+
+    def __call__(self, ctx: Context) -> float | None:
+        decision = self.condition(ctx)
+        if decision is None:
+            return None
+        return self.then(ctx) if decision != FALSE else self.otherwise(ctx)
+
+    def describe(self) -> SpecDict:
+        return {
+            "type": self.NODE_TYPE,
+            "version": self.NODE_VERSION,
+            "condition": self.condition.describe(),
+            "then": self.then.describe(),
+            "otherwise": self.otherwise.describe(),
+        }
+
+    @classmethod
+    def from_spec(cls, spec: SpecDict, build: Builder) -> Signal:
+        return cls(
+            _child(spec, "condition", build),
+            _child(spec, "then", build),
+            _child(spec, "otherwise", build),
+        )
+
+
+class MathOp(StrEnum):
+    """Operations unaires disponibles."""
+
+    ABS = "abs"
+    NEG = "neg"
+    SIGN = "sign"
+    LOG = "log"
+    EXP = "exp"
+    SQRT = "sqrt"
+    INVERSE = "inverse"
+    FLOOR = "floor"
+    CEIL = "ceil"
+
+
+EXP_LIMIT: Final[float] = 700.0
+"""Au-dela, `math.exp` deborde le flottant double. Rendre `None` plutot que
+laisser lever : la convention du socle est qu'une valeur non calculable est
+absente, pas fatale."""
+
+
+@signal_node(
+    "math",
+    summary="Operation arithmetique UNAIRE sur un sous-signal.",
+    fields=(
+        NodeField("op", FieldKind.STRING, choices=tuple(o.value for o in MathOp)),
+        NodeField("inner", FieldKind.NODE),
+    ),
+)
+@dataclass(frozen=True, slots=True)
+class MathNode:
+    """Complement unaire de `arith`, qui est binaire.
+
+    Les domaines invalides rendent `None`, jamais `NaN` : `log` d'un nombre
+    negatif ou nul, `sqrt` d'un negatif, `inverse` de zero. Un `NaN` se
+    propagerait en silence dans une comparaison, qui vaudrait `False`, et
+    produirait "pas de signal" au lieu de "erreur" - la raison d'etre de la
+    convention `None` du socle.
+    """
+
+    NODE_TYPE: ClassVar[str] = "math"
+    NODE_VERSION: ClassVar[int] = 1
+
+    op: MathOp
+    inner: Signal
+
+    @property
+    def warmup_bars(self) -> int:
+        return self.inner.warmup_bars
+
+    def __call__(self, ctx: Context) -> float | None:
+        value = self.inner(ctx)
+        if value is None:
+            return None
+        match self.op:
+            case MathOp.ABS:
+                return abs(value)
+            case MathOp.NEG:
+                return -value
+            case MathOp.SIGN:
+                return float((value > 0.0) - (value < 0.0))
+            case MathOp.LOG:
+                return None if value <= 0.0 else math.log(value)
+            case MathOp.EXP:
+                return None if value > EXP_LIMIT else math.exp(value)
+            case MathOp.SQRT:
+                return None if value < 0.0 else math.sqrt(value)
+            case MathOp.INVERSE:
+                return None if value == 0.0 else 1.0 / value
+            case MathOp.FLOOR:
+                return float(math.floor(value))
+            case MathOp.CEIL:
+                return float(math.ceil(value))
+
+    def describe(self) -> SpecDict:
+        return {
+            "type": self.NODE_TYPE,
+            "version": self.NODE_VERSION,
+            "op": self.op.value,
+            "inner": self.inner.describe(),
+        }
+
+    @classmethod
+    def from_spec(cls, spec: SpecDict, build: Builder) -> Signal:
+        raw = spec.get("op")
+        if not isinstance(raw, str) or raw not in set(MathOp):
+            raise ConfigurationError(
+                f"'math' : operation invalide {raw!r}. "
+                f"Attendu l'un de {', '.join(o.value for o in MathOp)}"
+            )
+        return cls(MathOp(raw), _child(spec, "inner", build))
+
+
+@signal_node(
+    "min_of",
+    summary="Plus petite valeur parmi plusieurs sous-signaux.",
+    fields=(NodeField("operands", FieldKind.NODE_LIST),),
+)
+@dataclass(frozen=True, slots=True)
+class MinOf:
+    """Minimum n-aire. Un seul operande indefini rend le tout indefini."""
+
+    NODE_TYPE: ClassVar[str] = "min_of"
+    NODE_VERSION: ClassVar[int] = 1
+
+    operands: tuple[Signal, ...]
+
+    @property
+    def warmup_bars(self) -> int:
+        return warmup_of(self.operands)
+
+    def __call__(self, ctx: Context) -> float | None:
+        valeurs = [operande(ctx) for operande in self.operands]
+        retenues = [v for v in valeurs if v is not None]
+        if len(retenues) != len(valeurs):
+            return None
+        return min(retenues)
+
+    def describe(self) -> SpecDict:
+        return {
+            "type": self.NODE_TYPE,
+            "version": self.NODE_VERSION,
+            "operands": [o.describe() for o in self.operands],
+        }
+
+    @classmethod
+    def from_spec(cls, spec: SpecDict, build: Builder) -> Signal:
+        return cls(_children(spec, "operands", build))
+
+
+@signal_node(
+    "max_of",
+    summary="Plus grande valeur parmi plusieurs sous-signaux.",
+    fields=(NodeField("operands", FieldKind.NODE_LIST),),
+)
+@dataclass(frozen=True, slots=True)
+class MaxOf:
+    """Maximum n-aire. Avec `min_of`, permet de borner une expression."""
+
+    NODE_TYPE: ClassVar[str] = "max_of"
+    NODE_VERSION: ClassVar[int] = 1
+
+    operands: tuple[Signal, ...]
+
+    @property
+    def warmup_bars(self) -> int:
+        return warmup_of(self.operands)
+
+    def __call__(self, ctx: Context) -> float | None:
+        valeurs = [operande(ctx) for operande in self.operands]
+        retenues = [v for v in valeurs if v is not None]
+        if len(retenues) != len(valeurs):
+            return None
+        return max(retenues)
+
+    def describe(self) -> SpecDict:
+        return {
+            "type": self.NODE_TYPE,
+            "version": self.NODE_VERSION,
+            "operands": [o.describe() for o in self.operands],
+        }
+
+    @classmethod
+    def from_spec(cls, spec: SpecDict, build: Builder) -> Signal:
+        return cls(_children(spec, "operands", build))
+
+
+@signal_node(
+    "bars_since",
+    summary="Nombre de barres depuis la derniere fois qu'une condition etait vraie.",
+    fields=(
+        NodeField("lookback", FieldKind.INTEGER, minimum=1),
+        NodeField("inner", FieldKind.NODE),
+    ),
+)
+@dataclass(frozen=True, slots=True)
+class BarsSince:
+    """Distance en barres au dernier "vrai", bornee par `lookback`.
+
+    Rend `0.0` si la condition est vraie maintenant, `None` si elle n'a pas ete
+    vraie dans les `lookback` dernieres barres. `None` plutot qu'une sentinelle
+    comme `lookback + 1` : une sentinelle se compare sans lever et ferait
+    passer "jamais vu" pour "vu il y a longtemps".
+
+    La borne est obligatoire. Sans elle le noeud devrait remonter tout
+    l'historique depuis l'origine, ce qui rendrait son cout dependant de la
+    position dans l'echantillon et son warmup indefinissable.
+    """
+
+    NODE_TYPE: ClassVar[str] = "bars_since"
+    NODE_VERSION: ClassVar[int] = 1
+
+    lookback: int
+    inner: Signal
+
+    def __post_init__(self) -> None:
+        if self.lookback < 1:
+            raise ConfigurationError(f"lookback doit etre >= 1, recu {self.lookback}")
+
+    @property
+    def warmup_bars(self) -> int:
+        return self.inner.warmup_bars + self.lookback - 1
+
+    def __call__(self, ctx: Context) -> float | None:
+        for lag in range(self.lookback):
+            try:
+                valeur = self.inner(ctx.shifted(lag))
+            except InsufficientHistoryError:
+                return None
+            if valeur is None:
+                return None
+            if valeur != FALSE:
+                return float(lag)
+        return None
+
+    def describe(self) -> SpecDict:
+        return {
+            "type": self.NODE_TYPE,
+            "version": self.NODE_VERSION,
+            "lookback": self.lookback,
+            "inner": self.inner.describe(),
+        }
+
+    @classmethod
+    def from_spec(cls, spec: SpecDict, build: Builder) -> Signal:
+        lookback = spec.get("lookback")
+        if not isinstance(lookback, int) or isinstance(lookback, bool):
+            raise ConfigurationError(
+                f"'bars_since' exige un `lookback` entier, recu {lookback!r}"
+            )
+        return cls(lookback, _child(spec, "inner", build))
+
+
+def if_then_else(condition: Signal, then: Signal, otherwise: Signal) -> IfThenElse:
+    """Raccourci : `if_then_else(cond, a, b)`."""
+    return IfThenElse(condition, then, otherwise)
+
+
+def unary(op: str, inner: Signal) -> MathNode:
+    """Raccourci : `unary("abs", spread)`."""
+    return MathNode(MathOp(op), inner)
+
+
+def min_of(*operands: Signal) -> MinOf:
+    return MinOf(tuple(operands))
+
+
+def max_of(*operands: Signal) -> MaxOf:
+    return MaxOf(tuple(operands))
+
+
+def bars_since(lookback: int, inner: Signal) -> BarsSince:
+    """Raccourci : `bars_since(50, condition)`."""
+    return BarsSince(lookback, inner)

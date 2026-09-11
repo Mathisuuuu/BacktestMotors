@@ -627,6 +627,33 @@
           },
           {
             "additionalProperties": false,
+            "description": "Nombre de barres depuis la derniere fois qu'une condition etait vraie.",
+            "properties": {
+              "inner": {
+                "$ref": "#/$defs/node"
+              },
+              "lookback": {
+                "minimum": 1,
+                "type": "integer"
+              },
+              "type": {
+                "const": "bars_since"
+              },
+              "version": {
+                "const": 1,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "type",
+              "lookback",
+              "inner"
+            ],
+            "title": "bars_since@1",
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
             "description": "Comparaison de deux sous-signaux, resultat booleen.",
             "properties": {
               "left": {
@@ -740,6 +767,36 @@
           },
           {
             "additionalProperties": false,
+            "description": "Choisit entre deux sous-signaux selon une condition.",
+            "properties": {
+              "condition": {
+                "$ref": "#/$defs/node"
+              },
+              "otherwise": {
+                "$ref": "#/$defs/node"
+              },
+              "then": {
+                "$ref": "#/$defs/node"
+              },
+              "type": {
+                "const": "if_then_else"
+              },
+              "version": {
+                "const": 1,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "type",
+              "condition",
+              "then",
+              "otherwise"
+            ],
+            "title": "if_then_else@1",
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
             "description": "Evalue un sous-signal tel qu'il etait il y a `bars` barres.",
             "properties": {
               "bars": {
@@ -764,6 +821,95 @@
               "inner"
             ],
             "title": "lag@1",
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "description": "Operation arithmetique UNAIRE sur un sous-signal.",
+            "properties": {
+              "inner": {
+                "$ref": "#/$defs/node"
+              },
+              "op": {
+                "enum": [
+                  "abs",
+                  "neg",
+                  "sign",
+                  "log",
+                  "exp",
+                  "sqrt",
+                  "inverse",
+                  "floor",
+                  "ceil"
+                ],
+                "type": "string"
+              },
+              "type": {
+                "const": "math"
+              },
+              "version": {
+                "const": 1,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "type",
+              "op",
+              "inner"
+            ],
+            "title": "math@1",
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "description": "Plus grande valeur parmi plusieurs sous-signaux.",
+            "properties": {
+              "operands": {
+                "items": {
+                  "$ref": "#/$defs/node"
+                },
+                "minItems": 1,
+                "type": "array"
+              },
+              "type": {
+                "const": "max_of"
+              },
+              "version": {
+                "const": 1,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "type",
+              "operands"
+            ],
+            "title": "max_of@1",
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "description": "Plus petite valeur parmi plusieurs sous-signaux.",
+            "properties": {
+              "operands": {
+                "items": {
+                  "$ref": "#/$defs/node"
+                },
+                "minItems": 1,
+                "type": "array"
+              },
+              "type": {
+                "const": "min_of"
+              },
+              "version": {
+                "const": 1,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "type",
+              "operands"
+            ],
+            "title": "min_of@1",
             "type": "object"
           },
           {
@@ -922,7 +1068,13 @@
                   "min",
                   "max",
                   "sum",
-                  "zscore"
+                  "zscore",
+                  "ema",
+                  "median",
+                  "var",
+                  "slope",
+                  "rank",
+                  "count_true"
                 ],
                 "type": "string"
               },

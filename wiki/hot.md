@@ -17,9 +17,9 @@ generated: true
 | Indicateur | Valeur |
 |---|---|
 | Pages de wiki | 21 |
-| Entrees de log | 33 |
+| Entrees de log | 38 |
 | Derniere activite | 2026-09-11 |
-| Idees ecartees (ledger) | 8 |
+| Idees ecartees (ledger) | 11 |
 | Idees en attente (ledger) | 3 |
 | Pages `Failed Ideas/` | 1 |
 | Pages `concepts/` | 6 |
@@ -27,7 +27,7 @@ generated: true
 | Pages `reference/` | 6 |
 | Pages `research/` | 1 |
 
-**Activite par type :** note × 19, fix × 7, feat × 2, decision × 2, setup × 1, lint × 1, experiment × 1
+**Activite par type :** note × 21, fix × 7, decision × 4, feat × 3, setup × 1, lint × 1, experiment × 1
 
 ## Experiences
 
@@ -41,14 +41,14 @@ Le total des essais alimente le Deflated Sharpe : un essai non enregistre gonfle
 
 ## Derniere activite — 8 entree(s)
 
+- **2026-09-11** — note | MACD verifie analytiquement, pas contre une seconde implementation | sur une droite de pente `s`, une EMA de fenetre `w` retarde de `s*(w-1)/2`, donc la ligne MACD vaut `s*(slow-fast)/2`. Mesure : 7,000000 pour s=1, fast=12, slow=26. ADX sature a 100 en tendance pure, OBV vaut exactement la somme des volumes, ratio d'efficience vaut 1 sur un chemin droit
+- **2026-09-11** — note | `examples/_moule_universel.json` : reference exhaustive du vocabulaire | 20/20 types de noeuds, 7 primitives nouvelles, long et short, stop adaptatif par `if_then_else`, objectif borne par `min_of`/`max_of`. Verifie a l'execution (66 trades, Sharpe 0,29, empreinte 5dd6973012b4c68b) et garde par `tests/unit/test_moule_universel.py`, qui nomme les types manquants. Mutation testee : retirer `time` fait echouer le test. **Cette execution consomme un essai** (L2)
+- **2026-09-11** — decision | variantes de Wilder publiees sous des NOMS distincts, pas en `@2` | `registry.py:124` resout une reference sans version vers la plus recente : `atr@2` aurait fait basculer tout `"ref": "atr"` non epingle d'une moyenne simple a une exponentielle, en silence. Les docstrings de `atr@1` et `rsi@1` recommandent pourtant ce chemin -> ledger + [[lessons]] L10
+- **2026-09-11** — decision | `rolling@1` gagne 6 statistiques par extension ADDITIVE, sans `rolling@2` | le levier structurel est `stat: "ema"` : avant lui, lisser une EXPRESSION etait impossible (`primitive` est une feuille), donc la ligne de signal d'un MACD etait inexprimable. Verification : les empreintes de `sma_es_daily`, `paire_es_nq`, `momentum`, `retour_moyenne` et `_moule` sont identiques avant et apres -> ledger
+- **2026-09-11** — feat | vocabulaire etendu : 9 primitives et 5 types de noeuds ajoutes, plus 6 statistiques sur `rolling@1` | primitives 13 -> 22 (`macd@1` avec ligne de signal et histogramme, `atr_wilder@1`, `rsi_wilder@1`, `adx@1`, `cci@1`, `williams_r@1`, `efficiency_ratio@1`, `vwap@1`, `obv@1`) ; noeuds 15 -> 20 (`if_then_else`, `math`, `min_of`, `max_of`, `bars_since`) ; `rolling` gagne `ema`, `median`, `var`, `slope`, `rank`, `count_true`. Suite 1263 -> 1387 tests. **Les 5 empreintes d'exemples sont inchangees**
 - **2026-09-11** — note | sondage d'expressivite du vocabulaire, 5 configurations lancees sur ES quotidien | EXPRIMABLE : MACD (difference de deux `ema@1` par `arith`, Sharpe 0,81, 33 trades), ligne de signal par `rolling mean` (Sharpe 0,74, 115 trades), stop suiveur via `position.high_since_entry` (Sharpe 0,64, 18 trades). REFUSE : EMA d'un sous-arbre (`primitive` est une feuille, pas de champ `inner`), et deux granularites du meme instrument (`'ES.v.0' apparait deux fois`). **Ces 5 executions consomment 5 essais** au sens de [[lessons]] L2 -- non promues en pages d'experience, aucune n'ayant d'hypothese
 - **2026-09-11** — note | gabarit de specification ajoute : `examples/_moule.json` | tous les blocs d'une specification plus une strategie `rules@1` complete (entree composee, sortie a deux conditions, stop ATR, objectif ATR). Verifie en l'executant : 18 trades, Sharpe 0,39, empreinte 58a9d31a2dae3658. **Cette execution consomme un essai** au sens de [[lessons]] L2 -- a promouvoir en page d'experience si le chiffre est conserve
 - **2026-09-11** — fix | deux tests de graphiques se sautaient en silence ("aucun affichage disponible") alors que Tk fonctionnait | creer puis detruire une racine `Tk()` par test echoue par intermittence sur les derniers. Fixture passee en portee `module` : une seule racine partagee, 3 executions consecutives sans saut
-- **2026-09-11** — note | correction de l'entree `feat` ci-dessus (log append-only : on corrige par ajout) | le compte exact est **1263 tests**, pas 1275
-- **2026-09-11** — decision | `mplfinance` ecarte pour les bougies | exigerait pandas, dont le rejet figure au ledger. Le motif du rejet vise la couche donnees et non l'affichage, mais une `LineCollection` plus un `bar` suffisent : pas de raison d'ouvrir le debat pour un graphique
-- **2026-09-11** — note | defaut trouve : le bouton de filtre actif s'affichait vide | avec `indicatoron=False`, Tk peint l'etat selectionne avec `selectcolor` et ignore `bg` ; libelle blanc sur fond blanc. `selectcolor` regle en meme temps que `bg`
-- **2026-09-11** — note | defaut trouve et verrouille : l'echelle des prix restait figee au zoom | `Axes.clear()` reinitialise le registre de callbacks de matplotlib, donc le `xlim_changed` connecte a la construction ne survivait pas au premier redessin. Remplace par un point d'extension explicite `_apres_fenetre()` -> voir [[lessons]] L9
-- **2026-09-11** — feat | tableau de bord refondu : 4 onglets, style plat blanc, vert/rouge porteurs de sens, onglet PRIX & ORDRES avec bougies et ordres, duree moyenne en position | style Windows 95 abandonne sur demande ; `RunArtifacts` remplace le tuple rendu par `run_backtest_detailed` pour transporter aussi les barres servies au moteur ; suite a 1275 tests
 
 ## Next Actions
 

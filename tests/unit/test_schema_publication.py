@@ -106,6 +106,13 @@ class TestSchemaAcceptsRealSpecifications:
             "time": {"type": "time", "field": "weekday"},
             "peer": {"type": "peer", "symbol": "NQ.v.0", "inner": leaf},
             "rolling": {"type": "rolling", "stat": "mean", "window": 5, "inner": leaf},
+            "if_then_else": {
+                "type": "if_then_else", "condition": leaf, "then": leaf, "otherwise": leaf,
+            },
+            "math": {"type": "math", "op": "abs", "inner": leaf},
+            "min_of": {"type": "min_of", "operands": [leaf, leaf]},
+            "max_of": {"type": "max_of", "operands": [leaf, leaf]},
+            "bars_since": {"type": "bars_since", "lookback": 10, "inner": leaf},
         }
         assert set(instances) == {node.name for node in list_node_types()}
         for name, instance in instances.items():

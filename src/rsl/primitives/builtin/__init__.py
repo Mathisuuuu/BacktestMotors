@@ -12,6 +12,22 @@ l'exigence de reproductibilite.
 
 from __future__ import annotations
 
-from rsl.primitives.builtin import oscillators, ranges, stats, trend
+from rsl.primitives.builtin import (
+    momentum,
+    oscillators,
+    ranges,
+    stats,
+    trend,
+    volume,
+    wilder,
+)
 
-__all__ = ["oscillators", "ranges", "stats", "trend"]
+__all__ = [
+    "momentum",
+    "oscillators",
+    "ranges",
+    "stats",
+    "trend",
+    "volume",
+    "wilder",
+]

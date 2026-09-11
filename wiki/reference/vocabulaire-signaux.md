@@ -19,6 +19,9 @@ autorite: schemas/signals.schema.json (engendre, ne pas editer a la main)
 | Comment regenerer les schemas ? | `rsl schema --out schemas/signals.schema.json` |
 | Comment un arbre est-il reconstruit depuis du JSON ? | `build_signal(spec)` dans [src/rsl/strategies/signals.py](../../src/rsl/strategies/signals.py) |
 | Par quoi commencer pour ecrire une strategie ? | [examples/_moule.json](../../examples/_moule.json), a copier puis editer |
+| A quoi ressemble CHAQUE type de noeud en JSON ? | [examples/_moule_universel.json](../../examples/_moule_universel.json) — les 20, dans un fichier qui tourne |
+| Comment lisser une EXPRESSION (pas un champ de prix) ? | `rolling` avec `stat: "ema"`. `primitive` est une feuille : elle ne lit que des champs de prix |
+| Wilder ou moyenne simple ? | `atr@1` / `rsi@1` sont des moyennes ARITHMETIQUES ; `atr_wilder@1` / `rsi_wilder@1` sont les variantes de Wilder. Des noms distincts, jamais des versions — voir [[lessons]] L10 |
 | Ou sont les moules de strategie descriptibles ? | [rules.py](../../src/rsl/strategies/rules.py) · [ranking.py](../../src/rsl/strategies/ranking.py) |
 | Ou branchera le futur compilateur de specifications ? | [src/rsl/pipeline.py](../../src/rsl/pipeline.py) — decrit, sans implementation |
 
@@ -26,7 +29,8 @@ autorite: schemas/signals.schema.json (engendre, ne pas editer a la main)
 
 | Fichier | Ce qu'il montre |
 |---|---|
-| [examples/_moule.json](../../examples/_moule.json) | **le gabarit a copier** : tous les blocs d'une specification, une strategie `rules@1` complete avec entree, sortie, stop et objectif. Tourne tel quel |
+| [examples/_moule_universel.json](../../examples/_moule_universel.json) | **la reference exhaustive** : les **20** types de noeuds, long ET short, stop adaptatif, objectif borne. Un test echoue si un type de noeud enregistre n'y figure pas |
+| [examples/_moule.json](../../examples/_moule.json) | **le gabarit de demarrage**, plus court : tous les blocs d'une specification et une strategie `rules@1` complete. Tourne tel quel |
 | [examples/sma_es_daily.json](../../examples/sma_es_daily.json) | croisement de moyennes, mono-instrument |
 | [examples/retour_moyenne_dans_tendance.json](../../examples/retour_moyenne_dans_tendance.json) | `rules@1` — strategie ecrite nulle part dans le code |
 | [examples/paire_es_nq.json](../../examples/paire_es_nq.json) | `peer` + `rolling` — paire ES/NQ sur donnees reelles |
