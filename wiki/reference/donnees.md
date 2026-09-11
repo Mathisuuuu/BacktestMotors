@@ -1,6 +1,6 @@
 ---
 type: reference
-updated: 2026-09-10
+updated: 2026-09-11
 autorite: docs/no-lookahead.md §4 + src/rsl/data/
 ---
 
@@ -10,27 +10,25 @@ autorite: docs/no-lookahead.md §4 + src/rsl/data/
 > dans `.gitignore`). Les tests d'integration le cherchent via la variable
 > d'environnement `RSL_DATA_DIR` et se sautent s'il est absent.
 
-> [!WARNING] Le paquet `rsl.data` est absent du depot (2026-09-10)
-> `.gitignore:1` contient `data/`, motif qui en git s'applique a **n'importe
-> quel** repertoire nomme `data`, a n'importe quelle profondeur — donc aussi a
-> `src/rsl/data/`. Consequence verifiee : le paquet de la couche donnees n'a
-> jamais ete commite (`git log --all -- src/rsl/data` est vide, aucune stash),
-> et il est absent de cette copie de travail. `import rsl.data` leve
-> `ModuleNotFoundError`, alors que tout le reste de `src/rsl/` l'importe.
-> **Etendue mesuree (2026-09-10)** : 6 modules absents -- `schema`, `feed`,
-> `loader`, `resample`, `validation`, `instruments` -- soit **42 symboles
-> publics**, importes par 20 fichiers de `src/` et 27 de `tests/`. Aucune copie
-> retrouvee sur la machine (pas d'install, pas de `.pyc`, pas d'egg-info).
+> [!WARNING] Le paquet `rsl.data` existe sur le disque mais n'est **pas versionne** (2026-09-11)
+> Etat au 2026-09-11 : les 6 modules sont **revenus** dans la copie de travail
+> -- `schema`, `feed`, `loader`, `resample`, `validation`, `instruments`, soit
+> 7 fichiers et 2063 lignes. `import rsl.data` fonctionne, la suite de tests
+> passe et `rsl run` produit un rapport. **Mais la cause racine n'est pas
+> corrigee** : `.gitignore:1` contient toujours `data/`, motif non ancre qui en
+> git s'applique a n'importe quel repertoire nomme `data` a n'importe quelle
+> profondeur -- donc encore a `src/rsl/data/`.
 >
-> **Ce qui a survecu** : `tests/` n'etait pas ignore. Les fichiers qui
-> specifient directement ces modules sont intacts -- `test_schema.py` (19),
-> `test_feed.py` (29), `test_loader.py` (23), `test_resample.py` (26),
-> `test_validation.py` (31), soit ~128 tests, plus tout le reste de la suite qui
-> les exerce indirectement. Une reconstruction serait donc **pilotee par les
-> tests**, pas a l'aveugle.
+> Consequence mesuree : `git ls-files src/` rend **36** fichiers quand le disque
+> en porte **43**. `git check-ignore -v src/rsl/data/feed.py` repond
+> `.gitignore:1:data/`. Le paquet reste donc invisible de git, et `git status`
+> affiche **« propre »** pendant que le tiers du moteur n'est suivi par rien.
+> Un clone frais, un `git clean -xfd` ou un changement de machine reperd la
+> couche donnees exactement comme le 2026-09-10.
 >
-> Voir [[hot]] § Next Actions. Les chemins `src/rsl/data/*` cites ci-dessous
-> sont ceux qu'attendent les imports, pas des fichiers existants.
+> **Correctif restant** : ancrer le motif en `/data/`, puis committer
+> `src/rsl/data/`. Tant que ce n'est pas fait, la reconstruction n'est sauvee
+> nulle part. Voir [[hot]] § Next Actions.
 
 ## Le jeu de donnees
 

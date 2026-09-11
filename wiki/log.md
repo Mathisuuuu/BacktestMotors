@@ -43,3 +43,11 @@ grep "^## \[" wiki/log.md | tail -5
 ## [2026-09-10] note | chaine d'outils passee sur l'arbre incomplet | `src/` propre sous ruff ; 28 I001 dans `tests/` et 35 des 36 erreurs mypy sont des symptomes de P1 ; 1 erreur reelle (stubs numpy vs python_version 3.11) -> P4 ; piege `ruff --fix` consigne au ledger
 
 ## [2026-09-10] fix | P5 : droits d'ecriture accordes, push reessaye | 3 commits pousses vers origin/main (26 fichiers, 1923 lignes) ; sync entre machines operationnelle
+
+## [2026-09-11] note | audit « que fait l'application, est-ce que ca marche » : wiki relu, CLI exercee de bout en bout sur donnees reelles | 1179 tests passent / 1 echoue ; ruff et mypy propres ; les 2 experiences seminales se reproduisent au chiffre pres (Sharpe 0,60, 57 % dans un pli) ; P3 et P4 constates resolus ; 2 defauts vivants trouves -> voir entrees suivantes
+
+## [2026-09-11] fix | P1 reexamine : `rsl.data` est revenu sur le disque mais reste NON VERSIONNE | `.gitignore:1` `data/` toujours non ancre ; 7 fichiers / 2063 lignes invisibles de git, `git status` affiche « propre » ; un clone frais ou un `git clean -xfd` reperd toute la couche donnees. Correctif : ancrer en `/data/`
+
+## [2026-09-11] note | defaut trouve dans `RunManifest.is_reproducible` : `all(())` vaut `True` | un run sans aucune source de donnees enregistree se declare `Rejouable oui` ; `test_missing_data_sources_are_flagged` echoue et a raison. Le champ que [[concepts/determinisme]] designe comme le seul qui compte ment par vacuite
+
+## [2026-09-11] note | defaut trouve sur `rsl schema` redirige : sortie en CP1252, pas en UTF-8 | `ensure_ascii=False` + stdout Windows ; le `§` sort en octet 0xA7, le fichier est illisible en UTF-8. `--out` ecrit correctement en UTF-8 : le defaut ne touche que la redirection `>`
