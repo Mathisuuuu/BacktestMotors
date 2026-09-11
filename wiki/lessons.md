@@ -214,3 +214,31 @@ l'ajout. La regle protege la rejouabilite, pas le numero.
 
 Fonde sur [[concepts/registre-versionne]] · [[Failed Ideas/ledger]] ·
 [[reference/vocabulaire-signaux]]
+
+## L11 -- Un test dont le verdict depend de l'etat du depot ne garde rien
+
+P6 a survecu une journee entiere a une suite de plus de mille tests, alors
+qu'un test le visait explicitement. La raison n'est pas qu'il manquait un test :
+c'est que celui qui existait ne se declenchait que sur un **arbre de travail
+propre**.
+
+    is_reproducible = git.is_reproducible and all(s.source_hash for s in sources)
+
+`all(())` vaut `True`, donc l'absence totale de source se declarait rejouable.
+Mais des que l'arbre etait modifie - c'est-a-dire pendant tout developpement -
+`git.is_reproducible` valait `False` et masquait le defaut. Le test passait au
+vert exactement quand on travaillait, et virait au rouge apres chaque commit :
+le moment ou l'on regarde le moins.
+
+**Consequence operationnelle :** un test qui exerce une condition composee doit
+**fixer** les autres termes plutot que les subir. Ici, construire un `GitState`
+propre explicitement, au lieu d'heriter de celui du depot. La regle plus large :
+si le resultat d'un test peut changer sans qu'aucune ligne de code n'ait bouge,
+ce n'est pas un garde-fou, c'est un indicateur d'humeur.
+
+Corollaire sur la forme du defaut lui-meme : `all()` sur un ensemble
+potentiellement vide affirme le plus la ou l'on sait le moins. Quand une
+condition porte sur une collection, la non-vacuite est une condition **a part
+entiere**, pas une consequence.
+
+Fonde sur [[concepts/determinisme]] · [[log]] (2026-09-11) · [[lessons]] L3

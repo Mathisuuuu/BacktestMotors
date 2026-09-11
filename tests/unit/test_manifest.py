@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import random
+from dataclasses import replace
 from pathlib import Path
 
 import numpy as np
@@ -146,6 +147,35 @@ class TestRunManifest:
         manifest = RunManifest.capture(config={}, seed=0, data_sources=())
         assert any("aucune source de donnees" in w for w in manifest.warnings)
         assert not manifest.is_reproducible
+
+    def test_no_source_means_not_reproducible_even_on_a_clean_tree(self):
+        """Regression : `all(())` vaut `True`, donc l'absence TOTALE de source
+        se declarait rejouable - le cas ou l'on en sait le moins etait celui ou
+        l'on affirmait le plus.
+
+        L'etat git est fixe ici, et ce n'est pas un detail : le test precedent
+        ne voyait le defaut que sur un arbre PROPRE. Sur un arbre modifie,
+        `git.is_reproducible` valait deja `False` et masquait tout. Un test dont
+        le verdict depend de la proprete du depot ne garde rien de facon fiable.
+        """
+        propre = GitState(available=True, commit="abc123", branch="main",
+                          dirty=False, detail="")
+        sans_source = replace(
+            RunManifest.capture(config={}, seed=0, data_sources=()), git=propre
+        )
+        assert propre.is_reproducible
+        assert not sans_source.is_reproducible
+
+    def test_a_hashed_source_on_a_clean_tree_stays_reproducible(self):
+        """Le pendant du precedent : la correction ne doit rien resserrer
+        d'autre."""
+        propre = GitState(available=True, commit="abc123", branch="main",
+                          dirty=False, detail="")
+        avec_source = replace(
+            RunManifest.capture(config={}, seed=0, data_sources=(source(),)),
+            git=propre,
+        )
+        assert avec_source.is_reproducible
 
     def test_a_source_without_a_hash_is_flagged(self):
         manifest = RunManifest.capture(

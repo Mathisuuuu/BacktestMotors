@@ -243,8 +243,22 @@ class RunManifest:
 
     @property
     def is_reproducible(self) -> bool:
-        """Ce run peut-il etre rejoue a l'identique par un tiers ?"""
-        return self.git.is_reproducible and all(s.source_hash for s in self.data_sources)
+        """Ce run peut-il etre rejoue a l'identique par un tiers ?
+
+        `data_sources` non vide est une condition A PART ENTIERE, et non une
+        consequence du `all(...)` : `all(())` vaut `True` en Python, si bien
+        qu'un run sans AUCUNE source enregistree se declarait rejouable - le
+        cas ou l'on en sait le moins etait celui ou l'on affirmait le plus.
+
+        Un avertissement signalait deja la provenance incomplete. Un
+        avertissement se lit, un `Rejouable NON` se traite : c'est ce dernier
+        que `rsl verify` regarde pour rendre son code de sortie.
+        """
+        return (
+            self.git.is_reproducible
+            and bool(self.data_sources)
+            and all(s.source_hash for s in self.data_sources)
+        )
 
     def describe(self) -> SpecDict:
         return {

@@ -17,7 +17,7 @@ generated: true
 | Indicateur | Valeur |
 |---|---|
 | Pages de wiki | 22 |
-| Entrees de log | 51 |
+| Entrees de log | 53 |
 | Derniere activite | 2026-09-11 |
 | Idees ecartees (ledger) | 16 |
 | Idees en attente (ledger) | 3 |
@@ -27,7 +27,7 @@ generated: true
 | Pages `reference/` | 7 |
 | Pages `research/` | 1 |
 
-**Activite par type :** note × 30, fix × 7, decision × 6, feat × 5, setup × 1, lint × 1, experiment × 1
+**Activite par type :** note × 31, fix × 8, decision × 6, feat × 5, setup × 1, lint × 1, experiment × 1
 
 ## Experiences
 
@@ -41,14 +41,14 @@ Le total des essais alimente le Deflated Sharpe : un essai non enregistre gonfle
 
 ## Derniere activite — 8 entree(s)
 
+- **2026-09-11** — note | pourquoi P6 a survecu a 1400 tests alors qu'un test le visait | le test n'echouait que sur un arbre PROPRE : des que l'arbre etait modifie, `git.is_reproducible` valait deja `False` et masquait tout. Il passait au vert exactement pendant qu'on travaille. Deux tests de regression FIXENT desormais un `GitState` propre au lieu de subir celui du depot -> [[lessons]] L11
+- **2026-09-11** — fix | P6 corrige : `RunManifest.is_reproducible` ne ment plus par vacuite | `all(())` vaut `True`, donc un run sans AUCUNE source enregistree se declarait `Rejouable oui` -- le cas ou l'on en sait le moins etait celui ou l'on affirmait le plus. `bool(self.data_sources)` devient une condition a part entiere. Verifie en isolant l'etat git : aucune source -> False, une source hachee -> True, source sans hash -> False, arbre sale -> False. Les runs reels sont inchanges
 - **2026-09-11** — note | P6 est ressorti puis re-masque, comme annonce | la suite a echoue sur `test_missing_data_sources_are_flagged` des que l'arbre est devenu propre (le hook avait commite), puis a repasse au vert des mes modifications suivantes. Le defaut `all(())` est intact : il n'est visible que sur un arbre propre
 - **2026-09-11** — note | VWAP ancre sur la seance : exprimable par COMPOSITION, sans primitive nouvelle | `arith(/, cumulative(sum, prix*volume), cumulative(sum, volume))`. Verifie analytiquement : a volumes constants il vaut la moyenne des clotures depuis l'ouverture, exact au 1e-9. C'etait l'exemple motivant de la proposition
 - **2026-09-11** — note | la surface publique du `Context` s'est elargie, et un test adversarial l'a signale | `test_public_surface_is_the_declared_one` a echoue a l'ajout de `session_value` : il fait exactement son travail. Avant d'elargir la liste blanche, j'ai ecrit `tests/adversarial/test_session_closure.py` -- 26 tests dont le decisif : corrompre toutes les barres apres un point ne change AUCUNE valeur de seance lue avant. Les agregats de seance sont calcules a la construction du magasin, donc c'etait le canal de fuite plausible
 - **2026-09-11** — decision | deux lignes du ledger REPRISES le jour meme de leur ecriture | `session` et `cumulative` avaient ete ecartes parce qu'il aurait fallu DEVINER la frontiere de seance. Une declaration ne devine rien : le motif du rejet tombe, et les deux lignes de reprise le disent en citant les anciennes. `reset: never` de `cumulative` reste ecarte -- son motif (historique non borne, warmup indefinissable) ne depend pas du calendrier
 - **2026-09-11** — feat | calendrier de seance DECLARE par instrument, et les deux noeuds qu'il debloque | nouveau `src/rsl/data/session.py` ; `data[].session` (start, end, timezone IANA) entre dans le `config_hash` ; `BarStore` porte un champ optionnel `sessions`, ce qui fait que `shifted`, `peer` et les deux feeds en heritent sans plomberie. Noeuds 20 -> 22 : `session@1` (feuille) et `cumulative@1` (fenetre a longueur variable). Suite 1434 -> 1460 tests
 - **2026-09-11** — note | `vol_target` verifie sur le mecanisme, pas sur un resultat | doubler la volatilite divise la taille par deux : 494, 197, 98, 49, 19 contrats pour des volatilites de 0,002 a 0,050 par barre. Piege d'interpretation observe au passage : une cible de 1 % PAR BARRE sur du quotidien avec une base de 20 donne ~18 contrats ES sur 100 k d'equity -- un levier considerable, meme famille de piege que celui deja documente pour `equity_fraction`. **3 executions sur donnees reelles, donc 3 essais** (L2)
-- **2026-09-11** — note | piege trouve en testant `vol_target` : la troncature peut annuler la strategie | `int(1 * 0.9)` vaut 0 : avec `contracts: 1` et un facteur d'echelle sous 1, aucune position n'est jamais prise, sans erreur ni avertissement. Documente dans la regle et couvert par un test ; remede = une base assez grande (`contracts: 10` donne dix paliers)
-- **2026-09-11** — note | le decalage d'une periode exige par la proposition est inutile ICI, et je l'ai omis | le `Context` n'expose que des barres closes et l'execution est retardee (`lag_bars >= 1`) : lire la barre courante n'est pas lire son propre resultat. `RiskFraction` herite deja de cette garantie pour son ATR sans regle supplementaire. Ajouter un decalage aurait ete un reglage sans effet, donc une fausse precaution
 
 ## Next Actions
 
@@ -68,13 +68,15 @@ chiffre pres.
       `git status` affiche « propre ». Un `git clean -xfd` ou un clone frais
       reperd tout. Correctif : `/data/` dans `.gitignore`, puis committer
       `src/rsl/data/`. **C'est le point le plus urgent du depot.**
-- [ ] **P6 nouveau** -- `RunManifest.is_reproducible` ment par vacuite :
+- [x] **P6 resolu (2026-09-11)** -- `RunManifest.is_reproducible` mentait par vacuite :
       `all(s.source_hash for s in self.data_sources)` vaut `True` sur un tuple
       vide, donc un run **sans aucune source enregistree** se declare
       `Rejouable oui`. `tests/unit/test_manifest.py::test_missing_data_sources_are_flagged`
       echoue et a raison. Le champ que [[concepts/determinisme]] designe comme
       le seul qui compte est exactement celui qui se trompe.
-      Correctif : exiger `self.data_sources and all(...)`.
+      Corrige : `bool(self.data_sources)` est desormais une condition a part
+      entiere. Deux tests de regression FIXENT l'etat git, parce que l'ancien
+      ne voyait le defaut que sur un arbre propre -- voir [[lessons]] L11.
 - [ ] **P7 nouveau** -- `rsl schema > fichier.json` ecrit du **CP1252**, pas de
       l'UTF-8 (`ensure_ascii=False` + stdout Windows). Le `§` sort en octet
       `0xA7` et le fichier devient illisible en UTF-8. `--out` ecrit

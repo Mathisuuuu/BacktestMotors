@@ -127,3 +127,7 @@ grep "^## \[" wiki/log.md | tail -5
 ## [2026-09-11] note | VWAP ancre sur la seance : exprimable par COMPOSITION, sans primitive nouvelle | `arith(/, cumulative(sum, prix*volume), cumulative(sum, volume))`. Verifie analytiquement : a volumes constants il vaut la moyenne des clotures depuis l'ouverture, exact au 1e-9. C'etait l'exemple motivant de la proposition
 
 ## [2026-09-11] note | P6 est ressorti puis re-masque, comme annonce | la suite a echoue sur `test_missing_data_sources_are_flagged` des que l'arbre est devenu propre (le hook avait commite), puis a repasse au vert des mes modifications suivantes. Le defaut `all(())` est intact : il n'est visible que sur un arbre propre
+
+## [2026-09-11] fix | P6 corrige : `RunManifest.is_reproducible` ne ment plus par vacuite | `all(())` vaut `True`, donc un run sans AUCUNE source enregistree se declarait `Rejouable oui` -- le cas ou l'on en sait le moins etait celui ou l'on affirmait le plus. `bool(self.data_sources)` devient une condition a part entiere. Verifie en isolant l'etat git : aucune source -> False, une source hachee -> True, source sans hash -> False, arbre sale -> False. Les runs reels sont inchanges
+
+## [2026-09-11] note | pourquoi P6 a survecu a 1400 tests alors qu'un test le visait | le test n'echouait que sur un arbre PROPRE : des que l'arbre etait modifie, `git.is_reproducible` valait deja `False` et masquait tout. Il passait au vert exactement pendant qu'on travaille. Deux tests de regression FIXENT desormais un `GitState` propre au lieu de subir celui du depot -> [[lessons]] L11
