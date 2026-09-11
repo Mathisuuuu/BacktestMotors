@@ -16,18 +16,18 @@ generated: true
 
 | Indicateur | Valeur |
 |---|---|
-| Pages de wiki | 21 |
-| Entrees de log | 46 |
+| Pages de wiki | 22 |
+| Entrees de log | 51 |
 | Derniere activite | 2026-09-11 |
-| Idees ecartees (ledger) | 14 |
+| Idees ecartees (ledger) | 16 |
 | Idees en attente (ledger) | 3 |
 | Pages `Failed Ideas/` | 1 |
 | Pages `concepts/` | 6 |
 | Pages `experiments/` | 3 |
-| Pages `reference/` | 6 |
+| Pages `reference/` | 7 |
 | Pages `research/` | 1 |
 
-**Activite par type :** note × 27, fix × 7, decision × 5, feat × 4, setup × 1, lint × 1, experiment × 1
+**Activite par type :** note × 30, fix × 7, decision × 6, feat × 5, setup × 1, lint × 1, experiment × 1
 
 ## Experiences
 
@@ -41,14 +41,14 @@ Le total des essais alimente le Deflated Sharpe : un essai non enregistre gonfle
 
 ## Derniere activite — 8 entree(s)
 
+- **2026-09-11** — note | P6 est ressorti puis re-masque, comme annonce | la suite a echoue sur `test_missing_data_sources_are_flagged` des que l'arbre est devenu propre (le hook avait commite), puis a repasse au vert des mes modifications suivantes. Le defaut `all(())` est intact : il n'est visible que sur un arbre propre
+- **2026-09-11** — note | VWAP ancre sur la seance : exprimable par COMPOSITION, sans primitive nouvelle | `arith(/, cumulative(sum, prix*volume), cumulative(sum, volume))`. Verifie analytiquement : a volumes constants il vaut la moyenne des clotures depuis l'ouverture, exact au 1e-9. C'etait l'exemple motivant de la proposition
+- **2026-09-11** — note | la surface publique du `Context` s'est elargie, et un test adversarial l'a signale | `test_public_surface_is_the_declared_one` a echoue a l'ajout de `session_value` : il fait exactement son travail. Avant d'elargir la liste blanche, j'ai ecrit `tests/adversarial/test_session_closure.py` -- 26 tests dont le decisif : corrompre toutes les barres apres un point ne change AUCUNE valeur de seance lue avant. Les agregats de seance sont calcules a la construction du magasin, donc c'etait le canal de fuite plausible
+- **2026-09-11** — decision | deux lignes du ledger REPRISES le jour meme de leur ecriture | `session` et `cumulative` avaient ete ecartes parce qu'il aurait fallu DEVINER la frontiere de seance. Une declaration ne devine rien : le motif du rejet tombe, et les deux lignes de reprise le disent en citant les anciennes. `reset: never` de `cumulative` reste ecarte -- son motif (historique non borne, warmup indefinissable) ne depend pas du calendrier
+- **2026-09-11** — feat | calendrier de seance DECLARE par instrument, et les deux noeuds qu'il debloque | nouveau `src/rsl/data/session.py` ; `data[].session` (start, end, timezone IANA) entre dans le `config_hash` ; `BarStore` porte un champ optionnel `sessions`, ce qui fait que `shifted`, `peer` et les deux feeds en heritent sans plomberie. Noeuds 20 -> 22 : `session@1` (feuille) et `cumulative@1` (fenetre a longueur variable). Suite 1434 -> 1460 tests
 - **2026-09-11** — note | `vol_target` verifie sur le mecanisme, pas sur un resultat | doubler la volatilite divise la taille par deux : 494, 197, 98, 49, 19 contrats pour des volatilites de 0,002 a 0,050 par barre. Piege d'interpretation observe au passage : une cible de 1 % PAR BARRE sur du quotidien avec une base de 20 donne ~18 contrats ES sur 100 k d'equity -- un levier considerable, meme famille de piege que celui deja documente pour `equity_fraction`. **3 executions sur donnees reelles, donc 3 essais** (L2)
 - **2026-09-11** — note | piege trouve en testant `vol_target` : la troncature peut annuler la strategie | `int(1 * 0.9)` vaut 0 : avec `contracts: 1` et un facteur d'echelle sous 1, aucune position n'est jamais prise, sans erreur ni avertissement. Documente dans la regle et couvert par un test ; remede = une base assez grande (`contracts: 10` donne dix paliers)
 - **2026-09-11** — note | le decalage d'une periode exige par la proposition est inutile ICI, et je l'ai omis | le `Context` n'expose que des barres closes et l'execution est retardee (`lag_bars >= 1`) : lire la barre courante n'est pas lire son propre resultat. `RiskFraction` herite deja de cette garantie pour son ATR sans regle supplementaire. Ajouter un decalage aurait ete un reglage sans effet, donc une fausse precaution
-- **2026-09-11** — note | la cible de `vol_target` est PAR BARRE, pas annualisee -- correction de la proposition | elle demandait `vol_window` "en SEANCES" et une cible implicitement annuelle. Le ledger a deja ecarte les fenetres exprimees autrement qu'en barres, et l'annualisation par facteur suppose (gonflement d'un facteur ~2 sur donnees minute). Une regle de dimensionnement ne connait pas le pas d'annualisation, qui se mesure apres coup sur l'echantillon
-- **2026-09-11** — decision | proposition d'extensions "seance" recue et arbitree : 2 ajouts sur 4 retenus | RETENUS : `sizing.kind: "vol_target"` (dimensionnement en volatilite cible, distinct de `risk_fraction` qui dimensionne sur la distance au stop) et `rolling.stride` (pas d'echantillonnage, qui couvre le besoin de `across: sessions_same_offset` sans deviner de frontiere). ECARTES : noeuds `session` et `cumulative` -> ledger. Suite 1405 -> 1434 tests, 4 empreintes d'exemples inchangees
-- **2026-09-11** — note | les cles de `rules` ne sont plus recopiees nulle part | elles etaient enumerees trois fois dans `rules.py` ; le squelette les DERIVE de `RuleStrategy.describe()` plutot que d'en faire une quatrieme copie
-- **2026-09-11** — note | suffisance du squelette verifiee, pas supposee | trois tests construisent, a partir du SEUL document, une specification valide, puis chaque type de noeud, puis chaque primitive. Verification pratique en plus : un script n'important pas `rsl` a lu le squelette, ecrit une strategie MACD + ADX + stop ATR de Wilder, et l'a executee -> 50 trades, +65,59 %, code 0, empreinte 104e266aa7bdfaf6. **Cette execution consomme un essai** (L2)
-- **2026-09-11** — feat | `rsl squelette` : le vocabulaire presente comme un formulaire a remplir | nouveau `src/rsl/skeleton.py` + `schemas/squelette.json` (33 ko, ASCII pur). Chaque emplacement d'une specification y porte son type, ses choix, son defaut. Trois renvois croises rendus enumerables : `root` (10 instruments), `strategy.ref` (6), `primitive.ref` (22). ENGENDRE depuis les registres, garde par un test de derive comme `schemas/` (L4)
 
 ## Next Actions
 

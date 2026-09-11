@@ -232,6 +232,41 @@
         },
         {
           "additionalProperties": false,
+          "description": "Cumul d'un sous-signal DEPUIS l'ouverture de la seance courante.",
+          "properties": {
+            "inner": {
+              "$ref": "#/$defs/node"
+            },
+            "stat": {
+              "enum": [
+                "sum",
+                "mean",
+                "min",
+                "max",
+                "first",
+                "last",
+                "count_true"
+              ],
+              "type": "string"
+            },
+            "type": {
+              "const": "cumulative"
+            },
+            "version": {
+              "const": 1,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "type",
+            "stat",
+            "inner"
+          ],
+          "title": "cumulative@1",
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
           "description": "Choisit entre deux sous-signaux selon une condition.",
           "properties": {
             "condition": {
@@ -567,6 +602,44 @@
             "inner"
           ],
           "title": "rolling@1",
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Feuille : une grandeur de la seance courante ou d'une seance close.",
+          "properties": {
+            "field": {
+              "default": "open",
+              "enum": [
+                "open",
+                "high",
+                "low",
+                "close",
+                "volume",
+                "bar_index",
+                "minutes_from_open",
+                "is_first",
+                "is_last"
+              ],
+              "type": "string"
+            },
+            "lag": {
+              "default": 0,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "type": {
+              "const": "session"
+            },
+            "version": {
+              "const": 1,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "title": "session@1",
           "type": "object"
         },
         {

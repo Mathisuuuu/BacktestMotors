@@ -113,6 +113,8 @@ class TestSchemaAcceptsRealSpecifications:
             "min_of": {"type": "min_of", "operands": [leaf, leaf]},
             "max_of": {"type": "max_of", "operands": [leaf, leaf]},
             "bars_since": {"type": "bars_since", "lookback": 10, "inner": leaf},
+            "session": {"type": "session", "field": "high", "lag": 1},
+            "cumulative": {"type": "cumulative", "stat": "sum", "inner": leaf},
         }
         assert set(instances) == {node.name for node in list_node_types()}
         for name, instance in instances.items():

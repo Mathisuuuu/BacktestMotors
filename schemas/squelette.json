@@ -197,6 +197,28 @@
       },
       "resume": "`fast` passe sous `slow` entre t-1 et t."
     },
+    "cumulative": {
+      "champs": {
+        "inner": {
+          "requis": true,
+          "type": "noeud"
+        },
+        "stat": {
+          "choix": [
+            "sum",
+            "mean",
+            "min",
+            "max",
+            "first",
+            "last",
+            "count_true"
+          ],
+          "requis": true,
+          "type": "choix"
+        }
+      },
+      "resume": "Cumul d'un sous-signal DEPUIS l'ouverture de la seance courante."
+    },
     "if_then_else": {
       "champs": {
         "condition": {
@@ -411,6 +433,31 @@
         }
       },
       "resume": "Statistique glissante d'un sous-signal QUELCONQUE, pas d'un champ de prix."
+    },
+    "session": {
+      "champs": {
+        "field": {
+          "choix": [
+            "open",
+            "high",
+            "low",
+            "close",
+            "volume",
+            "bar_index",
+            "minutes_from_open",
+            "is_first",
+            "is_last"
+          ],
+          "defaut": "open",
+          "type": "choix"
+        },
+        "lag": {
+          "defaut": 0,
+          "min": 0,
+          "type": "entier"
+        }
+      },
+      "resume": "Feuille : une grandeur de la seance courante ou d'une seance close."
     },
     "time": {
       "champs": {
@@ -941,6 +988,25 @@
             ],
             "requis": true,
             "type": "choix"
+          },
+          "session": {
+            "accepte_null": true,
+            "champs": {
+              "end": {
+                "requis": true,
+                "type": "texte"
+              },
+              "start": {
+                "requis": true,
+                "type": "texte"
+              },
+              "timezone": {
+                "requis": true,
+                "type": "texte"
+              }
+            },
+            "defaut": null,
+            "type": "objet"
           },
           "timestamp_column": {
             "accepte_null": true,

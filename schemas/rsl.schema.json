@@ -88,6 +88,18 @@
             "title": "Root",
             "type": "string"
           },
+          "session": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/SessionSpec"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Calendrier de seance. Sans lui, le noeud `session` leve."
+          },
           "timestamp_column": {
             "anyOf": [
               {
@@ -297,6 +309,34 @@
           }
         },
         "title": "RiskSpec",
+        "type": "object"
+      },
+      "SessionSpec": {
+        "additionalProperties": false,
+        "description": "Calendrier de seance DECLARE pour un instrument.\n\nVit dans la specification, donc entre dans le `config_hash` : deux runs qui\ndeclarent des seances differentes ne peuvent pas se confondre. Le socle ne\ndeduit jamais de frontiere des donnees - voir `rsl.data.session`.",
+        "properties": {
+          "end": {
+            "description": "Heure de fermeture locale, 'HH:MM'",
+            "title": "End",
+            "type": "string"
+          },
+          "start": {
+            "description": "Heure d'ouverture locale, 'HH:MM'",
+            "title": "Start",
+            "type": "string"
+          },
+          "timezone": {
+            "description": "Fuseau IANA, ex. 'America/Chicago'",
+            "title": "Timezone",
+            "type": "string"
+          }
+        },
+        "required": [
+          "start",
+          "end",
+          "timezone"
+        ],
+        "title": "SessionSpec",
         "type": "object"
       },
       "SizingSpec": {
@@ -800,6 +840,41 @@
           },
           {
             "additionalProperties": false,
+            "description": "Cumul d'un sous-signal DEPUIS l'ouverture de la seance courante.",
+            "properties": {
+              "inner": {
+                "$ref": "#/$defs/node"
+              },
+              "stat": {
+                "enum": [
+                  "sum",
+                  "mean",
+                  "min",
+                  "max",
+                  "first",
+                  "last",
+                  "count_true"
+                ],
+                "type": "string"
+              },
+              "type": {
+                "const": "cumulative"
+              },
+              "version": {
+                "const": 1,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "type",
+              "stat",
+              "inner"
+            ],
+            "title": "cumulative@1",
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
             "description": "Choisit entre deux sous-signaux selon une condition.",
             "properties": {
               "condition": {
@@ -1135,6 +1210,44 @@
               "inner"
             ],
             "title": "rolling@1",
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "description": "Feuille : une grandeur de la seance courante ou d'une seance close.",
+            "properties": {
+              "field": {
+                "default": "open",
+                "enum": [
+                  "open",
+                  "high",
+                  "low",
+                  "close",
+                  "volume",
+                  "bar_index",
+                  "minutes_from_open",
+                  "is_first",
+                  "is_last"
+                ],
+                "type": "string"
+              },
+              "lag": {
+                "default": 0,
+                "minimum": 0,
+                "type": "integer"
+              },
+              "type": {
+                "const": "session"
+              },
+              "version": {
+                "const": 1,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "type"
+            ],
+            "title": "session@1",
             "type": "object"
           },
           {

@@ -96,6 +96,7 @@ machines produisent le meme hash pour le meme run. Voir [[lessons]] L7.
 | Iteration a curseur | `src/rsl/data/feed.py` — voir [[concepts/context-curseur]] |
 | Politique de donnees manquantes | [docs/no-lookahead.md](../../docs/no-lookahead.md) §4 |
 | Racine des cotations, `.env` | `src/rsl/env.py` |
+| Frontieres de seance | `src/rsl/data/session.py` — **declarees**, voir [[reference/seances]] |
 | Valider des fichiers en ligne de commande | `rsl validate FICHIER...` — la racine est deduite du nom (`ES_v0_1m` → `ES`) |
 | Table des contrats | `rsl instruments` — multiplicateur, tick, valeur du tick, frais, marge |
 | Reechantillonnage causal | couche donnees + `rsl run` (champ `resample` de la config) |

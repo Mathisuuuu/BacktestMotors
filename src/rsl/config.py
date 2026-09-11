@@ -31,6 +31,7 @@ from rsl.data.schema import (
     Panel,
     ns_to_datetime,
 )
+from rsl.data.session import SessionCalendar, build_session_index
 from rsl.data.validation import ValidationConfig
 from rsl.engine.cross_sectional import EveryNRows, EveryRow, RebalanceSchedule
 from rsl.engine.execution import (
@@ -73,6 +74,22 @@ class StrictModel(BaseModel):
 # ---------------------------------------------------------------------------
 
 
+class SessionSpec(StrictModel):
+    """Calendrier de seance DECLARE pour un instrument.
+
+    Vit dans la specification, donc entre dans le `config_hash` : deux runs qui
+    declarent des seances differentes ne peuvent pas se confondre. Le socle ne
+    deduit jamais de frontiere des donnees - voir `rsl.data.session`.
+    """
+
+    start: str = Field(description="Heure d'ouverture locale, 'HH:MM'")
+    end: str = Field(description="Heure de fermeture locale, 'HH:MM'")
+    timezone: str = Field(description="Fuseau IANA, ex. 'America/Chicago'")
+
+    def build(self) -> SessionCalendar:
+        return SessionCalendar(start=self.start, end=self.end, timezone=self.timezone)
+
+
 class DataSpec(StrictModel):
     """Un instrument, son fichier, et son eventuelle agregation."""
 
@@ -88,6 +105,10 @@ class DataSpec(StrictModel):
     close_stamp: CloseStamp = CloseStamp.PERIOD_END
     max_gap_seconds: float | None = Field(default=None, gt=0.0)
     allow_non_positive_prices: bool = True
+    session: SessionSpec | None = Field(
+        default=None,
+        description="Calendrier de seance. Sans lui, le noeud `session` leve.",
+    )
 
     @property
     def instrument(self) -> InstrumentSpec:
@@ -386,6 +407,18 @@ def load_stores(
                 f"resample:{entry.resample.value}"
                 f"({resample_report.n_periods} periodes, "
                 f"{resample_report.n_dropped_incomplete} ecartee(s))"
+            )
+
+        if entry.session is not None:
+            calendrier = entry.session.build()
+            store = store.with_sessions(
+                build_session_index(
+                    store.ts_close, store.open, store.high, store.low,
+                    store.close, store.volume, calendrier,
+                )
+            )
+            transformations.append(
+                f"session:{calendrier.start}-{calendrier.end}@{calendrier.timezone}"
             )
 
         if instrument.symbol in stores:

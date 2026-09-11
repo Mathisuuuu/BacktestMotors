@@ -162,8 +162,12 @@ class TestNoSampleLengthLeak:
         ctx = advanced(ramp_store, 10)
         public = {name for name in dir(ctx) if not name.startswith("_")}
         assert public == {
+            # `session_value` a rejoint la surface : il ne lit que des seances
+            # CLOSES, et `tests/adversarial/test_session_closure.py` verifie
+            # qu'y corrompre le futur ne change aucune lecture passee.
             "bar", "bar_at", "granularity", "history", "n_bars_seen", "peer", "peers",
-            "position", "shifted", "symbol", "ts", "ts_event", "value", "values",
+            "position", "session_value", "shifted", "symbol", "ts", "ts_event",
+            "value", "values",
         }
 
     def test_n_bars_seen_never_anticipates(self, ramp_store: BarStore):

@@ -32,9 +32,11 @@ import numpy as np
 
 from rsl.data.feed import Context
 from rsl.data.schema import POSITION_FIELDS, TIME_FIELDS, time_field
+from rsl.data.session import SessionField
 from rsl.errors import (
     ConfigurationError,
     InsufficientHistoryError,
+    LookAheadError,
     RegistryError,
     SymbolNotAvailableError,
 )
@@ -1702,3 +1704,212 @@ def max_of(*operands: Signal) -> MaxOf:
 def bars_since(lookback: int, inner: Signal) -> BarsSince:
     """Raccourci : `bars_since(50, condition)`."""
     return BarsSince(lookback, inner)
+
+
+@signal_node(
+    "session",
+    summary="Feuille : une grandeur de la seance courante ou d'une seance close.",
+    fields=(
+        NodeField(
+            "field",
+            FieldKind.STRING,
+            required=False,
+            default=SessionField.OPEN.value,
+            choices=tuple(f.value for f in SessionField),
+        ),
+        NodeField("lag", FieldKind.INTEGER, required=False, default=0, minimum=0),
+    ),
+)
+@dataclass(frozen=True, slots=True)
+class Session:
+    """Ce que la strategie sait de la SEANCE, et seulement si elle en a declare une.
+
+    Exige un bloc `session` sur l'entree `data` de l'instrument. Sans lui le
+    noeud leve : le socle ne deduit aucune frontiere de seance d'un trou dans
+    les donnees, et les series continues en sont pleines.
+
+    Ce qui est lisible, et quand :
+
+    | Champ | `lag` 0 | `lag >= 1` |
+    |---|---|---|
+    | `open` | oui, connu des la premiere barre | oui |
+    | `high`, `low`, `close`, `volume` | **non**, la seance n'est pas finie | oui |
+    | positionnels (voir plus bas) | oui | **non** |
+
+    Les champs positionnels sont `bar_index`, `minutes_from_open`, `is_first`
+    et `is_last` : ils decrivent la barre COURANTE dans sa seance, donc n'ont
+    pas de sens pour une seance passee prise en bloc.
+
+    `lag` se compte en SEANCES, pas en barres - c'est toute la difference avec
+    le champ `lag` du noeud `price`.
+    """
+
+    NODE_TYPE: ClassVar[str] = "session"
+    NODE_VERSION: ClassVar[int] = 1
+
+    field: SessionField = SessionField.OPEN
+    lag: int = 0
+
+    def __post_init__(self) -> None:
+        if self.lag < 0:
+            raise LookAheadError(
+                f"session : lag negatif ({self.lag}) - le futur n'est pas lisible"
+            )
+
+    @property
+    def warmup_bars(self) -> int:
+        """Une barre suffit au socle ; c'est la disponibilite des seances
+        passees qui limite, et elle est verifiee a l'evaluation."""
+        return 1
+
+    def __call__(self, ctx: Context) -> float | None:
+        try:
+            return ctx.session_value(self.field, self.lag)
+        except InsufficientHistoryError:
+            return None
+
+    def describe(self) -> SpecDict:
+        return {
+            "type": self.NODE_TYPE,
+            "version": self.NODE_VERSION,
+            "field": self.field.value,
+            "lag": self.lag,
+        }
+
+    @classmethod
+    def from_spec(cls, spec: SpecDict, build: Builder) -> Signal:
+        brut = spec.get("field", SessionField.OPEN.value)
+        if not isinstance(brut, str) or brut not in set(SessionField):
+            raise ConfigurationError(
+                f"'session' : champ invalide {brut!r}. "
+                f"Attendu l'un de {', '.join(f.value for f in SessionField)}"
+            )
+        lag = spec.get("lag", 0)
+        if not isinstance(lag, int) or isinstance(lag, bool):
+            raise ConfigurationError(f"'session' exige un `lag` entier, recu {lag!r}")
+        return cls(SessionField(brut), lag)
+
+
+def session(field: str = "open", lag: int = 0) -> Session:
+    """Raccourci : `session("high", lag=1)`."""
+    return Session(SessionField(field), lag)
+
+
+class CumulativeStat(StrEnum):
+    """Statistique cumulee depuis l'ouverture de la seance."""
+
+    SUM = "sum"
+    MEAN = "mean"
+    MIN = "min"
+    MAX = "max"
+    FIRST = "first"
+    LAST = "last"
+    COUNT_TRUE = "count_true"
+
+
+@signal_node(
+    "cumulative",
+    summary="Cumul d'un sous-signal DEPUIS l'ouverture de la seance courante.",
+    fields=(
+        NodeField(
+            "stat",
+            FieldKind.STRING,
+            choices=tuple(s.value for s in CumulativeStat),
+        ),
+        NodeField("inner", FieldKind.NODE),
+    ),
+)
+@dataclass(frozen=True, slots=True)
+class Cumulative:
+    """Fenetre a longueur VARIABLE : celle qui va de l'ouverture a maintenant.
+
+    C'est la difference avec `rolling`, dont la fenetre est fixe. Ici elle
+    s'allonge barre apres barre et repart a zero a chaque seance. Exige donc un
+    calendrier declare, comme le noeud `session`.
+
+    Ce que cela debloque, sans aucune primitive nouvelle - le VWAP ANCRE sur la
+    seance, qui n'etait pas exprimable :
+
+        arith(/,
+          cumulative(sum, arith(*, prix_typique, price(volume))),
+          cumulative(sum, price(volume)))
+
+    Et aussi le plus haut depuis l'ouverture, le volume cumule, le nombre de
+    barres depuis l'ouverture ou le compte de conditions remplies dans la
+    seance.
+
+    Cout, assume et a connaitre : le sous-arbre est reevalue une fois par barre
+    ecoulee depuis l'ouverture. Sur une seance de 1 380 barres d'une minute, la
+    derniere barre l'evalue 1 380 fois. C'est le meme arbitrage que `rolling`,
+    la correction avant la vitesse, et une primitive dediee reste possible le
+    jour ou un cas precis devient trop lent.
+
+    Pas de `reset: never` : un cumul depuis l'origine remonterait tout
+    l'historique, son cout dependrait de la position dans l'echantillon et son
+    warmup serait indefinissable. C'est la raison pour laquelle `bars_since@1`
+    est borne, et elle vaut ici aussi.
+    """
+
+    NODE_TYPE: ClassVar[str] = "cumulative"
+    NODE_VERSION: ClassVar[int] = 1
+
+    stat: CumulativeStat
+    inner: Signal
+
+    @property
+    def warmup_bars(self) -> int:
+        return self.inner.warmup_bars
+
+    def __call__(self, ctx: Context) -> float | None:
+        rang = ctx.session_value(SessionField.BAR_INDEX, 0)
+        values: list[float] = []
+        for lag in range(int(rang) + 1):
+            try:
+                value = self.inner(ctx.shifted(lag))
+            except InsufficientHistoryError:
+                return None
+            if value is None:
+                return None
+            values.append(value)
+
+        # `values[0]` est le PRESENT, les lags croissants remontent le temps :
+        # `first` est donc le dernier element, `last` le premier.
+        fenetre = np.array(values, dtype=np.float64)
+        match self.stat:
+            case CumulativeStat.SUM:
+                return float(np.sum(fenetre))
+            case CumulativeStat.MEAN:
+                return float(np.mean(fenetre))
+            case CumulativeStat.MIN:
+                return float(np.min(fenetre))
+            case CumulativeStat.MAX:
+                return float(np.max(fenetre))
+            case CumulativeStat.FIRST:
+                return values[-1]
+            case CumulativeStat.LAST:
+                return values[0]
+            case CumulativeStat.COUNT_TRUE:
+                return float(np.count_nonzero(fenetre > 0.0))
+
+    def describe(self) -> SpecDict:
+        return {
+            "type": self.NODE_TYPE,
+            "version": self.NODE_VERSION,
+            "stat": self.stat.value,
+            "inner": self.inner.describe(),
+        }
+
+    @classmethod
+    def from_spec(cls, spec: SpecDict, build: Builder) -> Signal:
+        brut = spec.get("stat")
+        if not isinstance(brut, str) or brut not in set(CumulativeStat):
+            raise ConfigurationError(
+                f"'cumulative' : statistique invalide {brut!r}. "
+                f"Attendu l'un de {', '.join(s.value for s in CumulativeStat)}"
+            )
+        return cls(CumulativeStat(brut), _child(spec, "inner", build))
+
+
+def cumulative(stat: str, inner: Signal) -> Cumulative:
+    """Raccourci : `cumulative("sum", price("volume"))`."""
+    return Cumulative(CumulativeStat(stat), inner)

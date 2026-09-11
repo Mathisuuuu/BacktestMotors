@@ -12,7 +12,8 @@
       "path": "indices/ES_v0_1m.parquet",
       "granularity_minutes": 1,
       "resample": "day",
-      "resample_min_bars": 200
+      "resample_min_bars": 200,
+      "session": { "start": "17:00", "end": "16:00", "timezone": "America/Chicago" }
     },
     {
       "root": "NQ",
@@ -94,6 +95,24 @@
               "right": { "type": "lag", "bars": 5,
                          "inner": { "type": "rolling", "stat": "ema", "window": 10,
                                     "inner": { "type": "price", "field": "close" } } }
+            },
+            {
+              "type": "compare", "op": ">",
+              "left": { "type": "price", "field": "close" },
+              "right": { "type": "session", "field": "high", "lag": 1 }
+            },
+            {
+              "type": "compare", "op": ">",
+              "left": { "type": "price", "field": "close" },
+              "right": {
+                "type": "arith", "op": "/",
+                "left": { "type": "cumulative", "stat": "sum",
+                          "inner": { "type": "arith", "op": "*",
+                                     "left": { "type": "price", "field": "close" },
+                                     "right": { "type": "price", "field": "volume" } } },
+                "right": { "type": "cumulative", "stat": "sum",
+                           "inner": { "type": "price", "field": "volume" } }
+              }
             }
           ]
         },
