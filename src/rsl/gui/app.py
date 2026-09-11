@@ -21,7 +21,7 @@ import tkinter as tk
 from collections.abc import Callable
 from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
-from typing import Any, Literal
+from typing import Any, Final, Literal
 
 from rsl.config import BacktestSpec
 from rsl.gui.charts import ChartPanel, PricePanel
@@ -96,6 +96,25 @@ GROUPES: tuple[tuple[str, tuple[tuple[str, str, Teinte], ...]], ...] = (
         ("perte_moyenne", "Perte moyenne par trade", "perte"),
     )),
 )
+
+TEINTES: Final[dict[str, Teinte]] = {
+    cle: teinte for _, champs in GROUPES for cle, _, teinte in champs
+}
+"""La teinte de chaque carte, DERIVEE de `GROUPES`.
+
+Elle y etait deja declaree ; elle etait en plus injectee comme attribut sur le
+`tk.Label` (`valeur.teinte = teinte`) puis relue par
+`getattr(etiquette, "teinte", "neutre")`. Deux defauts a cela :
+
+- `tk.Label` n'a pas de champ `teinte`, donc c'etait une greffe sur un objet
+  d'une bibliotheque tierce - `mypy` l'ignorait par un `type: ignore`, et rien
+  ne garantit qu'une version future de tkinter la tolere ;
+- le defaut `"neutre"` du `getattr` rendait l'echec MUET. Une cle mal
+  orthographiee, un widget reconstruit sans la greffe, et tous les chiffres
+  passaient en noir sans qu'aucun test ni aucun lint ne le voie.
+
+Ici la table est la source, l'acces se fait par cle, et une cle absente leve.
+"""
 
 
 def _texte(valeur: float | None, gabarit: str, absent: str = "n/d") -> str:
@@ -257,11 +276,15 @@ class DashboardApp(tk.Tk):
                      anchor="w").pack(fill="x", pady=(0, 8))
             rangee = tk.Frame(bloc, bg=BLANC)
             rangee.pack(fill="x")
-            for cle, libelle, teinte in champs:
-                self._carte(rangee, cle, libelle, teinte)
+            for cle, libelle, _ in champs:
+                self._carte(rangee, cle, libelle)
 
-    def _carte(self, parent: tk.Misc, cle: str, libelle: str, teinte: Teinte) -> None:
-        """Une carte : un libelle gris, un chiffre, un filet autour."""
+    def _carte(self, parent: tk.Misc, cle: str, libelle: str) -> None:
+        """Une carte : un libelle gris, un chiffre, un filet autour.
+
+        La carte ne connait pas sa teinte : elle est dans `TEINTES`, lue au
+        moment de colorer. Un widget ne porte que ce que tkinter lui donne.
+        """
         carte = tk.Frame(parent, bg=BLANC, highlightthickness=1,
                          highlightbackground=FILET, highlightcolor=FILET)
         carte.pack(side="left", fill="both", expand=True, padx=(0, 10))
@@ -272,7 +295,6 @@ class DashboardApp(tk.Tk):
         valeur = tk.Label(carte, textvariable=variable, font=CHIFFRE, bg=BLANC,
                           fg=ENCRE, anchor="w")
         valeur.pack(fill="x", padx=14, pady=(0, 14))
-        valeur.teinte = teinte  # type: ignore[attr-defined]
         self._teintes[cle] = valeur
 
     def _onglet_courbes(self) -> None:
@@ -414,7 +436,9 @@ class DashboardApp(tk.Tk):
             "pf": None if stats.profit_factor is None else stats.profit_factor - 1.0,
         }
         for cle, etiquette in self._teintes.items():
-            teinte: Teinte = getattr(etiquette, "teinte", "neutre")
+            # `TEINTES[cle]` et non un defaut : une cle inconnue doit lever
+            # ici plutot que peindre tout en noir sans le dire.
+            teinte = TEINTES[cle]
             if teinte == "gain":
                 couleur = VERT
             elif teinte == "perte":

@@ -433,3 +433,57 @@ class TestBarres:
             bars={SYMBOL: barres},
         )
         assert enrichi.bars[SYMBOL].close.size == 5
+
+
+@pytest.fixture(scope="module")
+def table():
+    """`TEINTES` de `rsl.gui.app`, sans ouvrir de fenetre."""
+    pytest.importorskip("tkinter", reason="tkinter absent de cet interpreteur")
+    from rsl.gui.app import TEINTES
+
+    return TEINTES
+
+
+class TestTableDesTeintes:
+    """La couleur de chaque carte est une TABLE, plus une greffe sur un widget.
+
+    Jusqu'au 2026-09-11, `app.py` posait `valeur.teinte = teinte` sur un
+    `tk.Label` puis la relisait par `getattr(etiquette, "teinte", "neutre")`.
+    Deux defauts : une greffe sur un objet d'une bibliotheque tierce, que
+    `mypy` ne couvrait que par un `type: ignore` ; et un defaut `"neutre"` qui
+    rendait l'echec MUET - une cle mal orthographiee peignait tout en noir sans
+    qu'aucun test ni aucun lint ne le voie.
+
+    Ces tests n'ouvrent aucune fenetre : la table est de la donnee pure, et
+    c'est precisement ce qui la rend verifiable.
+    """
+
+    def test_chaque_carte_declaree_a_une_teinte(self, table):
+        from rsl.gui.app import GROUPES
+
+        declarees = [cle for _, champs in GROUPES for cle, _, _ in champs]
+        assert sorted(table) == sorted(declarees)
+
+    def test_aucune_cle_en_double_entre_onglets(self, table):
+        from rsl.gui.app import GROUPES
+
+        declarees = [cle for _, champs in GROUPES for cle, _, _ in champs]
+        assert len(declarees) == len(set(declarees)), "deux onglets se marcheraient dessus"
+
+    def test_les_teintes_sont_celles_du_vocabulaire(self, table):
+        assert set(table.values()) <= {"neutre", "gain", "perte", "signe"}
+
+    def test_une_cle_inconnue_leve_au_lieu_de_peindre_en_noir(self, table):
+        """Le point de la correction : l'echec doit etre bruyant."""
+        with pytest.raises(KeyError):
+            table["cle_qui_nexiste_pas"]
+
+    def test_le_sens_des_quatre_teintes_est_celui_qu_on_croit(self, table):
+        """Un gain est vert, une perte rouge, et les ratios dependent de leur
+        SIGNE - un profit factor sous 1 est rouge meme s'il est positif."""
+        assert table["gain_net"] == "gain"
+        assert table["perte_nette"] == "perte"
+        assert table["dd_max"] == "perte"
+        assert table["sharpe"] == "signe"
+        assert table["pf"] == "signe"
+        assert table["n"] == "neutre"

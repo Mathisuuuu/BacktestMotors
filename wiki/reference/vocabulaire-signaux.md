@@ -277,6 +277,26 @@ s'y applique pas ; le refus est fait par `RuleStrategy.from_spec`, et le schema
 publie porte desormais la meme contrainte. Meme regle que pour les champs d'un
 noeud, ou `build_signal` refuse deja `oprands` au lieu de `operands`.
 
+## Ou vit le code
+
+`rsl/strategies/signals.py` est une **facade** depuis le 2026-09-11 : elle ne
+fait que reexporter. Le code est dans
+[src/rsl/strategies/noeuds/](../../src/rsl/strategies/noeuds/), range par
+famille.
+
+| Module | Ce qu'il contient |
+|---|---|
+| `contrat` | ce qu'EST un noeud : protocole `Signal`, `NodeField`, registre, `build_signal` |
+| `feuilles` | ce qui lit le monde : `price`, `primitive`, `position`, `time`, `session`, `peer`, `constant` |
+| `fenetres` | ce qui regarde plusieurs barres : `rolling`, `lag`, `bars_since`, `cumulative` |
+| `operateurs` | ce qui combine : `compare`, `arith`, `all_of`, `not`, `crosses_*`, `if_then_else`, `math`, `min_of`, `max_of` |
+| `raccourcis` | abreviations Python (`prim`, `const`, `price`) - pas utilisees par le chemin declaratif |
+
+Les quatre familles importent `contrat`, jamais l'inverse
+([tests/unit/test_couches.py](../../tests/unit/test_couches.py) le verifie par
+analyse d'AST). Un noeud AJOUTE dans une famille doit apparaitre dans la
+facade : le meme fichier de test le verifie, sans liste a tenir a jour.
+
 ## A savoir avant d'etendre
 
 - `peer` et `rolling` vont ensemble : acces a un autre instrument au meme

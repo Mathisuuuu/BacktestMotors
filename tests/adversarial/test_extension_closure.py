@@ -30,9 +30,13 @@ from rsl.primitives.registry import (
     primitive,
 )
 from rsl.strategies.base import _STRATEGIES, Strategy, get_strategy, strategy
+
+# `_NODES` est prive : il vient de son module REEL, pas de la facade
+# `rsl.strategies.signals`, qui ne reexporte que la surface publique. Un nom
+# prive qui transite par une facade est un nom prive qu'on croit public.
+from rsl.strategies.noeuds.contrat import _NODES
 from rsl.strategies.rules import FlatStrategy
 from rsl.strategies.signals import (
-    _NODES,
     Builder,
     Compare,
     CompareOp,

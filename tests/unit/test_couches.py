@@ -82,3 +82,83 @@ class TestOrdersEstUneFeuille:
             assert getattr(rsl.engine, nom) is getattr(
                 __import__("rsl.orders", fromlist=[nom]), nom
             )
+
+
+class TestFacadeDesSignaux:
+    """`rsl.strategies.signals` est une FACADE depuis le 2026-09-11.
+
+    Le code vit dans `rsl/strategies/noeuds/`, range par famille. La facade
+    existe pour qu'aucun des trente et quelques fichiers qui importaient
+    `from rsl.strategies.signals import ...` n'ait a changer.
+
+    Une facade sans test est une facade qui perd des noms sans le dire : elle
+    n'est qu'une liste d'imports, et un `ruff --fix` retire un import qui ne
+    sert a rien d'autre qu'a etre reexporte. C'est arrive pendant le
+    decoupage - `_NODES` a disparu, et seule la suite l'a signale.
+    """
+
+    def test_tout_ce_que_les_familles_definissent_passe_par_la_facade(self):
+        """La garde qui compte, et elle est plus large qu'une liste de noeuds.
+
+        On ne compare pas au registre - `NodeType` ne porte pas la classe - mais
+        a ce que chaque module de famille DEFINIT reellement : classes et
+        fonctions dont le `__module__` est le sien. Un noeud ajoute demain dans
+        `feuilles.py` et oublie dans la facade fait echouer ce test, sans
+        qu'aucune liste n'ait ete tenue a jour ici.
+        """
+        import importlib
+        import inspect
+
+        import rsl.strategies.signals as facade
+
+        manquants: list[str] = []
+        for famille in ("contrat", "feuilles", "fenetres", "operateurs", "raccourcis"):
+            module = importlib.import_module(f"rsl.strategies.noeuds.{famille}")
+            for nom, objet in vars(module).items():
+                if nom.startswith("_") or not (
+                    inspect.isclass(objet) or inspect.isfunction(objet)
+                ):
+                    continue
+                if getattr(objet, "__module__", None) != module.__name__:
+                    continue  # importe, pas defini ici
+                if getattr(facade, nom, None) is not objet:
+                    manquants.append(f"{famille}.{nom}")
+        assert manquants == [], f"absents de la facade : {manquants}"
+
+    def test_tout_ce_que_all_annonce_existe(self):
+        """Un `__all__` qui ment casse `from ... import *` et trompe les
+        outils, sans qu'aucun import ordinaire ne s'en apercoive."""
+        import rsl.strategies.signals as facade
+
+        manquants = [nom for nom in facade.__all__ if not hasattr(facade, nom)]
+        assert manquants == [], manquants
+
+    def test_les_familles_ne_se_connaissent_pas_entre_elles(self):
+        """`contrat` est sous les autres ; les familles ne s'importent pas
+        mutuellement. Sans cela, le decoupage n'aurait deplace le monolithe
+        qu'en apparence."""
+        import ast
+        from pathlib import Path
+
+        familles = {"feuilles", "fenetres", "operateurs"}
+        racine = Path("src/rsl/strategies/noeuds")
+        for nom in familles:
+            arbre = ast.parse((racine / f"{nom}.py").read_text(encoding="utf-8"))
+            importes = {
+                noeud.module
+                for noeud in ast.walk(arbre)
+                if isinstance(noeud, ast.ImportFrom) and noeud.module
+            }
+            voisins = {
+                m for m in importes
+                if m.startswith("rsl.strategies.noeuds.")
+                and m.rsplit(".", 1)[-1] in familles - {nom}
+            }
+            assert voisins == set(), f"{nom} importe {voisins}"
+
+    def test_la_facade_ne_reexporte_pas_de_nom_prive(self):
+        """Un nom prive qui transite par une facade est un nom prive qu'on
+        croit public. `_NODES` s'importe depuis `noeuds.contrat`."""
+        import rsl.strategies.signals as facade
+
+        assert [nom for nom in facade.__all__ if nom.startswith("_")] == []

@@ -1,0 +1,44 @@
+{
+  "_moule.json": {
+    "config_hash": "f86ea93bb50191792c35c96645f69178a020675342ebe89da5c5f22d2a89bf58",
+    "final_equity": 152692.19999999995,
+    "n_trades": 18,
+    "result_fingerprint": "58a9d31a2dae3658350e7ad3e5a335555144acfd771c3644ecc9bfe447c48707"
+  },
+  "_moule_universel.json": {
+    "config_hash": "190584bbda855ee180408377259f246a5ba759441b739b809f80152d89ec48a6",
+    "final_equity": 180897.00000000128,
+    "n_trades": 55,
+    "result_fingerprint": "620a25560928be60142a0bdab80eb6381f525e59443f94070741569136a72561"
+  },
+  "momentum_12_1_mensuel.json": {
+    "config_hash": "776b703db6724b6709df84e3ea731c0b2296bde5979043c0180de5b63660ba5d",
+    "final_equity": 1731615.600000003,
+    "n_trades": 107,
+    "result_fingerprint": "0cbc24bade482f2b0c9c4a4f15f01318fc8c2718b76ed99c9f8a5fc16e4c9b6b"
+  },
+  "paire_es_nq.json": {
+    "config_hash": "c686c31fa61e36d2b739f8dd97d183cb26a6666c55f90b27c0baead2f7680184",
+    "final_equity": 1051530.9999999986,
+    "n_trades": 15,
+    "result_fingerprint": "ed5fdfcb2b74cfd2c7c4e78a0b4688db9e42229c12839b23f685a25f79ee0235"
+  },
+  "retour_moyenne_dans_tendance.json": {
+    "config_hash": "52add9cc0fc60543072be038b6f83b669fcbfec744390d7ec9a9876e2da57efa",
+    "final_equity": 471685.3500000001,
+    "n_trades": 4,
+    "result_fingerprint": "5df1d8313511e7fcac0e55091ec3f56d5c8a16cc1272de375f9642bc48ee561e"
+  },
+  "rsi_survendu_hors_lundi.json": {
+    "config_hash": "1881893d9b9d417ab51330687f48858ca963ddc90305521b0a36bd4fc1bc4f97",
+    "final_equity": 607024.6,
+    "n_trades": 49,
+    "result_fingerprint": "80e646bf9477a627e0ac1344a2f3a4a0bfbb252350fff560087925395824fdd2"
+  },
+  "sma_es_daily.json": {
+    "config_hash": "ac9bf24fc9f274bd081795afbc9c917d0327a235f83b936bb1fc9ad74e1e0537",
+    "final_equity": 627312.4142857143,
+    "n_trades": 10,
+    "result_fingerprint": "e96832fb121b91fb42b02b624c56041024e57e169624280e4dedd7e5a652c6f0"
+  }
+}
