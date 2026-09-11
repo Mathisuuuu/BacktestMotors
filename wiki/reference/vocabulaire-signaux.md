@@ -27,6 +27,29 @@ autorite: schemas/signals.schema.json (engendre, ne pas editer a la main)
 | Ou sont les moules de strategie descriptibles ? | [rules.py](../../src/rsl/strategies/rules.py) · [ranking.py](../../src/rsl/strategies/ranking.py) |
 | Ou branchera le futur compilateur de specifications ? | [src/rsl/pipeline.py](../../src/rsl/pipeline.py) — decrit, sans implementation |
 
+## Ou passe la frontiere du « sans code »
+
+Mesure du 2026-09-11, et pas une impression : le vocabulaire sait desormais
+**reconstruire une de ses propres primitives**. Un `rsi@1` recompose avec les
+seuls noeuds (`arith`, `lag`, `max_of`, `math`, `rolling`) rend des valeurs
+identiques a la primitive sur 240 points, ecart maximum `0.00e+00`. Ce qui
+suit de plus important : la meme composition s'applique a une EXPRESSION, donc
+le RSI d'un spread ES/NQ s'ecrit, alors qu'aucune primitive ne le calcule.
+
+Ce qui reste hors de portee sans Python, et pourquoi :
+
+| Mur | Nature |
+|---|---|
+| Deux granularites du MEME symbole | structurel : `'X apparait deux fois'`. Contourne pour le cas quotidien-sur-intraday par `session` |
+| Taille fonction d'un signal | `sizing` est un enum, pas une expression. `contracts` attend un entier |
+| Optimisation de parametres | hors perimetre declare du runner ([[Failed Ideas/ledger]]) |
+| Noeud a memoire entre barres | ecarte deliberement : casserait la reproductibilite bit-a-bit |
+| Primitive vraiment nouvelle | ~30 lignes de Python et un enregistrement `@1` |
+
+Astuce utile : `rolling` n'offre que l'EMA (`alpha = 2/(w+1)`), pas le lissage
+de Wilder (`alpha = 1/n`). Les deux coincident pour `w = 2n - 1` - l'amorce
+differe, les series convergent.
+
 ## Trois documents, trois usages
 
 | Document | Sert a | Engendre ? |

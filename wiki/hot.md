@@ -17,7 +17,7 @@ generated: true
 | Indicateur | Valeur |
 |---|---|
 | Pages de wiki | 22 |
-| Entrees de log | 55 |
+| Entrees de log | 56 |
 | Derniere activite | 2026-09-11 |
 | Idees ecartees (ledger) | 16 |
 | Idees en attente (ledger) | 3 |
@@ -27,7 +27,7 @@ generated: true
 | Pages `reference/` | 7 |
 | Pages `research/` | 1 |
 
-**Activite par type :** note × 32, fix × 9, decision × 6, feat × 5, setup × 1, lint × 1, experiment × 1
+**Activite par type :** note × 33, fix × 9, decision × 6, feat × 5, setup × 1, lint × 1, experiment × 1
 
 ## Experiences
 
@@ -41,6 +41,7 @@ Le total des essais alimente le Deflated Sharpe : un essai non enregistre gonfle
 
 ## Derniere activite — 8 entree(s)
 
+- **2026-09-11** — note | frontiere du « sans code » mesuree apres les ajouts du jour | le vocabulaire RECONSTRUIT `rsi@1` a partir de ses seuls noeuds : 240 points compares, ecart maximum 0.00e+00. Impossible avant `max_of` et `math`. Corollaire : le RSI d'un spread ES/NQ s'ecrit, alors qu'aucune primitive ne le calcule. Restent hors de portee : deux granularites du meme symbole (structurel), taille fonction d'un signal (`sizing` est un enum), optimisation de parametres et noeuds a memoire (tous deux au ledger). Aucun backtest lance : ces verifications construisent des signaux, elles ne consomment pas d'essai
 - **2026-09-11** — note | effet de bord decouvert en designorant : ruff respecte `.gitignore` | la couche donnees n'avait donc JAMAIS ete analysee. 7 defauts dormaient dans du code central (4 `__slots__` non tries, 2 blocs d'imports, 1 generateur). Corriges ; les empreintes de `sma_es_daily`, `paire_es_nq` et `_moule` sont identiques avant et apres, ce qui prouve la neutralite. A ne pas confondre avec les 28 `I001` du ledger, qui etaient des symptomes de l'ABSENCE du paquet -> [[lessons]] L12
 - **2026-09-11** — fix | P1 RESOLU : motif `.gitignore` ancre en `/data/`, couche donnees enfin versionnee | 8 fichiers, 2 446 lignes, dont `session.py` ecrit aujourd'hui. Diagnostic au moment de pousser : `git ls-files src/` rendait 45 fichiers contre 53 sur le disque, et des tests DEJA pousses importaient `rsl.data.session`, absent du depot -- un clone frais etait casse. `data/` a la racine reste ignore, verifie
 - **2026-09-11** — note | pourquoi P6 a survecu a 1400 tests alors qu'un test le visait | le test n'echouait que sur un arbre PROPRE : des que l'arbre etait modifie, `git.is_reproducible` valait deja `False` et masquait tout. Il passait au vert exactement pendant qu'on travaille. Deux tests de regression FIXENT desormais un `GitState` propre au lieu de subir celui du depot -> [[lessons]] L11
@@ -48,7 +49,6 @@ Le total des essais alimente le Deflated Sharpe : un essai non enregistre gonfle
 - **2026-09-11** — note | P6 est ressorti puis re-masque, comme annonce | la suite a echoue sur `test_missing_data_sources_are_flagged` des que l'arbre est devenu propre (le hook avait commite), puis a repasse au vert des mes modifications suivantes. Le defaut `all(())` est intact : il n'est visible que sur un arbre propre
 - **2026-09-11** — note | VWAP ancre sur la seance : exprimable par COMPOSITION, sans primitive nouvelle | `arith(/, cumulative(sum, prix*volume), cumulative(sum, volume))`. Verifie analytiquement : a volumes constants il vaut la moyenne des clotures depuis l'ouverture, exact au 1e-9. C'etait l'exemple motivant de la proposition
 - **2026-09-11** — note | la surface publique du `Context` s'est elargie, et un test adversarial l'a signale | `test_public_surface_is_the_declared_one` a echoue a l'ajout de `session_value` : il fait exactement son travail. Avant d'elargir la liste blanche, j'ai ecrit `tests/adversarial/test_session_closure.py` -- 26 tests dont le decisif : corrompre toutes les barres apres un point ne change AUCUNE valeur de seance lue avant. Les agregats de seance sont calcules a la construction du magasin, donc c'etait le canal de fuite plausible
-- **2026-09-11** — decision | deux lignes du ledger REPRISES le jour meme de leur ecriture | `session` et `cumulative` avaient ete ecartes parce qu'il aurait fallu DEVINER la frontiere de seance. Une declaration ne devine rien : le motif du rejet tombe, et les deux lignes de reprise le disent en citant les anciennes. `reset: never` de `cumulative` reste ecarte -- son motif (historique non borne, warmup indefinissable) ne depend pas du calendrier
 
 ## Next Actions
 
