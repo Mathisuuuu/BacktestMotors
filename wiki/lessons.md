@@ -365,3 +365,52 @@ verifier au passage ce que son absence permettait : ici, une faute de frappe
 silencieuse.
 
 Fonde sur [[reference/vocabulaire-signaux]] · [[log]] (2026-09-11)
+
+---
+
+## L16 -- Une bibliotheque se verifie par PARCOURS, pas indicateur par indicateur
+
+Passer de 22 a 136 primitives a pose une question que 22 ne posaient pas :
+comment savoir que les 136 tiennent ? Ecrire des tests un par un ne repond
+pas -- chaque ajout apporte alors sa propre couverture, et un oubli ne se voit
+nulle part.
+
+La reponse est de separer deux questions qui n'ont pas les memes moyens :
+
+| Question | Moyen | Echelle |
+|---|---|---|
+| « respecte-t-elle le contrat ? » | parcours du registre, parametres DERIVES du schema | automatique, toute primitive future incluse |
+| « la formule est-elle juste ? » | forme fermee, ou equivalence avec du code eprouve | une par une, irreductible |
+
+Le parcours a trouve **trois defauts le jour de sa mise en place**, et aucun
+n'aurait ete vu par relecture :
+
+- `zlema@1` sous-declarait son warmup de `(window-1)/2` barres -- il aurait
+  leve `InsufficientHistoryError` en plein run ;
+- `inertia@1` rendait `NaN` sur une serie plate, parce que `np.std` d'un
+  tableau VIDE vaut `NaN` et que `NaN <= 0` est faux : la garde existait et ne
+  gardait rien ;
+- `t3@1` empile SIX EMA et n'en recevait l'historique que pour cinq, donc
+  rendait `None` a **chaque** barre des que la fenetre depassait 5. Il passait
+  tous les autres tests -- il ne levait pas, ne lisait pas le futur, n'etait ni
+  NaN ni infini. Il etait simplement mort. C'est [[lessons]] L13 sous une
+  autre forme, et c'est le test « produit-elle une valeur au moins une fois »
+  qui l'a attrape -- test ajoute APRES coup, parce que le defaut a d'abord ete
+  trouve par une forme fermee.
+
+Deux principes s'en degagent.
+
+**Les parametres du parcours se DERIVENT du schema**, ils ne se listent pas.
+Sans cela, la liste devient la copie a maintenir que le parcours devait
+supprimer -- meme mecanisme qu'en [[lessons]] L15.
+
+**Une contrainte entre parametres est une contrainte sur l'UTILISABILITE.**
+`adosc@1` portait `window` rapide et une lente figee a 10 : toute fenetre >= 10
+etait refusee, donc une machine lisant le squelette echouait au premier essai.
+Le defaut n'etait pas dans la formule mais dans le choix de ce qui est
+obligatoire. Rendre `window` la fenetre LENTE l'a supprime.
+
+**Consequence operationnelle :** avant d'ajouter la dixieme chose d'une
+famille, ecrire le parcours. Il coute une fois, et il paie a chaque ajout.
+
+Fonde sur [[reference/vocabulaire-signaux]] · [[log]] (2026-09-11)

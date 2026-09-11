@@ -211,7 +211,7 @@ coupure.
 
 | Document | Sert a | Engendre ? |
 |---|---|---|
-| [schemas/squelette.json](../../schemas/squelette.json) | **ecrire** : chaque emplacement avec ses valeurs acceptees, les 10 instruments, les 22 primitives, les 20 noeuds, les 6 strategies | oui, `rsl squelette` |
+| [schemas/squelette.json](../../schemas/squelette.json) | **ecrire** : chaque emplacement avec ses valeurs acceptees, les 10 instruments, les 136 primitives, les 22 noeuds, les 7 strategies | oui, `rsl squelette` |
 | [schemas/signals.schema.json](../../schemas/signals.schema.json) | **valider** : JSON Schema exact | oui, `rsl schema` |
 | [examples/_moule_universel.json](../../examples/_moule_universel.json) | **imiter** : un fichier qui tourne et exerce les 20 noeuds | non, teste |
 
@@ -233,6 +233,32 @@ document.
 | [examples/retour_moyenne_dans_tendance.json](../../examples/retour_moyenne_dans_tendance.json) | `rules@1` — strategie ecrite nulle part dans le code |
 | [examples/paire_es_nq.json](../../examples/paire_es_nq.json) | `peer` + `rolling` — paire ES/NQ sur donnees reelles |
 | [examples/momentum_12_1_mensuel.json](../../examples/momentum_12_1_mensuel.json) | transversal, classement |
+
+## Combien d'indicateurs, et comment ils sont verifies
+
+**136 primitives** au 2026-09-11, soit **209 sorties nommees** - `adx@1`,
+`macd@1`, `bollinger@1` et les autres portent plusieurs lignes sous un seul
+nom, parce que deux lignes d'un meme indicateur doivent etre calculees avec les
+memes reglages pour que leur croisement veuille dire quelque chose.
+
+Ce chiffre n'est pas le bon indicateur de couverture, et il ne faut pas le
+lire comme tel. `rolling@1` eleve **n'importe quelle expression** en
+statistique glissante avec douze statistiques au choix, et 16 primitives
+acceptent un champ OHLCV libre. Le nombre de mesures exprimables n'a pas de
+borne ; ce qui en a une, c'est leur COUT (voir [[hot]], A-P2).
+
+Ce qui rend le chiffre credible n'est pas sa taille mais le fait qu'une
+bibliotheque de cette taille se verifie **d'un seul tenant** :
+
+| Ou | Ce qui est verifie | Pour qui |
+|---|---|---|
+| [tests/adversarial/test_registre_primitives.py](../../tests/adversarial/test_registre_primitives.py) | futur corrompu sans effet, warmup honnete, ni NaN ni infini, determinisme, serie plate sans erreur, et **jamais `None` partout** | TOUTES, par parcours du registre |
+| [tests/unit/test_indicateurs.py](../../tests/unit/test_indicateurs.py) | la valeur : formes fermees sur rampe et constante, equivalences avec du code deja eprouve | les formules, une a une |
+
+Le premier fichier est le seul qui passe a l'echelle : une primitive ajoutee
+demain y est couverte sans qu'une ligne soit ecrite. Il a trouve trois defauts
+reels le jour de sa mise en place, dont deux qu'aucune relecture n'aurait vus
+([[lessons]] L16).
 
 ## Les cles de `rules` : une liste, et elle est fermee
 

@@ -370,27 +370,141 @@
         },
         "ref": {
           "choix": [
+            "acceleration_bands@1",
+            "ad@1",
+            "adosc@1",
             "adx@1",
+            "adxr@1",
+            "alma@1",
+            "apo@1",
+            "aroon@1",
             "atr@1",
+            "atr_ratio@1",
             "atr_wilder@1",
+            "atr_wilder_pct@1",
+            "autocorrelation@1",
+            "average_price@1",
+            "awesome@1",
+            "bar_range@1",
+            "bar_range_pct@1",
+            "beta@1",
+            "bias@1",
+            "body_ratio@1",
+            "bollinger@1",
+            "bop@1",
             "cci@1",
+            "center_of_gravity@1",
+            "cfo@1",
+            "chaikin_volatility@1",
+            "chop@1",
+            "close_location@1",
+            "cmf@1",
+            "cmo@1",
+            "coppock@1",
+            "correlation@1",
+            "cti@1",
+            "dema@1",
+            "dollar_volume@1",
+            "donchian@1",
+            "downside_deviation@1",
+            "dpo@1",
+            "dx@1",
             "efficiency_ratio@1",
+            "elder_ray@1",
             "ema@1",
+            "entropy@1",
+            "envelope@1",
+            "eom@1",
+            "fisher@1",
+            "force_index@1",
+            "gap@1",
+            "garman_klass@1",
+            "heikin_ashi@1",
+            "hma@1",
+            "hurst@1",
+            "inertia@1",
+            "kama@1",
+            "keltner@1",
+            "klinger@1",
+            "kurtosis@1",
+            "linreg@1",
+            "linreg_angle@1",
+            "linreg_forecast@1",
+            "linreg_intercept@1",
+            "linreg_r2@1",
             "macd@1",
+            "mad@1",
+            "mass_index@1",
+            "max_drawdown@1",
+            "median@1",
+            "median_price@1",
+            "mfi@1",
+            "midpoint@1",
+            "midprice@1",
+            "mom@1",
+            "natr@1",
+            "nvi@1",
             "obv@1",
+            "parkinson@1",
+            "percentile_rank@1",
+            "pgo@1",
+            "pivot@1",
+            "pmo@1",
+            "ppo@1",
+            "psar@1",
+            "psl@1",
+            "pvi@1",
+            "pvo@1",
+            "pvt@1",
+            "pwma@1",
+            "qstick@1",
+            "quantile@1",
             "returns@1",
+            "roc@1",
+            "rocr@1",
+            "rogers_satchell@1",
             "rolling_high@1",
             "rolling_low@1",
             "rsi@1",
             "rsi_wilder@1",
+            "rvgi@1",
+            "rvi_volatility@1",
+            "skew@1",
             "slope@1",
             "sma@1",
+            "smi@1",
+            "smma@1",
+            "squeeze@1",
+            "stderr@1",
             "stdev@1",
+            "stoch@1",
+            "stoch_rsi@1",
             "stochastic@1",
+            "supertrend@1",
+            "swma@1",
+            "t3@1",
+            "tema@1",
+            "trima@1",
+            "trix@1",
             "true_range@1",
+            "tsi@1",
+            "ttm_trend@1",
+            "typical_price@1",
+            "ulcer_index@1",
+            "ultimate@1",
+            "upside_deviation@1",
+            "variance@1",
+            "vhf@1",
             "volatility@1",
+            "volatility_ratio@1",
+            "volume_oscillator@1",
+            "vortex@1",
             "vwap@1",
+            "vwma@1",
+            "weighted_close@1",
             "williams_r@1",
+            "wma@1",
+            "zlema@1",
             "zscore@1"
           ],
           "note": "les `params` attendus dependent de la primitive choisie",
@@ -482,6 +596,56 @@
     }
   },
   "primitives": {
+    "acceleration_bands@1": {
+      "params": {
+        "factor": {
+          "defaut": 4.0,
+          "type": "nombre"
+        },
+        "output": {
+          "choix": [
+            "upper",
+            "middle",
+            "lower",
+            "width",
+            "percent"
+          ],
+          "defaut": "upper",
+          "type": "choix"
+        },
+        "window": {
+          "requis": true,
+          "type": "entier"
+        }
+      },
+      "resume": "Bandes d'acceleration de Headley : largeur tiree de l'amplitude relative."
+    },
+    "ad@1": {
+      "params": {
+        "window": {
+          "requis": true,
+          "type": "entier"
+        }
+      },
+      "resume": "Ligne d'accumulation / distribution cumulee sur la FENETRE."
+    },
+    "adosc@1": {
+      "params": {
+        "fast_window": {
+          "defaut": 3,
+          "type": "entier"
+        },
+        "seed_multiplier": {
+          "defaut": 5,
+          "type": "entier"
+        },
+        "window": {
+          "requis": true,
+          "type": "entier"
+        }
+      },
+      "resume": "Oscillateur de Chaikin : EMA rapide moins EMA lente de la ligne A/D."
+    },
     "adx@1": {
       "params": {
         "output": {
@@ -504,6 +668,106 @@
       },
       "resume": "Systeme directionnel de Wilder : `adx`, `plus_di` ou `minus_di` au choix."
     },
+    "adxr@1": {
+      "params": {
+        "seed_multiplier": {
+          "defaut": 5,
+          "type": "entier"
+        },
+        "window": {
+          "requis": true,
+          "type": "entier"
+        }
+      },
+      "resume": "ADX moyenne avec sa propre valeur d'il y a `window` barres."
+    },
+    "alma@1": {
+      "params": {
+        "field": {
+          "choix": [
+            "open",
+            "high",
+            "low",
+            "close",
+            "volume"
+          ],
+          "defaut": "close",
+          "type": "choix"
+        },
+        "offset": {
+          "defaut": 0.85,
+          "type": "nombre"
+        },
+        "sigma": {
+          "defaut": 6.0,
+          "type": "nombre"
+        },
+        "window": {
+          "requis": true,
+          "type": "entier"
+        }
+      },
+      "resume": "Arnaud Legoux : gaussienne decalee, compromis reglable retard / bruit."
+    },
+    "apo@1": {
+      "params": {
+        "field": {
+          "choix": [
+            "open",
+            "high",
+            "low",
+            "close",
+            "volume"
+          ],
+          "defaut": "close",
+          "type": "choix"
+        },
+        "output": {
+          "choix": [
+            "line",
+            "signal",
+            "histogram"
+          ],
+          "defaut": "line",
+          "type": "choix"
+        },
+        "seed_multiplier": {
+          "defaut": 5,
+          "type": "entier"
+        },
+        "signal_window": {
+          "defaut": 9,
+          "type": "entier"
+        },
+        "slow_window": {
+          "defaut": 26,
+          "type": "entier"
+        },
+        "window": {
+          "requis": true,
+          "type": "entier"
+        }
+      },
+      "resume": "Oscillateur de prix absolu : EMA rapide moins EMA lente, en unites de prix."
+    },
+    "aroon@1": {
+      "params": {
+        "output": {
+          "choix": [
+            "up",
+            "down",
+            "oscillator"
+          ],
+          "defaut": "up",
+          "type": "choix"
+        },
+        "window": {
+          "requis": true,
+          "type": "entier"
+        }
+      },
+      "resume": "Aroon : anciennete du plus haut et du plus bas, en % de la fenetre."
+    },
     "atr@1": {
       "params": {
         "window": {
@@ -512,6 +776,19 @@
         }
       },
       "resume": "Average True Range, moyenne SIMPLE des True Ranges (pas le lissage de Wilder)."
+    },
+    "atr_ratio@1": {
+      "params": {
+        "slow_window": {
+          "defaut": 60,
+          "type": "entier"
+        },
+        "window": {
+          "requis": true,
+          "type": "entier"
+        }
+      },
+      "resume": "Rapport entre ATR court et ATR long : compression ou expansion."
     },
     "atr_wilder@1": {
       "params": {
@@ -525,6 +802,171 @@
         }
       },
       "resume": "Average True Range lisse a la WILDER (a distinguer de `atr@1`, moyenne simple)."
+    },
+    "atr_wilder_pct@1": {
+      "params": {
+        "seed_multiplier": {
+          "defaut": 5,
+          "type": "entier"
+        },
+        "window": {
+          "requis": true,
+          "type": "entier"
+        }
+      },
+      "resume": "ATR lisse a la Wilder, rapporte a la cloture, en pourcentage."
+    },
+    "autocorrelation@1": {
+      "params": {
+        "field": {
+          "choix": [
+            "open",
+            "high",
+            "low",
+            "close",
+            "volume"
+          ],
+          "defaut": "close",
+          "type": "choix"
+        },
+        "lag": {
+          "defaut": 1,
+          "type": "entier"
+        },
+        "window": {
+          "requis": true,
+          "type": "entier"
+        }
+      },
+      "resume": "Autocorrelation des rendements au decalage `lag`, de -1 a 1."
+    },
+    "average_price@1": {
+      "params": {},
+      "resume": "Moyenne des quatre prix de la barre : `(open + high + low + close) / 4`."
+    },
+    "awesome@1": {
+      "params": {
+        "fast": {
+          "defaut": 5,
+          "type": "entier"
+        },
+        "slow": {
+          "defaut": 34,
+          "type": "entier"
+        }
+      },
+      "resume": "Oscillateur genial de Williams : SMA courte moins SMA longue du prix median."
+    },
+    "bar_range@1": {
+      "params": {},
+      "resume": "Amplitude brute de la barre : `high - low`, en unites de prix."
+    },
+    "bar_range_pct@1": {
+      "params": {},
+      "resume": "Amplitude de la barre rapportee a sa cloture, en pourcentage."
+    },
+    "beta@1": {
+      "params": {
+        "field": {
+          "choix": [
+            "open",
+            "high",
+            "low",
+            "close",
+            "volume"
+          ],
+          "defaut": "close",
+          "type": "choix"
+        },
+        "other": {
+          "choix": [
+            "open",
+            "high",
+            "low",
+            "close",
+            "volume"
+          ],
+          "defaut": "volume",
+          "type": "choix"
+        },
+        "window": {
+          "requis": true,
+          "type": "entier"
+        }
+      },
+      "resume": "Pente de la regression des rendements d'un champ sur ceux d'un autre."
+    },
+    "bias@1": {
+      "params": {
+        "field": {
+          "choix": [
+            "open",
+            "high",
+            "low",
+            "close",
+            "volume"
+          ],
+          "defaut": "close",
+          "type": "choix"
+        },
+        "window": {
+          "requis": true,
+          "type": "entier"
+        }
+      },
+      "resume": "Ecart relatif entre le prix et sa moyenne simple, en pourcentage."
+    },
+    "body_ratio@1": {
+      "params": {},
+      "resume": "Part du corps de la bougie dans son amplitude totale, de 0 a 1."
+    },
+    "bollinger@1": {
+      "params": {
+        "ddof": {
+          "defaut": 1,
+          "type": "entier"
+        },
+        "field": {
+          "choix": [
+            "open",
+            "high",
+            "low",
+            "close",
+            "volume"
+          ],
+          "defaut": "close",
+          "type": "choix"
+        },
+        "multiplier": {
+          "defaut": 2.0,
+          "type": "nombre"
+        },
+        "output": {
+          "choix": [
+            "upper",
+            "middle",
+            "lower",
+            "width",
+            "percent"
+          ],
+          "defaut": "upper",
+          "type": "choix"
+        },
+        "window": {
+          "requis": true,
+          "type": "entier"
+        }
+      },
+      "resume": "Bandes de Bollinger : upper, middle, lower, width ou percent_b."
+    },
+    "bop@1": {
+      "params": {
+        "window": {
+          "requis": true,
+          "type": "entier"
+        }
+      },
+      "resume": "Balance of Power : `(close - open) / (high - low)`, moyennee sur la fenetre."
     },
     "cci@1": {
       "params": {
@@ -546,6 +988,303 @@
       },
       "resume": "Commodity Channel Index sur le prix typique (high + low + close) / 3."
     },
+    "center_of_gravity@1": {
+      "params": {
+        "field": {
+          "choix": [
+            "open",
+            "high",
+            "low",
+            "close",
+            "volume"
+          ],
+          "defaut": "close",
+          "type": "choix"
+        },
+        "window": {
+          "requis": true,
+          "type": "entier"
+        }
+      },
+      "resume": "Centre de gravite d'Ehlers : barycentre pondere de la fenetre de prix."
+    },
+    "cfo@1": {
+      "params": {
+        "field": {
+          "choix": [
+            "open",
+            "high",
+            "low",
+            "close",
+            "volume"
+          ],
+          "defaut": "close",
+          "type": "choix"
+        },
+        "window": {
+          "requis": true,
+          "type": "entier"
+        }
+      },
+      "resume": "Chande Forecast Oscillator : ecart relatif entre le prix et sa regression."
+    },
+    "chaikin_volatility@1": {
+      "params": {
+        "slow_window": {
+          "defaut": 60,
+          "type": "entier"
+        },
+        "window": {
+          "requis": true,
+          "type": "entier"
+        }
+      },
+      "resume": "Volatilite de Chaikin : variation de l'amplitude moyenne, en pourcentage."
+    },
+    "chop@1": {
+      "params": {
+        "window": {
+          "requis": true,
+          "type": "entier"
+        }
+      },
+      "resume": "Indice de choppiness : 100 en marche lateral, 0 en tendance franche."
+    },
+    "close_location@1": {
+      "params": {},
+      "resume": "Position de la cloture dans la barre, de -1 (au plus bas) a +1."
+    },
+    "cmf@1": {
+      "params": {
+        "window": {
+          "requis": true,
+          "type": "entier"
+        }
+      },
+      "resume": "Chaikin Money Flow : flux A/D rapporte au volume total, de -1 a 1."
+    },
+    "cmo@1": {
+      "params": {
+        "field": {
+          "choix": [
+            "open",
+            "high",
+            "low",
+            "close",
+            "volume"
+          ],
+          "defaut": "close",
+          "type": "choix"
+        },
+        "window": {
+          "requis": true,
+          "type": "entier"
+        }
+      },
+      "resume": "Chande Momentum Oscillator : hausses moins baisses, rapportees au total."
+    },
+    "coppock@1": {
+      "params": {
+        "field": {
+          "choix": [
+            "open",
+            "high",
+            "low",
+            "close",
+            "volume"
+          ],
+          "defaut": "close",
+          "type": "choix"
+        },
+        "output": {
+          "choix": [
+            "line",
+            "signal",
+            "histogram"
+          ],
+          "defaut": "line",
+          "type": "choix"
+        },
+        "seed_multiplier": {
+          "defaut": 5,
+          "type": "entier"
+        },
+        "signal_window": {
+          "defaut": 9,
+          "type": "entier"
+        },
+        "slow_window": {
+          "defaut": 26,
+          "type": "entier"
+        },
+        "window": {
+          "requis": true,
+          "type": "entier"
+        }
+      },
+      "resume": "Courbe de Coppock : WMA de la somme de deux taux de variation."
+    },
+    "correlation@1": {
+      "params": {
+        "field": {
+          "choix": [
+            "open",
+            "high",
+            "low",
+            "close",
+            "volume"
+          ],
+          "defaut": "close",
+          "type": "choix"
+        },
+        "other": {
+          "choix": [
+            "open",
+            "high",
+            "low",
+            "close",
+            "volume"
+          ],
+          "defaut": "volume",
+          "type": "choix"
+        },
+        "window": {
+          "requis": true,
+          "type": "entier"
+        }
+      },
+      "resume": "Correlation entre deux champs de la MEME barre, sur la fenetre."
+    },
+    "cti@1": {
+      "params": {
+        "field": {
+          "choix": [
+            "open",
+            "high",
+            "low",
+            "close",
+            "volume"
+          ],
+          "defaut": "close",
+          "type": "choix"
+        },
+        "window": {
+          "requis": true,
+          "type": "entier"
+        }
+      },
+      "resume": "Correlation Trend Indicator : correlation du prix avec le temps, de -1 a 1."
+    },
+    "dema@1": {
+      "params": {
+        "field": {
+          "choix": [
+            "open",
+            "high",
+            "low",
+            "close",
+            "volume"
+          ],
+          "defaut": "close",
+          "type": "choix"
+        },
+        "seed_multiplier": {
+          "defaut": 5,
+          "type": "entier"
+        },
+        "window": {
+          "requis": true,
+          "type": "entier"
+        }
+      },
+      "resume": "Double EMA : `2*EMA - EMA(EMA)`, deux fois moins en retard."
+    },
+    "dollar_volume@1": {
+      "params": {
+        "window": {
+          "requis": true,
+          "type": "entier"
+        }
+      },
+      "resume": "Volume en valeur : prix typique fois volume, moyenne sur la fenetre."
+    },
+    "donchian@1": {
+      "params": {
+        "output": {
+          "choix": [
+            "upper",
+            "middle",
+            "lower",
+            "width",
+            "percent"
+          ],
+          "defaut": "upper",
+          "type": "choix"
+        },
+        "window": {
+          "requis": true,
+          "type": "entier"
+        }
+      },
+      "resume": "Canal de Donchian : plus haut et plus bas des `window` dernieres barres."
+    },
+    "downside_deviation@1": {
+      "params": {
+        "field": {
+          "choix": [
+            "open",
+            "high",
+            "low",
+            "close",
+            "volume"
+          ],
+          "defaut": "close",
+          "type": "choix"
+        },
+        "threshold": {
+          "defaut": 0.0,
+          "type": "nombre"
+        },
+        "window": {
+          "requis": true,
+          "type": "entier"
+        }
+      },
+      "resume": "Ecart-type des seuls rendements SOUS le seuil, sans unite."
+    },
+    "dpo@1": {
+      "params": {
+        "field": {
+          "choix": [
+            "open",
+            "high",
+            "low",
+            "close",
+            "volume"
+          ],
+          "defaut": "close",
+          "type": "choix"
+        },
+        "window": {
+          "requis": true,
+          "type": "entier"
+        }
+      },
+      "resume": "Oscillateur de prix detendu : ecart a la moyenne DECALEE dans le passe."
+    },
+    "dx@1": {
+      "params": {
+        "seed_multiplier": {
+          "defaut": 5,
+          "type": "entier"
+        },
+        "window": {
+          "requis": true,
+          "type": "entier"
+        }
+      },
+      "resume": "Indice directionnel brut : ecart relatif entre `+DI` et `-DI`, non lisse."
+    },
     "efficiency_ratio@1": {
       "params": {
         "field": {
@@ -565,6 +1304,15 @@
         }
       },
       "resume": "Ratio d'efficience de Kaufman : trajet net rapporte au chemin parcouru."
+    },
+    "elder_ray@1": {
+      "params": {
+        "window": {
+          "requis": true,
+          "type": "entier"
+        }
+      },
+      "resume": "Elder Ray : ecart moyen entre les extremes et la moyenne du prix."
     },
     "ema@1": {
       "params": {
@@ -589,6 +1337,437 @@
         }
       },
       "resume": "Moyenne exponentielle sur historique tronque, amorcee par une SMA."
+    },
+    "entropy@1": {
+      "params": {
+        "bins": {
+          "defaut": 8,
+          "type": "entier"
+        },
+        "field": {
+          "choix": [
+            "open",
+            "high",
+            "low",
+            "close",
+            "volume"
+          ],
+          "defaut": "close",
+          "type": "choix"
+        },
+        "window": {
+          "requis": true,
+          "type": "entier"
+        }
+      },
+      "resume": "Entropie de Shannon des rendements, normalisee entre 0 et 1."
+    },
+    "envelope@1": {
+      "params": {
+        "field": {
+          "choix": [
+            "open",
+            "high",
+            "low",
+            "close",
+            "volume"
+          ],
+          "defaut": "close",
+          "type": "choix"
+        },
+        "output": {
+          "choix": [
+            "upper",
+            "middle",
+            "lower",
+            "width",
+            "percent"
+          ],
+          "defaut": "upper",
+          "type": "choix"
+        },
+        "percent": {
+          "defaut": 2.5,
+          "type": "nombre"
+        },
+        "window": {
+          "requis": true,
+          "type": "entier"
+        }
+      },
+      "resume": "Enveloppe a pourcentage fixe autour d'une moyenne simple."
+    },
+    "eom@1": {
+      "params": {
+        "window": {
+          "requis": true,
+          "type": "entier"
+        }
+      },
+      "resume": "Ease of Movement : deplacement du prix par unite de volume, lisse."
+    },
+    "fisher@1": {
+      "params": {
+        "field": {
+          "choix": [
+            "open",
+            "high",
+            "low",
+            "close",
+            "volume"
+          ],
+          "defaut": "close",
+          "type": "choix"
+        },
+        "output": {
+          "choix": [
+            "line",
+            "signal",
+            "histogram"
+          ],
+          "defaut": "line",
+          "type": "choix"
+        },
+        "seed_multiplier": {
+          "defaut": 5,
+          "type": "entier"
+        },
+        "signal_window": {
+          "defaut": 9,
+          "type": "entier"
+        },
+        "window": {
+          "requis": true,
+          "type": "entier"
+        }
+      },
+      "resume": "Transformee de Fisher du prix normalise : rend les extremes tranches."
+    },
+    "force_index@1": {
+      "params": {
+        "window": {
+          "requis": true,
+          "type": "entier"
+        }
+      },
+      "resume": "Indice de force d'Elder : variation du prix multipliee par le volume."
+    },
+    "gap@1": {
+      "params": {},
+      "resume": "Ecart entre l'ouverture et la cloture precedente, en pourcentage."
+    },
+    "garman_klass@1": {
+      "params": {
+        "log": {
+          "defaut": true,
+          "type": "booleen"
+        },
+        "window": {
+          "requis": true,
+          "type": "entier"
+        }
+      },
+      "resume": "Volatilite de Garman-Klass : extremes ET ouverture / cloture combines."
+    },
+    "heikin_ashi@1": {
+      "params": {
+        "lookback": {
+          "defaut": 50,
+          "type": "entier"
+        },
+        "output": {
+          "choix": [
+            "open",
+            "high",
+            "low",
+            "close"
+          ],
+          "defaut": "close",
+          "type": "choix"
+        }
+      },
+      "resume": "Bougie Heikin-Ashi : open, high, low ou close de la bougie lissee."
+    },
+    "hma@1": {
+      "params": {
+        "field": {
+          "choix": [
+            "open",
+            "high",
+            "low",
+            "close",
+            "volume"
+          ],
+          "defaut": "close",
+          "type": "choix"
+        },
+        "window": {
+          "requis": true,
+          "type": "entier"
+        }
+      },
+      "resume": "Hull : `WMA(2*WMA(w/2) - WMA(w), sqrt(w))`, tres peu de retard."
+    },
+    "hurst@1": {
+      "params": {
+        "field": {
+          "choix": [
+            "open",
+            "high",
+            "low",
+            "close",
+            "volume"
+          ],
+          "defaut": "close",
+          "type": "choix"
+        },
+        "window": {
+          "requis": true,
+          "type": "entier"
+        }
+      },
+      "resume": "Exposant de Hurst : 0,5 = marche aleatoire, >0,5 = persistance."
+    },
+    "inertia@1": {
+      "params": {
+        "field": {
+          "choix": [
+            "open",
+            "high",
+            "low",
+            "close",
+            "volume"
+          ],
+          "defaut": "close",
+          "type": "choix"
+        },
+        "window": {
+          "requis": true,
+          "type": "entier"
+        }
+      },
+      "resume": "Inertie : regression lineaire de l'indice de volatilite relative."
+    },
+    "kama@1": {
+      "params": {
+        "fast": {
+          "defaut": 2,
+          "type": "entier"
+        },
+        "field": {
+          "choix": [
+            "open",
+            "high",
+            "low",
+            "close",
+            "volume"
+          ],
+          "defaut": "close",
+          "type": "choix"
+        },
+        "seed_multiplier": {
+          "defaut": 5,
+          "type": "entier"
+        },
+        "slow": {
+          "defaut": 30,
+          "type": "entier"
+        },
+        "window": {
+          "requis": true,
+          "type": "entier"
+        }
+      },
+      "resume": "Kaufman adaptative : rapide en tendance, lente en marche lateral."
+    },
+    "keltner@1": {
+      "params": {
+        "multiplier": {
+          "defaut": 2.0,
+          "type": "nombre"
+        },
+        "output": {
+          "choix": [
+            "upper",
+            "middle",
+            "lower",
+            "width",
+            "percent"
+          ],
+          "defaut": "upper",
+          "type": "choix"
+        },
+        "seed_multiplier": {
+          "defaut": 5,
+          "type": "entier"
+        },
+        "window": {
+          "requis": true,
+          "type": "entier"
+        }
+      },
+      "resume": "Canal de Keltner : EMA plus ou moins `multiplier` ATR."
+    },
+    "klinger@1": {
+      "params": {
+        "field": {
+          "choix": [
+            "open",
+            "high",
+            "low",
+            "close",
+            "volume"
+          ],
+          "defaut": "close",
+          "type": "choix"
+        },
+        "output": {
+          "choix": [
+            "line",
+            "signal",
+            "histogram"
+          ],
+          "defaut": "line",
+          "type": "choix"
+        },
+        "seed_multiplier": {
+          "defaut": 5,
+          "type": "entier"
+        },
+        "signal_window": {
+          "defaut": 9,
+          "type": "entier"
+        },
+        "slow_window": {
+          "defaut": 26,
+          "type": "entier"
+        },
+        "window": {
+          "requis": true,
+          "type": "entier"
+        }
+      },
+      "resume": "Oscillateur de Klinger : volume SIGNE par la tendance, doublement lisse."
+    },
+    "kurtosis@1": {
+      "params": {
+        "field": {
+          "choix": [
+            "open",
+            "high",
+            "low",
+            "close",
+            "volume"
+          ],
+          "defaut": "close",
+          "type": "choix"
+        },
+        "window": {
+          "requis": true,
+          "type": "entier"
+        }
+      },
+      "resume": "Kurtosis EXCEDENTAIRE des rendements : 0 pour une loi normale."
+    },
+    "linreg@1": {
+      "params": {
+        "field": {
+          "choix": [
+            "open",
+            "high",
+            "low",
+            "close",
+            "volume"
+          ],
+          "defaut": "close",
+          "type": "choix"
+        },
+        "window": {
+          "requis": true,
+          "type": "entier"
+        }
+      },
+      "resume": "Valeur de la droite de regression a la DERNIERE barre de la fenetre."
+    },
+    "linreg_angle@1": {
+      "params": {
+        "field": {
+          "choix": [
+            "open",
+            "high",
+            "low",
+            "close",
+            "volume"
+          ],
+          "defaut": "close",
+          "type": "choix"
+        },
+        "window": {
+          "requis": true,
+          "type": "entier"
+        }
+      },
+      "resume": "Pente de la regression exprimee en degres, de -90 a 90."
+    },
+    "linreg_forecast@1": {
+      "params": {
+        "field": {
+          "choix": [
+            "open",
+            "high",
+            "low",
+            "close",
+            "volume"
+          ],
+          "defaut": "close",
+          "type": "choix"
+        },
+        "window": {
+          "requis": true,
+          "type": "entier"
+        }
+      },
+      "resume": "Projection de la droite de regression UNE barre en avant."
+    },
+    "linreg_intercept@1": {
+      "params": {
+        "field": {
+          "choix": [
+            "open",
+            "high",
+            "low",
+            "close",
+            "volume"
+          ],
+          "defaut": "close",
+          "type": "choix"
+        },
+        "window": {
+          "requis": true,
+          "type": "entier"
+        }
+      },
+      "resume": "Ordonnee a l'origine de la droite de regression sur la fenetre."
+    },
+    "linreg_r2@1": {
+      "params": {
+        "field": {
+          "choix": [
+            "open",
+            "high",
+            "low",
+            "close",
+            "volume"
+          ],
+          "defaut": "close",
+          "type": "choix"
+        },
+        "window": {
+          "requis": true,
+          "type": "entier"
+        }
+      },
+      "resume": "Coefficient de determination de la regression lineaire, de 0 a 1."
     },
     "macd@1": {
       "params": {
@@ -631,6 +1810,163 @@
       },
       "resume": "MACD : `line`, `signal` ou `histogram` au choix, sur historique tronque."
     },
+    "mad@1": {
+      "params": {
+        "field": {
+          "choix": [
+            "open",
+            "high",
+            "low",
+            "close",
+            "volume"
+          ],
+          "defaut": "close",
+          "type": "choix"
+        },
+        "window": {
+          "requis": true,
+          "type": "entier"
+        }
+      },
+      "resume": "Ecart absolu moyen a la moyenne : dispersion robuste, en unites de prix."
+    },
+    "mass_index@1": {
+      "params": {
+        "seed_multiplier": {
+          "defaut": 5,
+          "type": "entier"
+        },
+        "sum_window": {
+          "defaut": 25,
+          "type": "entier"
+        },
+        "window": {
+          "requis": true,
+          "type": "entier"
+        }
+      },
+      "resume": "Indice de masse : detecte un elargissement des barres, sans direction."
+    },
+    "max_drawdown@1": {
+      "params": {
+        "field": {
+          "choix": [
+            "open",
+            "high",
+            "low",
+            "close",
+            "volume"
+          ],
+          "defaut": "close",
+          "type": "choix"
+        },
+        "window": {
+          "requis": true,
+          "type": "entier"
+        }
+      },
+      "resume": "Repli maximal sur la fenetre, en pourcentage, toujours negatif ou nul."
+    },
+    "median@1": {
+      "params": {
+        "field": {
+          "choix": [
+            "open",
+            "high",
+            "low",
+            "close",
+            "volume"
+          ],
+          "defaut": "close",
+          "type": "choix"
+        },
+        "window": {
+          "requis": true,
+          "type": "entier"
+        }
+      },
+      "resume": "Mediane de la fenetre : la moyenne qui ignore les valeurs aberrantes."
+    },
+    "median_price@1": {
+      "params": {},
+      "resume": "Milieu de la barre : `(high + low) / 2`."
+    },
+    "mfi@1": {
+      "params": {
+        "window": {
+          "requis": true,
+          "type": "entier"
+        }
+      },
+      "resume": "Money Flow Index : un RSI pondere par le volume, de 0 a 100."
+    },
+    "midpoint@1": {
+      "params": {
+        "field": {
+          "choix": [
+            "open",
+            "high",
+            "low",
+            "close",
+            "volume"
+          ],
+          "defaut": "close",
+          "type": "choix"
+        },
+        "window": {
+          "requis": true,
+          "type": "entier"
+        }
+      },
+      "resume": "Milieu entre le plus haut et le plus bas du champ, sur la fenetre."
+    },
+    "midprice@1": {
+      "params": {
+        "window": {
+          "requis": true,
+          "type": "entier"
+        }
+      },
+      "resume": "Milieu entre le plus haut des `high` et le plus bas des `low`."
+    },
+    "mom@1": {
+      "params": {
+        "field": {
+          "choix": [
+            "open",
+            "high",
+            "low",
+            "close",
+            "volume"
+          ],
+          "defaut": "close",
+          "type": "choix"
+        },
+        "window": {
+          "requis": true,
+          "type": "entier"
+        }
+      },
+      "resume": "Momentum brut : difference entre la valeur courante et celle d'il y a `window`."
+    },
+    "natr@1": {
+      "params": {
+        "window": {
+          "requis": true,
+          "type": "entier"
+        }
+      },
+      "resume": "ATR normalise par la cloture, en pourcentage : comparable entre marches."
+    },
+    "nvi@1": {
+      "params": {
+        "window": {
+          "requis": true,
+          "type": "entier"
+        }
+      },
+      "resume": "Negative Volume Index : rendement cumule des seules barres a volume EN BAISSE."
+    },
     "obv@1": {
       "params": {
         "window": {
@@ -639,6 +1975,316 @@
         }
       },
       "resume": "On-Balance Volume cumule sur FENETRE (pas depuis l'origine)."
+    },
+    "parkinson@1": {
+      "params": {
+        "log": {
+          "defaut": true,
+          "type": "booleen"
+        },
+        "window": {
+          "requis": true,
+          "type": "entier"
+        }
+      },
+      "resume": "Volatilite de Parkinson, estimee sur les extremes de chaque barre."
+    },
+    "percentile_rank@1": {
+      "params": {
+        "field": {
+          "choix": [
+            "open",
+            "high",
+            "low",
+            "close",
+            "volume"
+          ],
+          "defaut": "close",
+          "type": "choix"
+        },
+        "window": {
+          "requis": true,
+          "type": "entier"
+        }
+      },
+      "resume": "Rang de la valeur courante dans sa fenetre passee, de 0 a 100."
+    },
+    "pgo@1": {
+      "params": {
+        "window": {
+          "requis": true,
+          "type": "entier"
+        }
+      },
+      "resume": "Pretty Good Oscillator : ecart a la moyenne, mesure en ATR."
+    },
+    "pivot@1": {
+      "params": {
+        "output": {
+          "choix": [
+            "pp",
+            "r1",
+            "r2",
+            "r3",
+            "s1",
+            "s2",
+            "s3"
+          ],
+          "defaut": "pp",
+          "type": "choix"
+        }
+      },
+      "resume": "Pivots classiques calcules sur la barre PRECEDENTE : pp, r1..r3, s1..s3."
+    },
+    "pmo@1": {
+      "params": {
+        "field": {
+          "choix": [
+            "open",
+            "high",
+            "low",
+            "close",
+            "volume"
+          ],
+          "defaut": "close",
+          "type": "choix"
+        },
+        "output": {
+          "choix": [
+            "line",
+            "signal",
+            "histogram"
+          ],
+          "defaut": "line",
+          "type": "choix"
+        },
+        "seed_multiplier": {
+          "defaut": 5,
+          "type": "entier"
+        },
+        "signal_window": {
+          "defaut": 9,
+          "type": "entier"
+        },
+        "slow_window": {
+          "defaut": 26,
+          "type": "entier"
+        },
+        "window": {
+          "requis": true,
+          "type": "entier"
+        }
+      },
+      "resume": "Price Momentum Oscillator : taux de variation doublement lisse."
+    },
+    "ppo@1": {
+      "params": {
+        "field": {
+          "choix": [
+            "open",
+            "high",
+            "low",
+            "close",
+            "volume"
+          ],
+          "defaut": "close",
+          "type": "choix"
+        },
+        "output": {
+          "choix": [
+            "line",
+            "signal",
+            "histogram"
+          ],
+          "defaut": "line",
+          "type": "choix"
+        },
+        "seed_multiplier": {
+          "defaut": 5,
+          "type": "entier"
+        },
+        "signal_window": {
+          "defaut": 9,
+          "type": "entier"
+        },
+        "slow_window": {
+          "defaut": 26,
+          "type": "entier"
+        },
+        "window": {
+          "requis": true,
+          "type": "entier"
+        }
+      },
+      "resume": "Oscillateur de prix en pourcentage : line, signal ou histogram."
+    },
+    "psar@1": {
+      "params": {
+        "lookback": {
+          "defaut": 120,
+          "type": "entier"
+        },
+        "maximum": {
+          "defaut": 0.2,
+          "type": "nombre"
+        },
+        "output": {
+          "choix": [
+            "value",
+            "direction"
+          ],
+          "defaut": "value",
+          "type": "choix"
+        },
+        "step": {
+          "defaut": 0.02,
+          "type": "nombre"
+        }
+      },
+      "resume": "SAR parabolique de Wilder : niveau du stop suiveur, ou son sens."
+    },
+    "psl@1": {
+      "params": {
+        "field": {
+          "choix": [
+            "open",
+            "high",
+            "low",
+            "close",
+            "volume"
+          ],
+          "defaut": "close",
+          "type": "choix"
+        },
+        "window": {
+          "requis": true,
+          "type": "entier"
+        }
+      },
+      "resume": "Ligne psychologique : part des barres en hausse sur la fenetre, en %."
+    },
+    "pvi@1": {
+      "params": {
+        "window": {
+          "requis": true,
+          "type": "entier"
+        }
+      },
+      "resume": "Positive Volume Index : rendement cumule des seules barres a volume EN HAUSSE."
+    },
+    "pvo@1": {
+      "params": {
+        "field": {
+          "choix": [
+            "open",
+            "high",
+            "low",
+            "close",
+            "volume"
+          ],
+          "defaut": "close",
+          "type": "choix"
+        },
+        "output": {
+          "choix": [
+            "line",
+            "signal",
+            "histogram"
+          ],
+          "defaut": "line",
+          "type": "choix"
+        },
+        "seed_multiplier": {
+          "defaut": 5,
+          "type": "entier"
+        },
+        "signal_window": {
+          "defaut": 9,
+          "type": "entier"
+        },
+        "slow_window": {
+          "defaut": 26,
+          "type": "entier"
+        },
+        "window": {
+          "requis": true,
+          "type": "entier"
+        }
+      },
+      "resume": "Percentage Volume Oscillator : le MACD applique au volume."
+    },
+    "pvt@1": {
+      "params": {
+        "window": {
+          "requis": true,
+          "type": "entier"
+        }
+      },
+      "resume": "Price Volume Trend : volume pondere par le rendement, cumule sur la fenetre."
+    },
+    "pwma@1": {
+      "params": {
+        "field": {
+          "choix": [
+            "open",
+            "high",
+            "low",
+            "close",
+            "volume"
+          ],
+          "defaut": "close",
+          "type": "choix"
+        },
+        "window": {
+          "requis": true,
+          "type": "entier"
+        }
+      },
+      "resume": "Moyenne ponderee par les coefficients binomiaux (triangle de Pascal)."
+    },
+    "qstick@1": {
+      "params": {
+        "field": {
+          "choix": [
+            "open",
+            "high",
+            "low",
+            "close",
+            "volume"
+          ],
+          "defaut": "close",
+          "type": "choix"
+        },
+        "window": {
+          "requis": true,
+          "type": "entier"
+        }
+      },
+      "resume": "Qstick : moyenne de `close - open` sur la fenetre."
+    },
+    "quantile@1": {
+      "params": {
+        "field": {
+          "choix": [
+            "open",
+            "high",
+            "low",
+            "close",
+            "volume"
+          ],
+          "defaut": "close",
+          "type": "choix"
+        },
+        "q": {
+          "defaut": 0.5,
+          "type": "nombre"
+        },
+        "window": {
+          "requis": true,
+          "type": "entier"
+        }
+      },
+      "resume": "Quantile empirique de la fenetre, `q` entre 0 et 1."
     },
     "returns@1": {
       "params": {
@@ -663,6 +2309,59 @@
         }
       },
       "resume": "Rendement sur `window` barres, simple ou logarithmique."
+    },
+    "roc@1": {
+      "params": {
+        "field": {
+          "choix": [
+            "open",
+            "high",
+            "low",
+            "close",
+            "volume"
+          ],
+          "defaut": "close",
+          "type": "choix"
+        },
+        "window": {
+          "requis": true,
+          "type": "entier"
+        }
+      },
+      "resume": "Taux de variation sur `window` barres, en pourcentage."
+    },
+    "rocr@1": {
+      "params": {
+        "field": {
+          "choix": [
+            "open",
+            "high",
+            "low",
+            "close",
+            "volume"
+          ],
+          "defaut": "close",
+          "type": "choix"
+        },
+        "window": {
+          "requis": true,
+          "type": "entier"
+        }
+      },
+      "resume": "Rapport de variation sur `window` barres : 1 signifie inchange."
+    },
+    "rogers_satchell@1": {
+      "params": {
+        "log": {
+          "defaut": true,
+          "type": "booleen"
+        },
+        "window": {
+          "requis": true,
+          "type": "entier"
+        }
+      },
+      "resume": "Volatilite de Rogers-Satchell : valide meme quand le prix derive."
     },
     "rolling_high@1": {
       "params": {
@@ -748,6 +2447,55 @@
       },
       "resume": "Relative Strength Index lisse a la WILDER (a distinguer de `rsi@1`)."
     },
+    "rvgi@1": {
+      "params": {
+        "window": {
+          "requis": true,
+          "type": "entier"
+        }
+      },
+      "resume": "Relative Vigor Index : `(close - open)` rapporte a l'amplitude, lisse."
+    },
+    "rvi_volatility@1": {
+      "params": {
+        "field": {
+          "choix": [
+            "open",
+            "high",
+            "low",
+            "close",
+            "volume"
+          ],
+          "defaut": "close",
+          "type": "choix"
+        },
+        "window": {
+          "requis": true,
+          "type": "entier"
+        }
+      },
+      "resume": "Relative Volatility Index : un RSI calcule sur l'ecart-type, de 0 a 100."
+    },
+    "skew@1": {
+      "params": {
+        "field": {
+          "choix": [
+            "open",
+            "high",
+            "low",
+            "close",
+            "volume"
+          ],
+          "defaut": "close",
+          "type": "choix"
+        },
+        "window": {
+          "requis": true,
+          "type": "entier"
+        }
+      },
+      "resume": "Asymetrie des rendements de la fenetre : negatif = queue a gauche."
+    },
     "slope@1": {
       "params": {
         "field": {
@@ -788,6 +2536,119 @@
       },
       "resume": "Moyenne simple des `window` dernieres barres closes."
     },
+    "smi@1": {
+      "params": {
+        "field": {
+          "choix": [
+            "open",
+            "high",
+            "low",
+            "close",
+            "volume"
+          ],
+          "defaut": "close",
+          "type": "choix"
+        },
+        "output": {
+          "choix": [
+            "line",
+            "signal",
+            "histogram"
+          ],
+          "defaut": "line",
+          "type": "choix"
+        },
+        "seed_multiplier": {
+          "defaut": 5,
+          "type": "entier"
+        },
+        "signal_window": {
+          "defaut": 9,
+          "type": "entier"
+        },
+        "slow_window": {
+          "defaut": 26,
+          "type": "entier"
+        },
+        "window": {
+          "requis": true,
+          "type": "entier"
+        }
+      },
+      "resume": "Stochastic Momentum Index : distance au MILIEU du range, doublement lissee."
+    },
+    "smma@1": {
+      "params": {
+        "field": {
+          "choix": [
+            "open",
+            "high",
+            "low",
+            "close",
+            "volume"
+          ],
+          "defaut": "close",
+          "type": "choix"
+        },
+        "seed_multiplier": {
+          "defaut": 5,
+          "type": "entier"
+        },
+        "window": {
+          "requis": true,
+          "type": "entier"
+        }
+      },
+      "resume": "Moyenne lissee de Wilder (`alpha = 1/window`), dite aussi RMA."
+    },
+    "squeeze@1": {
+      "params": {
+        "multiplier": {
+          "defaut": 2.0,
+          "type": "nombre"
+        },
+        "output": {
+          "choix": [
+            "upper",
+            "middle",
+            "lower",
+            "width",
+            "percent"
+          ],
+          "defaut": "upper",
+          "type": "choix"
+        },
+        "seed_multiplier": {
+          "defaut": 5,
+          "type": "entier"
+        },
+        "window": {
+          "requis": true,
+          "type": "entier"
+        }
+      },
+      "resume": "Compression : 1 quand les bandes de Bollinger entrent dans le canal de Keltner."
+    },
+    "stderr@1": {
+      "params": {
+        "field": {
+          "choix": [
+            "open",
+            "high",
+            "low",
+            "close",
+            "volume"
+          ],
+          "defaut": "close",
+          "type": "choix"
+        },
+        "window": {
+          "requis": true,
+          "type": "entier"
+        }
+      },
+      "resume": "Erreur type de la moyenne : ecart-type divise par la racine de la fenetre."
+    },
     "stdev@1": {
       "params": {
         "ddof": {
@@ -812,6 +2673,56 @@
       },
       "resume": "Ecart-type sur fenetre glissante, en unites du champ mesure."
     },
+    "stoch@1": {
+      "params": {
+        "output": {
+          "choix": [
+            "k",
+            "d"
+          ],
+          "defaut": "k",
+          "type": "choix"
+        },
+        "smooth_d": {
+          "defaut": 3,
+          "type": "entier"
+        },
+        "smooth_k": {
+          "defaut": 3,
+          "type": "entier"
+        },
+        "window": {
+          "requis": true,
+          "type": "entier"
+        }
+      },
+      "resume": "Stochastique lisse : `%K` lisse, ou `%D` qui est la moyenne de `%K`."
+    },
+    "stoch_rsi@1": {
+      "params": {
+        "output": {
+          "choix": [
+            "k",
+            "d"
+          ],
+          "defaut": "k",
+          "type": "choix"
+        },
+        "smooth_d": {
+          "defaut": 3,
+          "type": "entier"
+        },
+        "smooth_k": {
+          "defaut": 3,
+          "type": "entier"
+        },
+        "window": {
+          "requis": true,
+          "type": "entier"
+        }
+      },
+      "resume": "Stochastique applique au RSI : ou se situe le RSI dans son propre range."
+    },
     "stochastic@1": {
       "params": {
         "field": {
@@ -832,9 +2743,318 @@
       },
       "resume": "Position de la cloture dans l'amplitude des `window` dernieres barres, en %."
     },
+    "supertrend@1": {
+      "params": {
+        "lookback_multiplier": {
+          "defaut": 8,
+          "type": "entier"
+        },
+        "multiplier": {
+          "defaut": 3.0,
+          "type": "nombre"
+        },
+        "output": {
+          "choix": [
+            "value",
+            "direction"
+          ],
+          "defaut": "value",
+          "type": "choix"
+        },
+        "window": {
+          "requis": true,
+          "type": "entier"
+        }
+      },
+      "resume": "Supertrend : bande ATR verrouillee dans le sens de la tendance."
+    },
+    "swma@1": {
+      "params": {
+        "field": {
+          "choix": [
+            "open",
+            "high",
+            "low",
+            "close",
+            "volume"
+          ],
+          "defaut": "close",
+          "type": "choix"
+        },
+        "window": {
+          "requis": true,
+          "type": "entier"
+        }
+      },
+      "resume": "Moyenne ponderee SYMETRIQUE : poids en triangle centre sur la fenetre."
+    },
+    "t3@1": {
+      "params": {
+        "field": {
+          "choix": [
+            "open",
+            "high",
+            "low",
+            "close",
+            "volume"
+          ],
+          "defaut": "close",
+          "type": "choix"
+        },
+        "seed_multiplier": {
+          "defaut": 5,
+          "type": "entier"
+        },
+        "volume_factor": {
+          "defaut": 0.7,
+          "type": "nombre"
+        },
+        "window": {
+          "requis": true,
+          "type": "entier"
+        }
+      },
+      "resume": "T3 de Tillson : six EMA combinees, lissage fort a retard contenu."
+    },
+    "tema@1": {
+      "params": {
+        "field": {
+          "choix": [
+            "open",
+            "high",
+            "low",
+            "close",
+            "volume"
+          ],
+          "defaut": "close",
+          "type": "choix"
+        },
+        "seed_multiplier": {
+          "defaut": 5,
+          "type": "entier"
+        },
+        "window": {
+          "requis": true,
+          "type": "entier"
+        }
+      },
+      "resume": "Triple EMA : `3*EMA - 3*EMA(EMA) + EMA(EMA(EMA))`."
+    },
+    "trima@1": {
+      "params": {
+        "field": {
+          "choix": [
+            "open",
+            "high",
+            "low",
+            "close",
+            "volume"
+          ],
+          "defaut": "close",
+          "type": "choix"
+        },
+        "window": {
+          "requis": true,
+          "type": "entier"
+        }
+      },
+      "resume": "Moyenne triangulaire : une SMA appliquee a une SMA, poids en triangle."
+    },
+    "trix@1": {
+      "params": {
+        "field": {
+          "choix": [
+            "open",
+            "high",
+            "low",
+            "close",
+            "volume"
+          ],
+          "defaut": "close",
+          "type": "choix"
+        },
+        "output": {
+          "choix": [
+            "line",
+            "signal",
+            "histogram"
+          ],
+          "defaut": "line",
+          "type": "choix"
+        },
+        "seed_multiplier": {
+          "defaut": 5,
+          "type": "entier"
+        },
+        "signal_window": {
+          "defaut": 9,
+          "type": "entier"
+        },
+        "window": {
+          "requis": true,
+          "type": "entier"
+        }
+      },
+      "resume": "TRIX : taux de variation d'une triple EMA, en pourcentage."
+    },
     "true_range@1": {
       "params": {},
       "resume": "True Range de la barre courante, sans moyennage."
+    },
+    "tsi@1": {
+      "params": {
+        "field": {
+          "choix": [
+            "open",
+            "high",
+            "low",
+            "close",
+            "volume"
+          ],
+          "defaut": "close",
+          "type": "choix"
+        },
+        "output": {
+          "choix": [
+            "line",
+            "signal",
+            "histogram"
+          ],
+          "defaut": "line",
+          "type": "choix"
+        },
+        "seed_multiplier": {
+          "defaut": 5,
+          "type": "entier"
+        },
+        "signal_window": {
+          "defaut": 9,
+          "type": "entier"
+        },
+        "slow_window": {
+          "defaut": 26,
+          "type": "entier"
+        },
+        "window": {
+          "requis": true,
+          "type": "entier"
+        }
+      },
+      "resume": "True Strength Index : momentum doublement lisse, borne a [-100, 100]."
+    },
+    "ttm_trend@1": {
+      "params": {
+        "window": {
+          "requis": true,
+          "type": "entier"
+        }
+      },
+      "resume": "TTM Trend : 1 si la cloture est au-dessus du prix median moyen, sinon 0."
+    },
+    "typical_price@1": {
+      "params": {},
+      "resume": "Prix typique de la barre : `(high + low + close) / 3`."
+    },
+    "ulcer_index@1": {
+      "params": {
+        "field": {
+          "choix": [
+            "open",
+            "high",
+            "low",
+            "close",
+            "volume"
+          ],
+          "defaut": "close",
+          "type": "choix"
+        },
+        "window": {
+          "requis": true,
+          "type": "entier"
+        }
+      },
+      "resume": "Indice d'ulcere : ecart quadratique moyen au plus haut de la fenetre."
+    },
+    "ultimate@1": {
+      "params": {
+        "fast": {
+          "defaut": 7,
+          "type": "entier"
+        },
+        "medium": {
+          "defaut": 14,
+          "type": "entier"
+        },
+        "slow": {
+          "defaut": 28,
+          "type": "entier"
+        }
+      },
+      "resume": "Oscillateur ultime de Williams : trois horizons ponderes 4-2-1."
+    },
+    "upside_deviation@1": {
+      "params": {
+        "field": {
+          "choix": [
+            "open",
+            "high",
+            "low",
+            "close",
+            "volume"
+          ],
+          "defaut": "close",
+          "type": "choix"
+        },
+        "threshold": {
+          "defaut": 0.0,
+          "type": "nombre"
+        },
+        "window": {
+          "requis": true,
+          "type": "entier"
+        }
+      },
+      "resume": "Ecart-type des seuls rendements AU-DESSUS du seuil, sans unite."
+    },
+    "variance@1": {
+      "params": {
+        "field": {
+          "choix": [
+            "open",
+            "high",
+            "low",
+            "close",
+            "volume"
+          ],
+          "defaut": "close",
+          "type": "choix"
+        },
+        "window": {
+          "requis": true,
+          "type": "entier"
+        }
+      },
+      "resume": "Variance de la fenetre, en unites de prix au carre."
+    },
+    "vhf@1": {
+      "params": {
+        "field": {
+          "choix": [
+            "open",
+            "high",
+            "low",
+            "close",
+            "volume"
+          ],
+          "defaut": "close",
+          "type": "choix"
+        },
+        "window": {
+          "requis": true,
+          "type": "entier"
+        }
+      },
+      "resume": "Vertical Horizontal Filter : amplitude nette sur somme des variations."
     },
     "volatility@1": {
       "params": {
@@ -869,6 +3089,54 @@
       },
       "resume": "Ecart-type des RENDEMENTS, sans unite donc comparable entre instruments."
     },
+    "volatility_ratio@1": {
+      "params": {
+        "slow_window": {
+          "defaut": 60,
+          "type": "entier"
+        },
+        "window": {
+          "requis": true,
+          "type": "entier"
+        }
+      },
+      "resume": "Rapport entre volatilite courte et volatilite longue : 1 = regime stable."
+    },
+    "volume_oscillator@1": {
+      "params": {
+        "fast_window": {
+          "defaut": 3,
+          "type": "entier"
+        },
+        "seed_multiplier": {
+          "defaut": 5,
+          "type": "entier"
+        },
+        "window": {
+          "requis": true,
+          "type": "entier"
+        }
+      },
+      "resume": "Ecart relatif entre volume moyen court et volume moyen long, en %."
+    },
+    "vortex@1": {
+      "params": {
+        "output": {
+          "choix": [
+            "plus",
+            "minus",
+            "diff"
+          ],
+          "defaut": "plus",
+          "type": "choix"
+        },
+        "window": {
+          "requis": true,
+          "type": "entier"
+        }
+      },
+      "resume": "Vortex : mouvements haussier et baissier rapportes au True Range."
+    },
     "vwap@1": {
       "params": {
         "window": {
@@ -877,6 +3145,30 @@
         }
       },
       "resume": "Prix moyen pondere par les volumes, sur FENETRE (pas sur la seance)."
+    },
+    "vwma@1": {
+      "params": {
+        "field": {
+          "choix": [
+            "open",
+            "high",
+            "low",
+            "close",
+            "volume"
+          ],
+          "defaut": "close",
+          "type": "choix"
+        },
+        "window": {
+          "requis": true,
+          "type": "entier"
+        }
+      },
+      "resume": "Moyenne ponderee par les VOLUMES de la fenetre."
+    },
+    "weighted_close@1": {
+      "params": {},
+      "resume": "Cloture ponderee : `(high + low + 2*close) / 4`."
     },
     "williams_r@1": {
       "params": {
@@ -897,6 +3189,50 @@
         }
       },
       "resume": "Williams %R : position de la cloture dans l'amplitude, de -100 a 0."
+    },
+    "wma@1": {
+      "params": {
+        "field": {
+          "choix": [
+            "open",
+            "high",
+            "low",
+            "close",
+            "volume"
+          ],
+          "defaut": "close",
+          "type": "choix"
+        },
+        "window": {
+          "requis": true,
+          "type": "entier"
+        }
+      },
+      "resume": "Moyenne ponderee lineairement : poids 1..window, le plus recent le plus lourd."
+    },
+    "zlema@1": {
+      "params": {
+        "field": {
+          "choix": [
+            "open",
+            "high",
+            "low",
+            "close",
+            "volume"
+          ],
+          "defaut": "close",
+          "type": "choix"
+        },
+        "seed_multiplier": {
+          "defaut": 5,
+          "type": "entier"
+        },
+        "window": {
+          "requis": true,
+          "type": "entier"
+        }
+      },
+      "resume": "EMA a retard reduit, lissee sur la serie corrigee de son propre retard."
     },
     "zscore@1": {
       "params": {
