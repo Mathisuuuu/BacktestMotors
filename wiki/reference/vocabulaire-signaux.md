@@ -283,14 +283,23 @@ noeud, ou `build_signal` refuse deja `oprands` au lieu de `operands`.
 leur sous-arbre sur `ctx.shifted(k)`. Deux noeuds se comportent alors
 differemment, et il faut le savoir avant d'ecrire un signal :
 
-| Noeud | Ce que voit `shifted(k)` | Pourquoi |
-|---|---|---|
-| `peer` | l'autre instrument **a l'instant recule** | corrige le 2026-09-11 ; le panneau porte tout l'historique, donc reculer est possible |
-| `position` | l'etat **courant**, pas celui d'il y a `k` barres | le runner ne conserve que l'etat courant : il n'existe aucun historique a reculer |
+Les deux portaient le meme defaut, corrige le meme jour : ils rendaient la
+valeur COURANTE quel que soit le decalage.
 
-Consequence pratique : `rolling(mean, 20, position("bars_held"))` lit vingt
-fois la meme valeur. Ce n'est pas un bug de plus, c'est une limite du socle -
-mais elle est silencieuse, et c'est pour cela qu'elle est ecrite ici.
+| Noeud | Ce que voit `shifted(k)` | Comment |
+|---|---|---|
+| `peer` | l'autre instrument **a l'instant recule** | le panneau porte tout l'historique ; la lecture passe par ses REGLES, donc un absent le reste |
+| `position` | l'etat **de la barre `i-k`** | le runner enregistre l'etat a chaque barre dans un historique BORNE porte par le feed |
+
+La borne de l'historique de positions est le `warmup_bars` que la strategie
+**declare** - le budget de lecture en arriere qu'elle a elle-meme annonce.
+Au-dela, le socle leve plutot que de rendre un etat plat qui passerait pour
+une mesure. Une strategie a regles derive ce budget de son arbre de noeuds :
+le cas declaratif n'a donc rien a regler a la main.
+
+Avant la premiere barre enregistree, « a plat » est une **deduction** et non
+un defaut : le runner n'appelle pas la strategie pendant le prechauffage, donc
+aucun ordre n'a pu etre emis.
 
 Le cas `peer`, lui, **etait** un bug. Le terme distant restait a l'instant
 courant, donc constant sur toute la fenetre ; un z-score etant invariant

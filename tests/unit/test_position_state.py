@@ -84,14 +84,47 @@ class TestContextExposure:
         ctx._advance()
         assert ctx.position.is_flat
 
-    def test_the_shifted_view_keeps_the_position(self):
-        """Une expression evaluee 'telle qu'elle etait' voit la position telle
-        qu'elle EST : la decaler remettrait la position a plat par accident."""
+    def test_une_vue_reculee_lit_l_etat_de_sa_propre_barre(self):
+        """Corrige le 2026-09-11.
+
+        Avant, `shifted` recopiait l'etat COURANT : une expression evaluee
+        « telle qu'elle etait il y a k barres » voyait la position telle
+        qu'elle EST. `rolling(mean, 20, position("bars_held"))` lisait donc
+        vingt fois la meme valeur, en silence.
+        """
         ctx = BarContext(store_of())
+        ctx._set_position_depth(20)
+        for barre in range(10):
+            ctx._advance()
+            ctx._set_position(PositionState(quantity=1, bars_held=barre))
+        assert ctx.position.bars_held == 9
+        assert ctx.shifted(3).position.bars_held == 6
+        assert ctx.shifted(9).position.bars_held == 0
+
+    def test_avant_la_premiere_barre_enregistree_c_est_plat_par_deduction(self):
+        """Et non par defaut choisi : le runner n'appelle pas la strategie
+        pendant le prechauffage, donc aucun ordre n'a pu etre emis."""
+        ctx = BarContext(store_of())
+        ctx._set_position_depth(20)
         for _ in range(10):
             ctx._advance()
-        ctx._set_position(PositionState(quantity=1, bars_held=4))
-        assert ctx.shifted(3).position.quantity == 1
+        ctx._set_position(PositionState(quantity=1, bars_held=0))
+        assert ctx.shifted(5).position.is_flat
+
+    def test_au_dela_de_la_profondeur_declaree_ca_leve(self):
+        """L'historique est borne par le `warmup_bars` declare : au-dela, le
+        socle dit qu'il ne sait pas plutot que de rendre une valeur plate qui
+        passerait pour une mesure."""
+        from rsl.errors import InsufficientHistoryError
+
+        ctx = BarContext(store_of())
+        ctx._set_position_depth(5)
+        for barre in range(40):
+            ctx._advance()
+            ctx._set_position(PositionState(quantity=1, bars_held=barre))
+        assert ctx.shifted(4).position.bars_held == 35
+        with pytest.raises(InsufficientHistoryError, match="etat de position"):
+            ctx.shifted(30).position  # noqa: B018
 
 
 class TestTheRunnerFillsIt:
@@ -312,3 +345,102 @@ class TestDeterminismIsPreserved:
         assert [e.hex() for e in observed.equity.equity] == [
             e.hex() for e in reference.equity.equity
         ]
+
+
+class TestLHistoriqueVuDuRunner:
+    """La preuve qui compte : un vrai run, une vraie fenetre sur la position.
+
+    Les tests ci-dessus pilotent le contexte a la main. Ceux-ci passent par
+    `SingleAssetRunner`, donc par le chemin qu'emprunte une specification
+    reelle - y compris la declaration de profondeur, qu'un montage manuel
+    pourrait oublier sans que rien ne le dise.
+
+    Ils ont d'ailleurs echoue au premier jet, et c'est instructif : le
+    `Watcher` lisait cinq barres en arriere sans declarer de `warmup_bars`.
+    La borne a refuse, exactement comme elle doit. Une strategie a regles,
+    elle, derive son warmup de son arbre de noeuds - donc le cas reel est sur,
+    et c'est le montage a la main qui devait etre corrige.
+    """
+
+    def observer(self, spec: InstrumentSpec, noeud, profondeur: int):
+        """Lance un run en lisant `noeud` a chaque barre en position."""
+        from rsl.strategies.signals import warmup_of
+
+        vus: list[tuple[int, float]] = []
+
+        class Watcher(BuyAndHold):
+            @property
+            def warmup_bars(self) -> int:
+                # DECLARE ce qu'il lit : c'est ce budget qui dimensionne
+                # l'historique de positions.
+                return max(warmup_of([noeud]), profondeur)
+
+            def on_bar(self, ctx):  # type: ignore[override]
+                valeur = noeud(ctx)
+                if valeur is not None and not ctx.position.is_flat:
+                    vus.append((ctx.position.bars_held, valeur))
+                return super().on_bar(ctx)
+
+        SingleAssetRunner(store_of(), spec, config()).run(Watcher(SYMBOL, 1))
+        return vus
+
+    def test_une_fenetre_sur_bars_held_voit_la_position_vieillir(
+        self, spec: InstrumentSpec
+    ):
+        """`bars_held` croit de 1 par barre. Sur les 5 dernieres barres, sa
+        moyenne vaut donc `bars_held - 2` - verifiable a la main, et
+        impossible a obtenir quand la fenetre lit cinq fois la valeur courante.
+        """
+        from rsl.strategies.signals import rolling
+
+        vus = self.observer(spec, rolling("mean", 5, position("bars_held")), 10)
+        tardifs = [(tenu, m) for tenu, m in vus if tenu >= 10]
+        assert len(tardifs) > 50, "le montage doit exercer un nombre utile de barres"
+        for tenu, moyenne in tardifs[:20]:
+            assert moyenne == pytest.approx(tenu - 2.0), (tenu, moyenne)
+
+    def test_sans_historique_cette_moyenne_vaudrait_bars_held(
+        self, spec: InstrumentSpec
+    ):
+        """Le pendant du precedent : il dit ce que l'ANCIEN comportement
+        donnait, pour que la difference soit lisible et non supposee."""
+        from rsl.strategies.signals import rolling
+
+        vus = self.observer(spec, rolling("mean", 5, position("bars_held")), 10)
+        tardifs = [(tenu, m) for tenu, m in vus if tenu >= 10]
+        assert tardifs
+        tenu, moyenne = tardifs[0]
+        assert moyenne != pytest.approx(float(tenu)), (
+            "la fenetre lit encore cinq fois la valeur courante"
+        )
+
+    def test_lag_sur_la_position_recule_aussi(self, spec: InstrumentSpec):
+        recule = build_signal({
+            "type": "lag", "bars": 7,
+            "inner": {"type": "position", "field": "bars_held"},
+        })
+        vus = self.observer(spec, recule, 20)
+        tardifs = [(tenu, v) for tenu, v in vus if tenu >= 20]
+        assert tardifs
+        for tenu, valeur in tardifs[:10]:
+            assert valeur == pytest.approx(tenu - 7.0)
+
+    def test_une_strategie_a_regles_derive_son_warmup_toute_seule(
+        self, spec: InstrumentSpec
+    ):
+        """Le cas qui compte vraiment : une specification JSON n'a rien a
+        declarer a la main, `RuleStrategy.warmup_bars` remonte l'arbre."""
+        from rsl.strategies.signals import rolling
+
+        fenetre = rolling("mean", 12, position("bars_held"))
+        strategie = RuleStrategy(
+            symbol=SYMBOL, quantity=1,
+            entry_long=CrossesAbove(prim("sma@1", window=5), prim("sma@1", window=20)),
+            exit_long=Compare(fenetre, CompareOp.GE, const(8.0)),
+        )
+        assert strategie.warmup_bars >= 12
+
+        resultat = SingleAssetRunner(store_of(), spec, config()).run(strategie)
+        assert resultat.counters.n_orders_submitted > 0, (
+            "la strategie doit negocier, sinon le test ne prouve rien"
+        )

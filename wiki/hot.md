@@ -17,7 +17,7 @@ generated: true
 | Indicateur | Valeur |
 |---|---|
 | Pages de wiki | 23 |
-| Entrees de log | 96 |
+| Entrees de log | 101 |
 | Derniere activite | 2026-09-11 |
 | Idees ecartees (ledger) | 17 |
 | Idees en attente (ledger) | 3 |
@@ -27,7 +27,7 @@ generated: true
 | Pages `reference/` | 7 |
 | Pages `research/` | 1 |
 
-**Activite par type :** note × 49, fix × 19, feat × 12, decision × 10, experiment × 2, setup × 1, lint × 1, audit × 1, refactor × 1
+**Activite par type :** note × 50, fix × 22, feat × 12, decision × 11, experiment × 2, setup × 1, lint × 1, audit × 1, refactor × 1
 
 ## Experiences
 
@@ -42,14 +42,14 @@ Le total des essais alimente le Deflated Sharpe : un essai non enregistre gonfle
 
 ## Derniere activite — 8 entree(s)
 
+- **2026-09-11** — note | mes trois premiers tests par le runner echouaient, et ils avaient tort | le `Watcher` lisait cinq barres en arriere sans declarer de `warmup_bars` : la borne a refuse, exactement comme elle doit. Une strategie a REGLES, elle, derive son warmup de son arbre -- le cas reel etait donc sur, et c'est le montage a la main qui devait etre corrige. Un test de plus verifie desormais ce chemin declaratif
+- **2026-09-11** — fix | ma premiere purge de l'historique balayait tout le dictionnaire a chaque barre | O(portee) par barre, soit 740 millions d'operations sur les 3,7 M de barres minute d'ES pour une profondeur de 200. Remplacee par un retrait en O(1) -- le runner enregistre barre par barre, donc une seule cle sort de la fenetre a chaque appel. Le balayage reste en secours pour le cas non sequentiel. Verifie sans regression : 11,2-12,3 ms des deux cotes sur `_moule_universel`, soit du bruit
+- **2026-09-11** — fix | trou referme, que j'avais introduit deux heures plus tot avec `FrozenPeers` | le resolveur de pairs fige construisait un `BarContext` neuf, donc sans historique de position : `peer(NQ, position("quantity"))` rendait zero depuis une vue reculee alors qu'il rendait la bonne valeur depuis la vue courante. Aucun exemple ne l'exercait, donc aucune empreinte ne l'aurait signale. Trouve en enumerant ce que `FrozenPeers` ne transmettait pas
+- **2026-09-11** — decision | l'historique de positions est BORNE par le `warmup_bars` declare, et ce qui est hors borne est distingue | un etat par barre sur 3,7 M de barres minute pese des centaines de Mo. La borne est le budget de lecture en arriere que la strategie annonce elle-meme -- une strategie a regles le derive de son arbre, donc le cas declaratif n'a rien a regler. Deux cas hors borne, traites differemment : AVANT la premiere barre enregistree, « a plat » est une DEDUCTION (le runner n'appelle pas la strategie pendant le prechauffage, aucun ordre n'a pu etre emis) ; AU-DELA de la borne, ca leve, plutot que de rendre un etat plat qui passerait pour une mesure
+- **2026-09-11** — fix | `position` sous une vue reculee : meme defaut que `peer`, corrige le meme jour | `shifted` recopiait l'etat COURANT, donc `rolling(mean, 20, position("bars_held"))` lisait vingt fois la meme valeur, en silence. Le runner enregistre desormais l'etat a chaque barre dans un `PositionHistory` porte par le feed, et `shifted(k)` y lit la barre `i-k`. **Les 7 empreintes sont inchangees** : aucun exemple ne lisait `position` sous un noeud qui recule, ce qui a ete VERIFIE avant de toucher au code plutot que constate apres
 - **2026-09-11** — experiment | paire ES/NQ : premiers chiffres ou le terme distant compte | Sharpe 0,61, 149 trades, profit factor 1,77 sur 2633 barres quotidiennes. **A ne pas lire comme une amelioration** : l'ancien 0,24 venait d'une strategie DIFFERENTE, qui ne regardait pas NQ. Un seul echantillon, aucun walk-forward, seuils herites de l'epoque ou le signal etait inerte, roulement non ajuste. Verdict `non-conclusif` -> [[experiments/paire-es-nq-retour-a-la-moyenne]]
 - **2026-09-11** — note | mon premier test de la correction echouait sur du code juste, pour la meme raison mathematique que le defaut | montage : `A = 100 + k` et `B = 1000 + 10k`, dont le ratio vaut 0,1 pour TOUT k. Deux rampes proportionnelles sont un cas degenere qui annule le terme a verifier. Corrige en prenant `B = 500 + 7k`
 - **2026-09-11** — note | ce qui ne pouvait pas voir ce defaut, et pourquoi les empreintes en font partie | tests unitaires (chaque noeud pris seul est juste), `mypy`/`ruff` (rien d'incorrect), corruption du futur (aucune fuite : `NQ[t]` lu en `t` est du passe), relecture (`sub._set_peers(self._peers)` est la ligne qu'on ecrit) -- et les EMPREINTES, qui garantissent qu'un resultat ne change pas, jamais qu'il est juste. Un defaut deterministe leur est transparent par construction -> [[lessons]] L18
-- **2026-09-11** — note | l'empreinte de `paire_es_nq` change et son `config_hash` non, ce qui est exactement la signature attendue | `ed5fdfcb2b74cfd2` -> `479348a0ff34b8e3`, 15 -> 149 trades. Le `config_hash` reste `c686c31fa61e36d2` : la specification n'a pas bouge, le moteur si. C'est la distinction que `tests/test_integration_reelle.py` avait ete ecrit pour rendre lisible -- et c'est LUI qui a signale le changement, une heure apres avoir ete ecrit. `tests/fixtures/empreintes_attendues.json` regenere DELIBEREMENT, ancienne valeur conservee dans cette entree
-- **2026-09-11** — fix | `peer` sous une fenetre glissante : le terme distant etait INERTE, pas seulement mal defini | `shifted` recopiait le resolveur de pairs sans le reculer, donc `rolling(zscore, 120, close / peer(NQ, close))` divisait les 120 clotures d'ES par la MEME cloture de NQ. Le z-score etant invariant d'echelle, le terme distant n'avait AUCUN effet : ecart maximum **2,08e-14** avec un z-score d'ES seul. L'exemple phare du depot, presente comme une strategie de paires, negociait ES tout court. Corrige : `shifted` recule aussi les pairs, par les regles du PANNEAU (un absent le reste, un report borne le reste) et non par lecture directe du magasin, qui aurait rendu un « dernier prix connu »
-- **2026-09-11** — note | fausse alerte de performance, tranchee par une mesure temoin | la suite rapide passait de 33 a 51 s apres le decoupage, ce qui aurait pu signifier une memoisation desactivee en silence -- plus lent, jamais faux, donc invisible aux tests. Verifie : `sma@1`, un chemin que le decoupage ne touche pas, etait AUSSI deux fois plus lent (10,65 contre 5,43 us). La machine tournait au ralenti, pas le code. Une mesure sans temoin ne tranche rien
-- **2026-09-11** — note | la facade a perdu un nom pendant le decoupage, et seule la suite l'a dit | `ruff --fix` retire un import qui ne sert qu'a etre reexporte : `_NODES` a disparu, et `test_extension_closure.py` a echoue a la collecte. Corrige en pointant ce test vers `noeuds.contrat`, son module REEL -- un nom prive qui transite par une facade est un nom prive qu'on croit public. Et `test_couches.py` verifie desormais que tout ce que les familles DEFINISSENT passe par la facade, verification elle-meme validee en retirant `Rolling` et en constatant l'echec
-- **2026-09-11** — refactor | A-P3.3 : `signals.py`, 1 949 lignes, devient une facade de 168 | le code vit dans `rsl/strategies/noeuds/` : `contrat` (ce qu'est un noeud), `feuilles` (ce qui lit le monde), `fenetres` (ce qui regarde plusieurs barres), `operateurs` (ce qui combine), `raccourcis`. Les quatre familles importent `contrat`, jamais l'inverse, et un test le verifie par analyse d'AST. Aucun import du depot ne change. Verifie : 7 empreintes inchangees, et les TROIS contrats engendres (squelette, schema des signaux, schema complet) identiques au fichier pres -- `list_node_types()` triant, l'ordre d'enregistrement n'entre nulle part
 
 ## Next Actions
 
@@ -151,11 +151,15 @@ suivante, qui viennent de l'audit fonctionnel du 2026-09-10.
       [[experiments/paire-es-nq-retour-a-la-moyenne]] ; ce qu'il ne faut PAS en
       conclure y est ecrit. Cout : le run passe de 3,6 a 5,4 s, le pair etant
       desormais reellement resolu 120 fois par barre ([[lessons]] L18).
-- [ ] **Limite restante, de la meme famille** : `position` sous une vue reculee
-      rend l'etat COURANT - le runner ne garde aucun historique de positions.
-      `rolling(mean, 20, position("bars_held"))` lit donc vingt fois la meme
-      valeur, en silence. La lever demanderait au runner de conserver cet
-      historique.
+- [x] **`position` sous une vue reculee : CORRIGE (2026-09-11)**, le meme jour
+      que `peer` et par le meme raisonnement. Le runner enregistre l'etat a
+      chaque barre dans un historique BORNE par le `warmup_bars` declare ;
+      `shifted(k)` y lit la barre `i-k`. Les 7 empreintes sont INCHANGEES -
+      aucun exemple ne lisait `position` sous un noeud qui recule, ce qui avait
+      ete verifie avant de toucher au code. Trou referme au passage :
+      `FrozenPeers` rendait un contexte de pair sans historique de position,
+      donc `peer(NQ, position(...))` valait zero depuis une vue reculee.
+      `docs/no-lookahead.md` §2.5 mis a jour : il est normatif.
 - [ ] Relancer les deux experiences seminales **avec manifeste et empreinte
       archives** -- l'audit a montre qu'elles se reproduisent
       (`sma_es_daily` : Sharpe 0,60, empreinte `e96832fb121b91fb`,

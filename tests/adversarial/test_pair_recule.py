@@ -271,3 +271,88 @@ class TestLaMemoisationResteRefusee:
         if MEMO_DESACTIVEE:
             pytest.skip("memoisation desactivee")
         assert rolling("mean", 10, peer("B", price("close")))._memoire is None
+
+
+class TestHistoriqueDePositions:
+    """`position` sous une vue reculee : meme defaut que `peer`, meme jour.
+
+    `shifted` recopiait l'etat COURANT. Le runner enregistre desormais l'etat
+    a chaque barre dans un historique borne, et la vue reculee y lit SA barre.
+
+    Ce que ces tests attaquent : que l'historique ne devienne pas une voie de
+    lecture du futur, et qu'il ne reponde pas quand il ne sait pas.
+    """
+
+    def historique(self, portee: int, n: int = 40):
+        from rsl.data.schema import PositionState
+
+        ctx = BarContext(magasin(100.0, 1.0, "A"))
+        ctx._set_position_depth(portee)
+        for barre in range(n):
+            ctx._advance()
+            ctx._set_position(PositionState(quantity=1, bars_held=barre))
+        return ctx
+
+    def test_il_ne_repond_jamais_pour_une_barre_future(self):
+        """Un lag negatif est deja refuse par `shifted` ; on verifie que
+        l'historique n'ouvre pas une seconde porte."""
+        from rsl.errors import LookAheadError
+
+        ctx = self.historique(portee=30)
+        with pytest.raises(LookAheadError):
+            ctx.shifted(-1)
+
+    def test_il_ne_devine_pas_au_dela_de_sa_portee(self):
+        """Rendre `FLAT` serait une valeur inventee, et elle traverserait une
+        comparaison sans que rien ne la signale."""
+        ctx = self.historique(portee=5)
+        assert ctx.shifted(4).position.bars_held == 35
+        with pytest.raises(InsufficientHistoryError, match="etat de position"):
+            ctx.shifted(25).position  # noqa: B018
+
+    def test_mais_avant_le_premier_enregistrement_plat_est_deduit(self):
+        """Distinction qui compte : « je ne sais pas » et « je sais que
+        c'etait plat » ne sont pas la meme reponse."""
+        from rsl.data.schema import PositionState
+
+        ctx = BarContext(magasin(100.0, 1.0, "A"))
+        ctx._set_position_depth(30)
+        for _ in range(20):
+            ctx._advance()
+        ctx._set_position(PositionState(quantity=2, bars_held=0))
+        assert ctx.shifted(10).position.is_flat
+
+    def test_l_historique_reste_borne_sur_un_long_parcours(self):
+        ctx = self.historique(portee=25, n=2_000)
+        assert ctx._positions.taille() <= 2 * (25 + 1) + 2
+
+    def test_un_pair_recule_porte_son_propre_historique(self):
+        """Trou introduit avec `FrozenPeers` et referme le meme jour : le
+        contexte neuf du pair etait a plat."""
+        from rsl.data.schema import PositionState
+
+        panneau = panneau_rampes()
+        multi = MultiContext(panneau)
+        multi._context_of("B")._set_position_depth(30)
+        for ligne in range(180, 201):
+            multi._seek_row(ligne)
+            multi._context_of("B")._set_position(
+                PositionState(quantity=3, bars_held=ligne - 180)
+            )
+        depuis_a = multi["A"]
+        assert depuis_a.peer("B").position.bars_held == 20
+        assert depuis_a.shifted(8).peer("B").position.bars_held == 12
+
+    def test_deux_runs_ne_partagent_aucun_historique(self):
+        """L'argument qui fait que cette memoire ne casse pas le determinisme :
+        les contextes sont recrees a chaque run."""
+        from rsl.data.schema import PositionState
+
+        un = BarContext(magasin(100.0, 1.0, "A"))
+        un._set_position_depth(10)
+        un._advance()
+        un._set_position(PositionState(quantity=9, bars_held=3))
+
+        deux = BarContext(magasin(100.0, 1.0, "A"))
+        deux._advance()
+        assert deux.position.is_flat

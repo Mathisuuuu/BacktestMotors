@@ -303,7 +303,15 @@ class SingleAssetRunner:
         last_marks: dict[str, float] = {}
 
         feed = BarFeed(self.store, warmup_bars=warmup, stop=self.config.stop)
+        profondeur_dite = False
         for ctx in feed:
+            if not profondeur_dite:
+                # Le feed reutilise UN contexte : la profondeur se declare une
+                # fois, sur lui. `warmup` est le budget de lecture en arriere
+                # que la strategie a annonce ; retenir au-dela serait payer
+                # pour ce que personne n'a dit vouloir lire.
+                ctx._set_position_depth(warmup)
+                profondeur_dite = True
             index = ctx.n_bars_seen - 1
             bar = ctx.bar
             portfolio.begin_bar()

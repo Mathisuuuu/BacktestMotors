@@ -118,10 +118,31 @@ n'est pas cosmétique. Un nœud de signal qui mémoriserait son état survivrait
 d'un run à l'autre : deux backtests identiques donneraient des résultats
 différents selon ce qui a tourné avant, et le test de corruption du futur
 perdrait son sens. Le runner, lui, repart de zéro à chaque `run()` par
-construction, et son suivi est une variable locale de la boucle.
+construction, et son suivi ne survit pas à la fin de `run()`.
 
 **Hors runner, la position est toujours à plat.** Un `Context` construit à la
 main ne peut pas inventer une position que personne n'a prise.
+
+**Une vue reculée voit la position de SA barre** (depuis le 2026-09-11). Le
+runner enregistre l'état à chaque barre dans un historique **borné** porté par
+le feed, et `ctx.shifted(k)` y lit l'état de la barre `i-k`. Auparavant il
+recopiait l'état courant : `rolling(mean, 20, position("bars_held"))` lisait
+vingt fois la même valeur, sans que rien ne le signale.
+
+Cela ne déplace pas la frontière du §2.5, et il faut voir pourquoi :
+
+- l'historique est écrit par le **runner**, pas par un nœud. L'argument
+  ci-dessus tient mot pour mot — c'est toujours le runner qui calcule ;
+- il est **reconstruit à chaque run** : les contextes sont créés par le feed à
+  chaque `run()`, donc rien ne survit d'un backtest à l'autre ;
+- il ne contient que des états **déjà exposés** à la stratégie. Le relire plus
+  tard ne révèle rien de neuf, et surtout rien de postérieur ;
+- il est borné par le `warmup_bars` que la stratégie **déclare**. Au-delà, le
+  socle lève `InsufficientHistoryError` plutôt que de rendre un état plat qui
+  passerait pour une mesure. Avant la première barre enregistrée, en revanche,
+  « à plat » est une **déduction** et non un défaut choisi : le runner
+  n'appelle pas la stratégie pendant le préchauffage, donc aucun ordre n'a pu
+  être émis.
 
 Ce que cela rend exprimable : les sorties temporelles (« sortir après dix
 barres ») et les sorties calées sur un extrême atteint depuis l'entrée, dont le

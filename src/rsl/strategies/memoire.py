@@ -64,8 +64,10 @@ par les noeuds `peer` et `position`, et aucun des deux n'est une fonction de
 - `_peers` designe un PANNEAU, que la cle n'identifie pas. Deux panneaux
   partageant le meme magasin d'ES donneraient des valeurs differentes a la
   meme cle ;
-- `_position` est l'etat COURANT, recopie tel quel par `shifted` - le runner
-  ne conserve aucun historique de positions a reculer.
+- `_position` designe un HISTORIQUE de positions, propre a un run et a une
+  strategie. La cle ne l'identifie pas davantage qu'elle n'identifie le
+  panneau. (Jusqu'au 2026-09-11 la raison etait differente : `shifted`
+  recopiait l'etat courant. Corrige - mais le refus, lui, subsiste.)
 
 D'ou la regle, qui n'est pas une precaution mais une demonstration : un
 sous-arbre est memoisable si et seulement s'il ne contient ni `peer` ni

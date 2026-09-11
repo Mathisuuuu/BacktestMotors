@@ -226,7 +226,15 @@ class CrossSectionalRunner:
         fills: list[Fill] = []
         tracking: dict[str, _SinceEntry] = {}
 
+        profondeur_dite = False
         for mctx in PanelFeed(self.panel, warmup_rows=warmup, stop=self.config.stop):
+            if not profondeur_dite:
+                # Un historique par instrument : le feed transversal reutilise
+                # un contexte par symbole, donc la profondeur se declare une
+                # fois sur chacun.
+                for symbole in self.panel.symbols:
+                    mctx._context_of(symbole)._set_position_depth(warmup)
+                profondeur_dite = True
             row = mctx._row
             bars = {symbol: mctx[symbol].bar for symbol in mctx.symbols}
             portfolio.begin_bar()

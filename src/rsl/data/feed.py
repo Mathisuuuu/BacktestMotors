@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 from datetime import datetime
-from typing import Protocol, runtime_checkable
+from typing import Final, Protocol, runtime_checkable
 
 import numpy as np
 
@@ -36,6 +36,96 @@ from rsl.errors import (
     LookAheadError,
     SymbolNotAvailableError,
 )
+
+
+class PositionHistory:
+    """Etat de position PAR BARRE, ecrit par le runner, lu par le contexte.
+
+    Pourquoi il existe
+    ------------------
+    `shifted(lag)` promet une vue « telle qu'elle etait il y a `lag` barres ».
+    Jusqu'au 2026-09-11 elle recopiait l'etat de position COURANT, donc
+    `rolling(mean, 20, position("bars_held"))` lisait vingt fois la meme
+    valeur - en silence. Meme forme de defaut que celui des pairs, corrige le
+    meme jour, et pour la meme raison : une vue reculee doit voir le passe.
+
+    Pourquoi ce n'est pas le « noeud a memoire » ecarte au ledger
+    -------------------------------------------------------------
+    Cette memoire n'est pas dans un noeud, elle est dans le FEED, et c'est le
+    runner qui l'ecrit - exactement l'argument que `PositionState` donne deja
+    pour justifier que le runner calcule la position plutot qu'un noeud. Le
+    runner repart de zero a chaque run par construction ; rien ne survit.
+
+    Pourquoi elle est BORNEE
+    ------------------------
+    Un etat par barre sur 3,7 M de barres minute pese des centaines de Mo. La
+    borne est le `warmup_bars` declare par la strategie, plus un : c'est le
+    budget de lecture en arriere que la strategie a elle-meme annonce, et
+    aucun noeud ne peut legitimement demander plus sans l'avoir declare.
+
+    Ce qui est rendu hors de la fenetre retenue
+    -------------------------------------------
+    - avant la premiere barre enregistree : `FLAT`, et ce n'est PAS une
+      supposition. Le runner n'appelle pas la strategie pendant le
+      prechauffage, donc aucun ordre n'a pu etre emis, donc la position etait
+      plate. C'est une deduction, pas un defaut choisi ;
+    - au-dela de la borne : `InsufficientHistoryError`, comme partout ailleurs
+      quand on demande plus d'historique qu'il n'en existe.
+    """
+
+    __slots__ = ("_etats", "_portee", "_premier")
+
+    DEFAUT: Final[int] = 2
+    """Profondeur hors runner. Un `BarContext` construit a la main est a plat :
+    il n'a rien a retenir, et `FLAT` repond a tout."""
+
+    def __init__(self) -> None:
+        self._portee = PositionHistory.DEFAUT
+        self._etats: dict[int, PositionState] = {}
+        self._premier = -1
+
+    def set_depth(self, portee: int) -> None:
+        """Fixee par le runner, depuis le `warmup_bars` de la strategie."""
+        self._portee = max(portee, PositionHistory.DEFAUT)
+
+    def taille(self) -> int:
+        """Nombre d'etats retenus. Existe pour les tests de bornage."""
+        return len(self._etats)
+
+    def record(self, index: int, state: PositionState) -> None:
+        """Enregistre l'etat de la barre `index` et laisse tomber le plus vieux.
+
+        Le retrait est en O(1) : le runner enregistre barre par barre, donc
+        une seule cle sort de la fenetre a chaque appel. Une purge qui
+        BALAYERAIT le dictionnaire couterait `portee` operations par barre -
+        740 millions sur les 3,7 M de barres minute d'ES pour une profondeur
+        de 200. La premiere version faisait exactement cela.
+
+        Le balayage reste en secours pour le cas non sequentiel, qui ne se
+        produit dans aucun runner mais qui ne doit pas faire enfler la memoire
+        s'il se produisait.
+        """
+        if self._premier < 0:
+            self._premier = index
+        self._etats[index] = state
+        self._etats.pop(index - self._portee - 1, None)
+        if len(self._etats) > 2 * (self._portee + 1):
+            limite = index - self._portee
+            for cle in [k for k in self._etats if k < limite or k > index]:
+                del self._etats[cle]
+
+    def at(self, index: int) -> PositionState:
+        etat = self._etats.get(index)
+        if etat is not None:
+            return etat
+        if self._premier < 0 or index < self._premier:
+            # Aucun runner, ou barre de prechauffage : plat par deduction.
+            return FLAT
+        raise InsufficientHistoryError(
+            f"etat de position demande a la barre {index}, mais seules les "
+            f"{self._portee} dernieres sont retenues. Declarez un "
+            f"`extra_warmup` suffisant sur la strategie."
+        )
 
 
 @runtime_checkable
@@ -152,12 +242,12 @@ class BarContext:
     strategie n'a contourne le contrat.
     """
 
-    __slots__ = ("_i", "_peers", "_position", "_store")
+    __slots__ = ("_i", "_peers", "_positions", "_store")
 
     def __init__(self, store: BarStore) -> None:
         self._store = store
         self._i = -1
-        self._position = FLAT
+        self._positions = PositionHistory()
         self._peers: PeerResolver | None = None
 
     # -- avancee du curseur : reserve au feed -----------------------------
@@ -174,13 +264,33 @@ class BarContext:
         self._peers = resolver
 
     def _set_position(self, state: PositionState) -> None:
-        """Renseigne l'etat de position. Reserve au runner.
+        """Enregistre l'etat de position DE CETTE BARRE. Reserve au runner.
 
         Le runner est le seul a connaitre la verite : il voit les fills. Un
         `Context` construit hors runner reste a plat, ce qui est la seule
         reponse honnete quand personne ne negocie.
+
+        Enregistre plutot qu'affecte depuis le 2026-09-11 : une vue reculee
+        doit pouvoir lire l'etat de SA barre, pas celui du present.
         """
-        self._position = state
+        self._positions.record(self._i, state)
+
+    def _set_position_depth(self, warmup_bars: int) -> None:
+        """Profondeur de l'historique de positions. Reserve au runner.
+
+        Le `warmup_bars` de la strategie est le budget de lecture en arriere
+        qu'elle a elle-meme declare : retenir au-dela serait payer pour ce que
+        personne n'a annonce vouloir lire.
+        """
+        self._positions.set_depth(warmup_bars + 1)
+
+    def _share_positions(self, history: PositionHistory) -> None:
+        """Fait pointer ce contexte vers un historique EXISTANT.
+
+        Sert a `shifted` et aux pairs figes : une vue derivee doit lire le
+        meme historique que celle dont elle vient, pas un historique vide.
+        """
+        self._positions = history
 
     # -- surface publique -------------------------------------------------
 
@@ -226,13 +336,16 @@ class BarContext:
 
     @property
     def position(self) -> PositionState:
-        """Etat de la position de la strategie sur cet instrument.
+        """Etat de la position de la strategie sur cet instrument, A CETTE BARRE.
 
-        Decrit le passe de la strategie, pas l'avenir du marche : les
-        valeurs viennent des fills et des barres deja traversees. Voir
-        `PositionState` et `docs/no-lookahead.md` §2.5.
+        Decrit le passe de la strategie, pas l'avenir du marche : les valeurs
+        viennent des fills et des barres deja traversees. Voir `PositionState`
+        et `docs/no-lookahead.md` §2.5.
+
+        Sur une vue reculee, rend l'etat qu'avait la position a la barre visee
+        - et non l'etat courant, ce qui etait le cas jusqu'au 2026-09-11.
         """
-        return self._position
+        return self._positions.at(self._i)
 
     @property
     def symbol(self) -> str:
@@ -325,12 +438,12 @@ class BarContext:
         index = self._require_index(lag)
         sub = BarContext(self._store)
         sub._seek(index)
-        # L'etat de position suit la vue. C'est une LIMITE connue, pas un
-        # choix : le runner ne conserve que l'etat courant, il n'existe nulle
-        # part d'historique de positions a reculer. Consequence a connaitre -
-        # `rolling(mean, 20, position("bars_held"))` lit vingt fois la meme
-        # valeur. Voir [[reference/vocabulaire-signaux]].
-        sub._set_position(self._position)
+        # La vue PARTAGE l'historique de positions, et son propre curseur y
+        # designe sa barre : `position` y lit donc l'etat qu'avait la position
+        # a ce moment-la. Recopier l'etat courant, comme jusqu'au 2026-09-11,
+        # faisait lire vingt fois la meme valeur a
+        # `rolling(mean, 20, position("bars_held"))`.
+        sub._share_positions(self._positions)
         # Les pairs, eux, RECULENT : ils le peuvent, puisque le panneau porte
         # tout leur historique. Jusqu'au 2026-09-11 ils restaient a l'instant
         # courant, ce qui rendait le terme distant constant sur toute une
@@ -483,6 +596,16 @@ class MultiContext:
             )
         return self._contexts[symbol]
 
+    def _context_of(self, symbol: str) -> BarContext:
+        """Le contexte d'un symbole, qu'il cote ou non a la ligne courante.
+
+        Reserve au runner, comme `_seek_row` : il doit pouvoir declarer la
+        profondeur de l'historique de positions sur CHAQUE instrument, y
+        compris ceux qui ne cotent pas encore. `__getitem__` leve dans ce cas,
+        et c'est voulu - mais ce n'est pas la question posee ici.
+        """
+        return self._contexts[symbol]
+
     def resolve_peer(self, symbol: str) -> BarContext:
         """Implemente `PeerResolver`.
 
@@ -507,7 +630,11 @@ class MultiContext:
         un curseur unique que le feed avance, et le reculer ici corromprait la
         ligne en cours d'evaluation.
         """
-        return FrozenPeers(self._panel, ts_close_ns)
+        return FrozenPeers(
+            self._panel,
+            ts_close_ns,
+            {s: c._positions for s, c in self._contexts.items()},
+        )
 
     def is_stale(self, symbol: str) -> bool:
         """True si la barre visible pour cet instrument provient d'un report explicite."""
@@ -542,12 +669,25 @@ class FrozenPeers:
     `docs/no-lookahead.md` §4.1 refuse explicitement.
     """
 
-    __slots__ = ("_instant", "_panel", "_row")
+    __slots__ = ("_historiques", "_instant", "_panel", "_row")
 
-    def __init__(self, panel: Panel, ts_close_ns: int) -> None:
+    def __init__(
+        self,
+        panel: Panel,
+        ts_close_ns: int,
+        historiques: dict[str, PositionHistory] | None = None,
+    ) -> None:
         self._panel = panel
         self._instant = ts_close_ns
         self._row = -1  # cherche a la PREMIERE demande, pas ici
+        self._historiques = historiques or {}
+        """Historiques de position, par symbole.
+
+        Sans eux, le contexte neuf construit par `resolve_peer` serait a plat,
+        et `peer(NQ, position("quantity"))` rendrait zero depuis une vue
+        reculee alors qu'il rend la bonne valeur depuis la vue courante. Trou
+        introduit avec `FrozenPeers` le 2026-09-11 et referme le meme jour.
+        """
 
     @property
     def row(self) -> int:
@@ -583,6 +723,9 @@ class FrozenPeers:
             )
         ctx = BarContext(self._panel.stores[symbol])
         ctx._seek(index)
+        historique = self._historiques.get(symbol)
+        if historique is not None:
+            ctx._share_positions(historique)
         # Le pair peut lui-meme atteindre les autres, au MEME instant fige :
         # `peer(A, peer(B, ...))` doit rester coherent.
         ctx._set_peers(self)
@@ -593,7 +736,7 @@ class FrozenPeers:
 
     def at_instant(self, ts_close_ns: int) -> PeerResolver:
         """Reculer encore depuis une vue deja reculee reste possible."""
-        return FrozenPeers(self._panel, ts_close_ns)
+        return FrozenPeers(self._panel, ts_close_ns, self._historiques)
 
 
 class PanelFeed:
