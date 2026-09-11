@@ -168,7 +168,35 @@ class TestNoSampleLengthLeak:
             "bar", "bar_at", "granularity", "history", "n_bars_seen", "peer", "peers",
             "position", "session_value", "shifted", "symbol", "ts", "ts_event",
             "value", "values",
+            # `data_token` a rejoint la surface le 2026-09-11, pour la
+            # memoisation (`rsl/strategies/memoire.py`). Il ne fuite rien :
+            # c'est un `object()` NU, sans aucun attribut, dont le seul usage
+            # possible est `token is autre_token`. Les trois tests qui suivent
+            # l'attaquent explicitement.
+            "data_token",
         }
+
+    def test_le_jeton_de_donnees_ne_porte_aucune_donnee(self, ramp_store: BarStore):
+        """La garde qui rend `data_token` acceptable sur la surface publique.
+
+        Un jeton qui serait le MAGASIN donnerait l'historique complet, futur
+        inclus, a qui sait le caster. Un `object()` nu n'a aucun attribut : il
+        n'y a rien a en tirer, meme en trichant.
+        """
+        jeton = advanced(ramp_store, 10).data_token
+        assert type(jeton) is object
+        assert [nom for nom in dir(jeton) if not nom.startswith("_")] == []
+        for interdit in ("close", "high", "low", "open", "volume", "ts_event", "symbol"):
+            assert not hasattr(jeton, interdit), interdit
+
+    def test_le_jeton_ne_distingue_pas_deux_barres(self, ramp_store: BarStore):
+        """Il identifie la SERIE, pas l'instant : il ne peut donc pas servir a
+        deduire ou l'on se trouve dans l'echantillon."""
+        assert advanced(ramp_store, 10).data_token is advanced(ramp_store, 40).data_token
+
+    def test_deux_series_ont_deux_jetons(self, ramp_store: BarStore, walk_store: BarStore):
+        """Le seul service qu'il rend, et celui dont la memoisation depend."""
+        assert advanced(ramp_store, 10).data_token is not advanced(walk_store, 10).data_token
 
     def test_n_bars_seen_never_anticipates(self, ramp_store: BarStore):
         for i, ctx in enumerate(BarFeed(ramp_store, stop=40)):

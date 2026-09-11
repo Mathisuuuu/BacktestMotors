@@ -282,8 +282,14 @@ noeud, ou `build_signal` refuse deja `oprands` au lieu de `operands`.
 - `peer` et `rolling` vont ensemble : acces a un autre instrument au meme
   instant, et elevation de n'importe quelle expression en statistique glissante.
   L'un sans l'autre ne sert a rien.
-- `rolling` a un **cout assume** : il reevalue son sous-arbre `window` fois par
-  barre. Voir les idees en attente du [[Failed Ideas/ledger]].
+- `rolling` reevalue son sous-arbre `window` fois par barre, mais la
+  redondance ENTRE barres est supprimee depuis le 2026-09-11 par une
+  memoisation ([src/rsl/strategies/memoire.py](../../src/rsl/strategies/memoire.py)) :
+  **1 381 -> 116 us** sur une fenetre de 120, empreintes inchangees.
+  **Sauf si le sous-arbre contient `peer` ou `position`** - leur valeur ne
+  depend pas que de la serie et de la barre, et les memoiser a reellement
+  change une empreinte avant que la garde n'existe. Le z-score d'un ratio
+  ES/NQ garde donc son cout entier.
 - Ajouter un type de noeud **sans regenerer les schemas** fait echouer la suite
   de tests, avec la commande a lancer.
 - Ajouter une **regle** a `RuleStrategy` ne demande qu'un champ `Signal | None` :

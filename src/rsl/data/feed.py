@@ -82,6 +82,28 @@ class Context(Protocol):
     def shifted(self, lag: int) -> Context: ...
 
     @property
+    def data_token(self) -> object:
+        """Jeton OPAQUE identifiant la serie lue. Comparable, rien d'autre.
+
+        Deux contextes rendent le MEME jeton si et seulement s'ils lisent le
+        meme magasin : `shifted` le conserve, `peer` en donne un autre, et deux
+        magasins distincts du meme symbole - une serie propre et sa version
+        corrompue, par exemple - n'ont jamais le meme.
+
+        A quoi il sert : les noeuds qui reevaluent leur sous-arbre a plusieurs
+        decalages (`rolling`, `bars_since`, `cumulative`) memoisent le resultat
+        par barre, et doivent pouvoir jeter cette memoire des qu'on leur
+        presente une autre serie. Sans jeton, ils n'ont aucun moyen de le
+        savoir, et une valeur calculee sur une serie servirait pour une autre.
+
+        Ce qu'il n'est PAS : un acces aux donnees. C'est un `object()` nu,
+        sans aucun attribut - le seul usage possible est `token is autre`. Y
+        mettre le magasin aurait donne l'historique complet, futur inclus, a
+        qui lit la surface publique.
+        """
+        ...
+
+    @property
     def position(self) -> PositionState:
         """Ce que la strategie sait de SA position. Jamais du marche."""
         ...
@@ -201,6 +223,16 @@ class BarContext:
     @property
     def granularity(self) -> Granularity:
         return self._store.granularity
+
+    @property
+    def data_token(self) -> object:
+        """Le jeton du magasin : un objet NU, qui ne porte aucune donnee.
+
+        Ni le magasin lui-meme - ce serait donner l'historique complet, futur
+        inclus, sur la surface publique - ni un entier d'identite, que le
+        ramassage reattribue. Voir `BarStore.token`.
+        """
+        return self._store.token
 
     @property
     def n_bars_seen(self) -> int:

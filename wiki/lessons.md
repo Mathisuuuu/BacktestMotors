@@ -414,3 +414,54 @@ obligatoire. Rendre `window` la fenetre LENTE l'a supprime.
 famille, ecrire le parcours. Il coute une fois, et il paie a chaque ajout.
 
 Fonde sur [[reference/vocabulaire-signaux]] · [[log]] (2026-09-11)
+
+---
+
+## L17 -- Une memoire qui ne change pas un resultat n'est pas l'etat qu'on interdit
+
+Le ledger ecarte les « noeuds de signaux a memoire interne » parce qu'« un
+noeud a etat survit d'un run a l'autre, ce qui casse le determinisme ». Ce
+motif est juste, et il ne s'applique pas a tout ce qui se souvient.
+
+**Deux choses differentes portent le meme mot.** Un etat SEMANTIQUE fait
+dependre la sortie du noeud de l'ordre des appels : deux contextes identiques
+donnent deux valeurs. Une MEMOISATION range le resultat d'une fonction pure ;
+la rendre ou la recalculer donne les memes bits. La premiere invalide la
+reproductibilite, la seconde ne peut pas la toucher.
+
+Mais la distinction ne se decrete pas. Ce qui la rend utilisable est qu'elle
+est **falsifiable**, par trois voies independantes :
+
+1. les empreintes d'exemples restent identiques ;
+2. `RSL_NO_MEMO=1` rejoue la suite entiere sans le mecanisme, et donne le
+   meme resultat ;
+3. les suites adversariales tiennent - une memoire qui traverserait deux
+   series ferait echouer la corruption du futur.
+
+**Et la distinction a failli etre fausse.** Memoiser suppose que la valeur du
+sous-arbre ne depend que de `(serie, barre)`. C'est faux pour deux noeuds, et
+l'empreinte de `examples/paire_es_nq.json` l'a dit tout de suite : 634
+remplissages au lieu de 30. La cause est dans `BarContext.shifted`, qui
+recopie le resolveur de pairs et l'etat de position de la vue d'origine. Dans
+`rolling(zscore, 120, close / peer(NQ, close))`, le terme NQ vaut la barre
+COURANTE pour les 120 decalages.
+
+Le remede n'est pas une precaution mais une **demonstration** : un
+`BarContext` porte exactement quatre choses - `_store`, `_i`, `_position`,
+`_peers`. La cle en couvre deux ; les deux autres ne s'atteignent que par les
+noeuds `peer` et `position`. Donc memoiser est correct si et seulement si le
+sous-arbre ne contient ni l'un ni l'autre, et la liste est complete parce que
+la liste des attributs l'est.
+
+**Consequence operationnelle :** avant de memoiser quoi que ce soit, enumerer
+ce que porte le contexte et montrer que la cle le couvre. Une cle « qui a
+l'air suffisante » est une fuite qui attend. Et garder l'interrupteur : ce
+n'est pas un reglage, c'est l'instrument qui rend l'equivalence verifiable a
+tout moment.
+
+Effet de bord a connaitre, decouvert en chemin : la semantique de `peer` sous
+`rolling` - le terme distant ne glisse pas avec la fenetre - n'est ni
+documentee ni evidemment voulue. Elle n'est pas modifiee ici : la corriger
+changerait une empreinte archivee, et c'est une decision a prendre a part.
+
+Fonde sur [[Failed Ideas/ledger]] · [[concepts/determinisme]] · [[log]] (2026-09-11)

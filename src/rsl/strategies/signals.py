@@ -24,7 +24,7 @@ from __future__ import annotations
 
 import math
 from collections.abc import Callable, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import ClassVar, Final, Protocol, runtime_checkable
 
@@ -42,6 +42,13 @@ from rsl.errors import (
 )
 from rsl.primitives.base import BoundPrimitive
 from rsl.primitives.registry import get_primitive
+from rsl.strategies.memoire import (
+    Leve,
+    Memoire,
+    memoire_pour,
+    valeur_a,
+    valeurs_de_fenetre,
+)
 
 TRUE: Final[float] = 1.0
 FALSE: Final[float] = 0.0
@@ -810,12 +817,27 @@ class Rolling:
     que du contexte recu, et deux evaluations du meme instant donnent le meme
     resultat.
 
-    Le prix a payer est assume : `window` evaluations du sous-arbre a chaque
-    barre. Sur une fenetre de 100 et un sous-arbre de trois primitives, cela
-    fait 300 calculs la ou une primitive dediee en ferait un. La correction
-    prime sur la vitesse a cette etape (`docs/execution-model.md`), et une
-    primitive dediee reste toujours possible quand un cas precis devient
-    couteux.
+    Le cout, et ce qui en reste
+    ---------------------------
+    En principe `window` evaluations du sous-arbre par barre : sur une fenetre
+    de 120 et un `arith` de deux primitives, 1 381 us par barre - soit 1,6 h
+    pour UN signal sur les 3,7 M de barres minute d'ES.
+
+    Depuis le 2026-09-11, une MEMOISATION supprime la redondance ENTRE barres
+    (`rsl/strategies/memoire.py`) : la valeur du sous-arbre a la barre j etait
+    recalculee `window` fois, elle l'est une. Mesure sur le meme cas :
+    **1 381 -> 116 us**, et de bout en bout sur ES quotidien 5 427 -> 2 299 ms,
+    a empreinte IDENTIQUE.
+
+    Deux limites a connaitre, et elles ne sont pas des details :
+
+    - un sous-arbre contenant `peer` ou `position` n'est PAS memoise, parce que
+      `shifted` recopie le resolveur de pairs et l'etat de position : sa valeur
+      ne depend alors pas seulement de la serie et de la barre. Le cas
+      emblematique - le z-score d'un ratio ES/NQ - garde donc son cout entier ;
+    - la memoisation ne change pas la COMPLEXITE. Elle retire un facteur
+      `window` constant ; une primitive dediee reste preferable quand elle
+      existe.
 
     Une seule valeur indefinie dans la fenetre rend le tout indefini : une
     moyenne sur une fenetre trouee ne serait pas la moyenne demandee.
@@ -828,6 +850,7 @@ class Rolling:
     window: int
     inner: Signal
     stride: int = 1
+    _memoire: Memoire | None = field(default=None, compare=False, repr=False)
 
     def __post_init__(self) -> None:
         if self.stride < 1:
@@ -839,21 +862,26 @@ class Rolling:
                 f"'{self.stat.value}' exige window >= 2 : une seule observation n'a "
                 f"ni dispersion ni pente"
             )
+        # Le noeud reste gele ; seule la memoire qu'il detient est mutable.
+        object.__setattr__(
+            self,
+            "_memoire",
+            memoire_pour(self.window * self.stride, self.inner),
+        )
 
     @property
     def warmup_bars(self) -> int:
         return self.inner.warmup_bars + (self.window - 1) * self.stride
 
     def __call__(self, ctx: Context) -> float | None:
-        values: list[float] = []
-        for lag in range(0, self.window * self.stride, self.stride):
-            try:
-                value = self.inner(ctx.shifted(lag))
-            except InsufficientHistoryError:
-                return None
-            if value is None:
-                return None
-            values.append(value)
+        values = valeurs_de_fenetre(
+            self._memoire,
+            self.inner,
+            ctx,
+            range(0, self.window * self.stride, self.stride),
+        )
+        if values is None:
+            return None
 
         window = np.array(values, dtype=np.float64)
         match self.stat:
@@ -1644,22 +1672,23 @@ class BarsSince:
 
     lookback: int
     inner: Signal
+    _memoire: Memoire | None = field(default=None, compare=False, repr=False)
 
     def __post_init__(self) -> None:
         if self.lookback < 1:
             raise ConfigurationError(f"lookback doit etre >= 1, recu {self.lookback}")
+        object.__setattr__(self, "_memoire", memoire_pour(self.lookback, self.inner))
 
     @property
     def warmup_bars(self) -> int:
         return self.inner.warmup_bars + self.lookback - 1
 
     def __call__(self, ctx: Context) -> float | None:
+        # Valeur par valeur et non par fenetre entiere : ce noeud s'arrete des qu'il
+        # trouve, et construire toute la fenetre annulerait cet arret.
         for lag in range(self.lookback):
-            try:
-                valeur = self.inner(ctx.shifted(lag))
-            except InsufficientHistoryError:
-                return None
-            if valeur is None:
+            valeur = valeur_a(self._memoire, self.inner, ctx, lag)
+            if valeur is None or isinstance(valeur, Leve):
                 return None
             if valeur != FALSE:
                 return float(lag)
@@ -1855,6 +1884,15 @@ class Cumulative:
 
     stat: CumulativeStat
     inner: Signal
+    _memoire: Memoire | None = field(default=None, compare=False, repr=False)
+
+    def __post_init__(self) -> None:
+        # Portee : une seance de barres d'une minute en compte ~1 380. Le
+        # chiffre n'a pas besoin d'etre exact - il borne la memoire, il ne
+        # gouverne rien. Trop petit, on perd des reprises ; trop grand, on
+        # retient des barres inutiles. C'est le seul parametre approximatif du
+        # mecanisme, et il ne peut pas changer un resultat.
+        object.__setattr__(self, "_memoire", memoire_pour(1_500, self.inner))
 
     @property
     def warmup_bars(self) -> int:
@@ -1862,15 +1900,11 @@ class Cumulative:
 
     def __call__(self, ctx: Context) -> float | None:
         rang = ctx.session_value(SessionField.BAR_INDEX, 0)
-        values: list[float] = []
-        for lag in range(int(rang) + 1):
-            try:
-                value = self.inner(ctx.shifted(lag))
-            except InsufficientHistoryError:
-                return None
-            if value is None:
-                return None
-            values.append(value)
+        values = valeurs_de_fenetre(
+            self._memoire, self.inner, ctx, range(int(rang) + 1)
+        )
+        if values is None:
+            return None
 
         # `values[0]` est le PRESENT, les lags croissants remontent le temps :
         # `first` est donc le dernier element, `last` le premier.

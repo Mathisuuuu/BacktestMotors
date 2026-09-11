@@ -138,6 +138,12 @@ class TestSurfacePublique:
             "bar", "bar_at", "granularity", "history", "n_bars_seen", "peer", "peers",
             "position", "session_value", "shifted", "symbol", "ts", "ts_event",
             "value", "values",
+            # `data_token` a rejoint la surface le 2026-09-11, pour la
+            # memoisation (`rsl/strategies/memoire.py`). Il ne fuite rien :
+            # c'est un `object()` NU, sans aucun attribut, dont le seul usage
+            # possible est `token is autre_token`. Les trois tests qui suivent
+            # l'attaquent explicitement.
+            "data_token",
         }
 
     def test_sans_calendrier_le_noeud_leve_au_lieu_de_deviner(self):

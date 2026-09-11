@@ -11,7 +11,7 @@ l'information devient disponible. Le moteur raisonne sur `ts_close`.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime, timedelta
 from enum import StrEnum
 from typing import Final
@@ -231,6 +231,27 @@ class BarStore:
     de seance et le dit en levant, plutot que d'en inventer une. Porte par le
     magasin plutot que par le contexte pour que `shifted`, `peer` et les deux
     feeds en heritent sans plomberie supplementaire."""
+
+    token: object = field(default_factory=object, compare=False, repr=False)
+    """Jeton d'identite : un objet nu, unique a ce magasin, qui ne PORTE RIEN.
+
+    Il existe pour que la memoisation des noeuds
+    (`rsl/strategies/memoire.py`) sache reconnaitre un changement de serie.
+    Deux magasins n'ont jamais le meme jeton ; `shifted` et les vues derivees
+    gardent celui de leur magasin.
+
+    Pourquoi un objet nu plutot que le magasin lui-meme : `Context.data_token`
+    est une surface PUBLIQUE. Y exposer le magasin donnerait a un appelant
+    determine l'historique complet, futur inclus - exactement ce que
+    `tests/adversarial/test_forbidden_access.py` interdit. Un `object()` n'a
+    aucun attribut : il ne se compare qu'a lui-meme.
+
+    Pourquoi pas un entier d'identite non plus : `id()` est reattribue apres
+    ramassage, et deux series differentes finiraient par se confondre en
+    silence. Un objet detenu par qui s'en sert ne peut pas etre reattribue.
+
+    `compare=False` : deux magasins de contenu identique restent egaux.
+    """
 
     @staticmethod
     def build(
