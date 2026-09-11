@@ -19,6 +19,7 @@ autorite: src/rsl/cli.py + README.md
 | `rsl run CONFIG` | execute un backtest, affiche le rapport, ecrit le JSON |
 | `rsl walkforward CONFIG --train N --test N` | fenetres successives |
 | `rsl verify CONFIG` | execute DEUX fois et compare les empreintes |
+| `rsl squelette [--out F]` | squelette a trous : tout ce qu'on peut ecrire, engendre depuis les registres |
 | `rsl gui [CONFIG]` | tableau de bord graphique — voir [[reference/tableau-de-bord]] |
 | `rsl run CONFIG --gui` | run ordinaire, puis ouverture du tableau de bord |
 

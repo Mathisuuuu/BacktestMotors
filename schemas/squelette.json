@@ -1,0 +1,1365 @@
+{
+  "cles_de_rules": [
+    "entry_long",
+    "exit_long",
+    "entry_short",
+    "exit_short",
+    "stop_loss",
+    "take_profit"
+  ],
+  "contraintes": [
+    "Un meme instrument ne peut apparaitre qu'une fois dans `data` : deux",
+    "granularites du meme symbole sont refusees ('X apparait deux fois').",
+    "",
+    "`path` doit etre RELATIF a la racine declaree par la variable d'environnement",
+    "RSL_DATA_DIR (ou un fichier `.env`). Un chemin absolu fonctionne mais n'est",
+    "pas portable, et fait diverger le `config_hash` entre deux machines.",
+    "",
+    "`root` doit figurer dans la liste `instruments` : c'est elle qui determine",
+    "multiplicateur, tick et frais.",
+    "",
+    "Pour `macd@1`, `fast` doit etre strictement inferieur a `slow`.",
+    "",
+    "Pour le noeud `rolling`, les statistiques `stdev`, `zscore`, `var` et `slope`",
+    "exigent `window >= 2` : une observation unique n'a ni dispersion ni pente.",
+    "",
+    "Les fenetres sont en NOMBRE DE BARRES, jamais en duree. Sur des donnees",
+    "minute trouees, `window: 60` ne fait pas une heure.",
+    "",
+    "`lag_bars` vaut au minimum 1 : une execution sur la barre qui a produit le",
+    "signal serait du look-ahead, et le moteur la refuse.",
+    "",
+    "Les strategies marquees `cross_sectional: true` ignorent `symbol` et",
+    "travaillent sur tout l'univers declare dans `data`."
+  ],
+  "engendre_par": "rsl squelette",
+  "format": "rsl-squelette@1",
+  "instruments": [
+    "6A",
+    "6B",
+    "6E",
+    "6J",
+    "CL",
+    "ES",
+    "FDAX",
+    "GC",
+    "NQ",
+    "YM"
+  ],
+  "mode_d_emploi": [
+    "Ce fichier decrit CE QU'ON PEUT ECRIRE, pas un backtest. Pour en produire un,",
+    "recopier la forme de `specification` en remplacant chaque descripteur par une",
+    "valeur prise dans son `choix`, ou conforme a son `type`.",
+    "",
+    "Un descripteur est un objet portant une cle `type`. Il n'apparait jamais dans",
+    "une specification finale : il indique quoi mettre a sa place.",
+    "",
+    "Une cle `requis: true` doit etre presente. Une cle qui porte un `defaut` peut",
+    "etre omise ; elle vaudra ce defaut.",
+    "",
+    "Le type `noeud` est recursif : y ecrire n'importe quel objet du catalogue",
+    "`noeuds`, choisi par sa cle `type`. Un noeud contient souvent d'autres noeuds.",
+    "C'est de cette recursion que vient toute l'expressivite du vocabulaire.",
+    "",
+    "Les seules feuilles d'un arbre de noeuds - celles qui n'en contiennent pas",
+    "d'autres - sont `constant`, `price`, `time`, `position` et `primitive`.",
+    "Un arbre qui ne se termine pas par des feuilles est invalide.",
+    "",
+    "`primitive` prend une `ref` du catalogue `primitives` et ses `params`. Elle ne",
+    "lit QUE des champs de prix : pour appliquer un calcul a une expression",
+    "quelconque, utiliser le noeud `rolling`.",
+    "",
+    "Toute erreur est refusee, jamais ignoree : cle inconnue, valeur hors `choix`,",
+    "`ref` inexistante. La commande rend alors le code de sortie 1 et nomme ce",
+    "qu'elle attendait."
+  ],
+  "noeuds": {
+    "all_of": {
+      "champs": {
+        "operands": {
+          "element": {
+            "type": "noeud"
+          },
+          "min_elements": 1,
+          "requis": true,
+          "type": "liste"
+        }
+      },
+      "resume": "Conjonction : vrai si tous les sous-signaux sont vrais."
+    },
+    "any_of": {
+      "champs": {
+        "operands": {
+          "element": {
+            "type": "noeud"
+          },
+          "min_elements": 1,
+          "requis": true,
+          "type": "liste"
+        }
+      },
+      "resume": "Disjonction : vrai si au moins un sous-signal est vrai."
+    },
+    "arith": {
+      "champs": {
+        "left": {
+          "requis": true,
+          "type": "noeud"
+        },
+        "op": {
+          "choix": [
+            "+",
+            "-",
+            "*",
+            "/"
+          ],
+          "requis": true,
+          "type": "choix"
+        },
+        "right": {
+          "requis": true,
+          "type": "noeud"
+        }
+      },
+      "resume": "Operation arithmetique entre deux sous-signaux."
+    },
+    "bars_since": {
+      "champs": {
+        "inner": {
+          "requis": true,
+          "type": "noeud"
+        },
+        "lookback": {
+          "min": 1,
+          "requis": true,
+          "type": "entier"
+        }
+      },
+      "resume": "Nombre de barres depuis la derniere fois qu'une condition etait vraie."
+    },
+    "compare": {
+      "champs": {
+        "left": {
+          "requis": true,
+          "type": "noeud"
+        },
+        "op": {
+          "choix": [
+            ">",
+            ">=",
+            "<",
+            "<=",
+            "==",
+            "!="
+          ],
+          "requis": true,
+          "type": "choix"
+        },
+        "right": {
+          "requis": true,
+          "type": "noeud"
+        }
+      },
+      "resume": "Comparaison de deux sous-signaux, resultat booleen."
+    },
+    "constant": {
+      "champs": {
+        "value": {
+          "requis": true,
+          "type": "nombre"
+        }
+      },
+      "resume": "Valeur litterale, independante du contexte."
+    },
+    "crosses_above": {
+      "champs": {
+        "fast": {
+          "requis": true,
+          "type": "noeud"
+        },
+        "slow": {
+          "requis": true,
+          "type": "noeud"
+        }
+      },
+      "resume": "`fast` passe au-dessus de `slow` entre t-1 et t."
+    },
+    "crosses_below": {
+      "champs": {
+        "fast": {
+          "requis": true,
+          "type": "noeud"
+        },
+        "slow": {
+          "requis": true,
+          "type": "noeud"
+        }
+      },
+      "resume": "`fast` passe sous `slow` entre t-1 et t."
+    },
+    "if_then_else": {
+      "champs": {
+        "condition": {
+          "requis": true,
+          "type": "noeud"
+        },
+        "otherwise": {
+          "requis": true,
+          "type": "noeud"
+        },
+        "then": {
+          "requis": true,
+          "type": "noeud"
+        }
+      },
+      "resume": "Choisit entre deux sous-signaux selon une condition."
+    },
+    "lag": {
+      "champs": {
+        "bars": {
+          "min": 1,
+          "requis": true,
+          "type": "entier"
+        },
+        "inner": {
+          "requis": true,
+          "type": "noeud"
+        }
+      },
+      "resume": "Evalue un sous-signal tel qu'il etait il y a `bars` barres."
+    },
+    "math": {
+      "champs": {
+        "inner": {
+          "requis": true,
+          "type": "noeud"
+        },
+        "op": {
+          "choix": [
+            "abs",
+            "neg",
+            "sign",
+            "log",
+            "exp",
+            "sqrt",
+            "inverse",
+            "floor",
+            "ceil"
+          ],
+          "requis": true,
+          "type": "choix"
+        }
+      },
+      "resume": "Operation arithmetique UNAIRE sur un sous-signal."
+    },
+    "max_of": {
+      "champs": {
+        "operands": {
+          "element": {
+            "type": "noeud"
+          },
+          "min_elements": 1,
+          "requis": true,
+          "type": "liste"
+        }
+      },
+      "resume": "Plus grande valeur parmi plusieurs sous-signaux."
+    },
+    "min_of": {
+      "champs": {
+        "operands": {
+          "element": {
+            "type": "noeud"
+          },
+          "min_elements": 1,
+          "requis": true,
+          "type": "liste"
+        }
+      },
+      "resume": "Plus petite valeur parmi plusieurs sous-signaux."
+    },
+    "not": {
+      "champs": {
+        "inner": {
+          "requis": true,
+          "type": "noeud"
+        }
+      },
+      "resume": "Negation booleenne."
+    },
+    "peer": {
+      "champs": {
+        "inner": {
+          "requis": true,
+          "type": "noeud"
+        },
+        "symbol": {
+          "requis": true,
+          "type": "texte"
+        }
+      },
+      "resume": "Evalue un sous-signal sur un AUTRE instrument, au meme instant."
+    },
+    "position": {
+      "champs": {
+        "field": {
+          "choix": [
+            "quantity",
+            "direction",
+            "bars_held",
+            "entry_price",
+            "high_since_entry",
+            "low_since_entry"
+          ],
+          "defaut": "quantity",
+          "type": "choix"
+        }
+      },
+      "resume": "Feuille : ce que la strategie sait de SA propre position."
+    },
+    "price": {
+      "champs": {
+        "field": {
+          "choix": [
+            "open",
+            "high",
+            "low",
+            "close",
+            "volume"
+          ],
+          "defaut": "close",
+          "type": "choix"
+        },
+        "lag": {
+          "defaut": 0,
+          "min": 0,
+          "type": "entier"
+        }
+      },
+      "resume": "Feuille : un champ OHLCV de la barre courante ou passee."
+    },
+    "primitive": {
+      "champs": {
+        "params": {
+          "type": "objet"
+        },
+        "ref": {
+          "choix": [
+            "adx@1",
+            "atr@1",
+            "atr_wilder@1",
+            "cci@1",
+            "efficiency_ratio@1",
+            "ema@1",
+            "macd@1",
+            "obv@1",
+            "returns@1",
+            "rolling_high@1",
+            "rolling_low@1",
+            "rsi@1",
+            "rsi_wilder@1",
+            "slope@1",
+            "sma@1",
+            "stdev@1",
+            "stochastic@1",
+            "true_range@1",
+            "volatility@1",
+            "vwap@1",
+            "williams_r@1",
+            "zscore@1"
+          ],
+          "note": "les `params` attendus dependent de la primitive choisie",
+          "requis": true,
+          "type": "choix"
+        }
+      },
+      "resume": "Feuille : une primitive du registre, parametres figes."
+    },
+    "rolling": {
+      "champs": {
+        "inner": {
+          "requis": true,
+          "type": "noeud"
+        },
+        "stat": {
+          "choix": [
+            "mean",
+            "stdev",
+            "min",
+            "max",
+            "sum",
+            "zscore",
+            "ema",
+            "median",
+            "var",
+            "slope",
+            "rank",
+            "count_true"
+          ],
+          "requis": true,
+          "type": "choix"
+        },
+        "window": {
+          "min": 1,
+          "requis": true,
+          "type": "entier"
+        }
+      },
+      "resume": "Statistique glissante d'un sous-signal QUELCONQUE, pas d'un champ de prix."
+    },
+    "time": {
+      "champs": {
+        "field": {
+          "choix": [
+            "weekday",
+            "hour",
+            "minute",
+            "day",
+            "month",
+            "day_of_year",
+            "year"
+          ],
+          "defaut": "weekday",
+          "type": "choix"
+        }
+      },
+      "resume": "Feuille : un champ calendaire de la barre courante (UTC)."
+    }
+  },
+  "primitives": {
+    "adx@1": {
+      "params": {
+        "output": {
+          "choix": [
+            "adx",
+            "plus_di",
+            "minus_di"
+          ],
+          "defaut": "adx",
+          "type": "choix"
+        },
+        "seed_multiplier": {
+          "defaut": 5,
+          "type": "entier"
+        },
+        "window": {
+          "requis": true,
+          "type": "entier"
+        }
+      },
+      "resume": "Systeme directionnel de Wilder : `adx`, `plus_di` ou `minus_di` au choix."
+    },
+    "atr@1": {
+      "params": {
+        "window": {
+          "requis": true,
+          "type": "entier"
+        }
+      },
+      "resume": "Average True Range, moyenne SIMPLE des True Ranges (pas le lissage de Wilder)."
+    },
+    "atr_wilder@1": {
+      "params": {
+        "seed_multiplier": {
+          "defaut": 5,
+          "type": "entier"
+        },
+        "window": {
+          "requis": true,
+          "type": "entier"
+        }
+      },
+      "resume": "Average True Range lisse a la WILDER (a distinguer de `atr@1`, moyenne simple)."
+    },
+    "cci@1": {
+      "params": {
+        "field": {
+          "choix": [
+            "open",
+            "high",
+            "low",
+            "close",
+            "volume"
+          ],
+          "defaut": "close",
+          "type": "choix"
+        },
+        "window": {
+          "requis": true,
+          "type": "entier"
+        }
+      },
+      "resume": "Commodity Channel Index sur le prix typique (high + low + close) / 3."
+    },
+    "efficiency_ratio@1": {
+      "params": {
+        "field": {
+          "choix": [
+            "open",
+            "high",
+            "low",
+            "close",
+            "volume"
+          ],
+          "defaut": "close",
+          "type": "choix"
+        },
+        "window": {
+          "requis": true,
+          "type": "entier"
+        }
+      },
+      "resume": "Ratio d'efficience de Kaufman : trajet net rapporte au chemin parcouru."
+    },
+    "ema@1": {
+      "params": {
+        "field": {
+          "choix": [
+            "open",
+            "high",
+            "low",
+            "close",
+            "volume"
+          ],
+          "defaut": "close",
+          "type": "choix"
+        },
+        "seed_multiplier": {
+          "defaut": 5,
+          "type": "entier"
+        },
+        "window": {
+          "requis": true,
+          "type": "entier"
+        }
+      },
+      "resume": "Moyenne exponentielle sur historique tronque, amorcee par une SMA."
+    },
+    "macd@1": {
+      "params": {
+        "fast": {
+          "defaut": 12,
+          "type": "entier"
+        },
+        "field": {
+          "choix": [
+            "open",
+            "high",
+            "low",
+            "close",
+            "volume"
+          ],
+          "defaut": "close",
+          "type": "choix"
+        },
+        "output": {
+          "choix": [
+            "line",
+            "signal",
+            "histogram"
+          ],
+          "defaut": "line",
+          "type": "choix"
+        },
+        "seed_multiplier": {
+          "defaut": 5,
+          "type": "entier"
+        },
+        "signal": {
+          "defaut": 9,
+          "type": "entier"
+        },
+        "slow": {
+          "defaut": 26,
+          "type": "entier"
+        }
+      },
+      "resume": "MACD : `line`, `signal` ou `histogram` au choix, sur historique tronque."
+    },
+    "obv@1": {
+      "params": {
+        "window": {
+          "requis": true,
+          "type": "entier"
+        }
+      },
+      "resume": "On-Balance Volume cumule sur FENETRE (pas depuis l'origine)."
+    },
+    "returns@1": {
+      "params": {
+        "field": {
+          "choix": [
+            "open",
+            "high",
+            "low",
+            "close",
+            "volume"
+          ],
+          "defaut": "close",
+          "type": "choix"
+        },
+        "log": {
+          "defaut": false,
+          "type": "booleen"
+        },
+        "window": {
+          "defaut": 1,
+          "type": "entier"
+        }
+      },
+      "resume": "Rendement sur `window` barres, simple ou logarithmique."
+    },
+    "rolling_high@1": {
+      "params": {
+        "field": {
+          "choix": [
+            "open",
+            "high",
+            "low",
+            "close",
+            "volume"
+          ],
+          "defaut": "high",
+          "type": "choix"
+        },
+        "window": {
+          "requis": true,
+          "type": "entier"
+        }
+      },
+      "resume": "Plus haut des `window` dernieres barres closes."
+    },
+    "rolling_low@1": {
+      "params": {
+        "field": {
+          "choix": [
+            "open",
+            "high",
+            "low",
+            "close",
+            "volume"
+          ],
+          "defaut": "low",
+          "type": "choix"
+        },
+        "window": {
+          "requis": true,
+          "type": "entier"
+        }
+      },
+      "resume": "Plus bas des `window` dernieres barres closes."
+    },
+    "rsi@1": {
+      "params": {
+        "field": {
+          "choix": [
+            "open",
+            "high",
+            "low",
+            "close",
+            "volume"
+          ],
+          "defaut": "close",
+          "type": "choix"
+        },
+        "window": {
+          "requis": true,
+          "type": "entier"
+        }
+      },
+      "resume": "Relative Strength Index, moyennes SIMPLES des hausses et des baisses."
+    },
+    "rsi_wilder@1": {
+      "params": {
+        "field": {
+          "choix": [
+            "open",
+            "high",
+            "low",
+            "close",
+            "volume"
+          ],
+          "defaut": "close",
+          "type": "choix"
+        },
+        "seed_multiplier": {
+          "defaut": 5,
+          "type": "entier"
+        },
+        "window": {
+          "requis": true,
+          "type": "entier"
+        }
+      },
+      "resume": "Relative Strength Index lisse a la WILDER (a distinguer de `rsi@1`)."
+    },
+    "slope@1": {
+      "params": {
+        "field": {
+          "choix": [
+            "open",
+            "high",
+            "low",
+            "close",
+            "volume"
+          ],
+          "defaut": "close",
+          "type": "choix"
+        },
+        "window": {
+          "requis": true,
+          "type": "entier"
+        }
+      },
+      "resume": "Pente d'une regression lineaire sur la fenetre, en unites par barre."
+    },
+    "sma@1": {
+      "params": {
+        "field": {
+          "choix": [
+            "open",
+            "high",
+            "low",
+            "close",
+            "volume"
+          ],
+          "defaut": "close",
+          "type": "choix"
+        },
+        "window": {
+          "requis": true,
+          "type": "entier"
+        }
+      },
+      "resume": "Moyenne simple des `window` dernieres barres closes."
+    },
+    "stdev@1": {
+      "params": {
+        "ddof": {
+          "defaut": 1,
+          "type": "entier"
+        },
+        "field": {
+          "choix": [
+            "open",
+            "high",
+            "low",
+            "close",
+            "volume"
+          ],
+          "defaut": "close",
+          "type": "choix"
+        },
+        "window": {
+          "requis": true,
+          "type": "entier"
+        }
+      },
+      "resume": "Ecart-type sur fenetre glissante, en unites du champ mesure."
+    },
+    "stochastic@1": {
+      "params": {
+        "field": {
+          "choix": [
+            "open",
+            "high",
+            "low",
+            "close",
+            "volume"
+          ],
+          "defaut": "close",
+          "type": "choix"
+        },
+        "window": {
+          "requis": true,
+          "type": "entier"
+        }
+      },
+      "resume": "Position de la cloture dans l'amplitude des `window` dernieres barres, en %."
+    },
+    "true_range@1": {
+      "params": {},
+      "resume": "True Range de la barre courante, sans moyennage."
+    },
+    "volatility@1": {
+      "params": {
+        "annualise": {
+          "accepte_null": true,
+          "defaut": null,
+          "type": "nombre"
+        },
+        "ddof": {
+          "defaut": 1,
+          "type": "entier"
+        },
+        "field": {
+          "choix": [
+            "open",
+            "high",
+            "low",
+            "close",
+            "volume"
+          ],
+          "defaut": "close",
+          "type": "choix"
+        },
+        "log": {
+          "defaut": false,
+          "type": "booleen"
+        },
+        "window": {
+          "requis": true,
+          "type": "entier"
+        }
+      },
+      "resume": "Ecart-type des RENDEMENTS, sans unite donc comparable entre instruments."
+    },
+    "vwap@1": {
+      "params": {
+        "window": {
+          "requis": true,
+          "type": "entier"
+        }
+      },
+      "resume": "Prix moyen pondere par les volumes, sur FENETRE (pas sur la seance)."
+    },
+    "williams_r@1": {
+      "params": {
+        "field": {
+          "choix": [
+            "open",
+            "high",
+            "low",
+            "close",
+            "volume"
+          ],
+          "defaut": "close",
+          "type": "choix"
+        },
+        "window": {
+          "requis": true,
+          "type": "entier"
+        }
+      },
+      "resume": "Williams %R : position de la cloture dans l'amplitude, de -100 a 0."
+    },
+    "zscore@1": {
+      "params": {
+        "ddof": {
+          "defaut": 1,
+          "type": "entier"
+        },
+        "field": {
+          "choix": [
+            "open",
+            "high",
+            "low",
+            "close",
+            "volume"
+          ],
+          "defaut": "close",
+          "type": "choix"
+        },
+        "window": {
+          "requis": true,
+          "type": "entier"
+        }
+      },
+      "resume": "Z-score sur fenetre glissante passee. Aucun mode echantillon complet."
+    }
+  },
+  "specification": {
+    "check_invariant": {
+      "defaut": true,
+      "type": "booleen"
+    },
+    "data": {
+      "element": {
+        "champs": {
+          "allow_non_positive_prices": {
+            "defaut": true,
+            "type": "booleen"
+          },
+          "close_stamp": {
+            "choix": [
+              "period_end",
+              "last_bar"
+            ],
+            "defaut": "period_end",
+            "type": "choix"
+          },
+          "granularity_minutes": {
+            "defaut": 1,
+            "min": 1,
+            "type": "entier"
+          },
+          "max_gap_seconds": {
+            "accepte_null": true,
+            "defaut": null,
+            "min_exclu": 0.0,
+            "type": "nombre"
+          },
+          "path": {
+            "requis": true,
+            "type": "texte"
+          },
+          "resample": {
+            "accepte_null": true,
+            "choix": [
+              "day",
+              "week",
+              "month",
+              "quarter",
+              "year"
+            ],
+            "defaut": null,
+            "type": "choix"
+          },
+          "resample_min_bars": {
+            "accepte_null": true,
+            "defaut": null,
+            "min": 1,
+            "type": "entier"
+          },
+          "root": {
+            "choix": [
+              "6A",
+              "6B",
+              "6E",
+              "6J",
+              "CL",
+              "ES",
+              "FDAX",
+              "GC",
+              "NQ",
+              "YM"
+            ],
+            "requis": true,
+            "type": "choix"
+          },
+          "timestamp_column": {
+            "accepte_null": true,
+            "defaut": null,
+            "type": "texte"
+          }
+        },
+        "requis": true,
+        "type": "objet"
+      },
+      "requis": true,
+      "type": "liste"
+    },
+    "execution": {
+      "champs": {
+        "fees": {
+          "champs": {
+            "kind": {
+              "choix": [
+                "per_contract",
+                "flat",
+                "zero"
+              ],
+              "requis": true,
+              "type": "choix"
+            },
+            "per_contract": {
+              "accepte_null": true,
+              "defaut": null,
+              "min": 0.0,
+              "type": "nombre"
+            }
+          },
+          "requis": true,
+          "type": "objet"
+        },
+        "intrabar_priority": {
+          "choix": [
+            "pessimistic",
+            "optimistic"
+          ],
+          "defaut": "pessimistic",
+          "type": "choix"
+        },
+        "lag_bars": {
+          "defaut": 1,
+          "min": 1,
+          "type": "entier"
+        },
+        "margin_policy": {
+          "choix": [
+            "reject",
+            "warn"
+          ],
+          "defaut": "reject",
+          "type": "choix"
+        },
+        "max_fill_gap_seconds": {
+          "accepte_null": true,
+          "defaut": null,
+          "min_exclu": 0.0,
+          "type": "nombre"
+        },
+        "slippage": {
+          "champs": {
+            "bps": {
+              "accepte_null": true,
+              "defaut": null,
+              "min": 0.0,
+              "type": "nombre"
+            },
+            "kind": {
+              "choix": [
+                "tick",
+                "bps",
+                "zero"
+              ],
+              "requis": true,
+              "type": "choix"
+            },
+            "ticks": {
+              "accepte_null": true,
+              "defaut": null,
+              "min": 0.0,
+              "type": "nombre"
+            }
+          },
+          "requis": true,
+          "type": "objet"
+        }
+      },
+      "requis": true,
+      "type": "objet"
+    },
+    "initial_cash": {
+      "min_exclu": 0.0,
+      "requis": true,
+      "type": "nombre"
+    },
+    "liquidate_at_end": {
+      "defaut": false,
+      "type": "booleen"
+    },
+    "min_warmup_bars": {
+      "defaut": 0,
+      "min": 0,
+      "type": "entier"
+    },
+    "name": {
+      "requis": true,
+      "type": "texte"
+    },
+    "panel": {
+      "champs": {
+        "align_policy": {
+          "choix": [
+            "drop",
+            "ffill",
+            "error"
+          ],
+          "defaut": "drop",
+          "type": "choix"
+        },
+        "max_ffill_bars": {
+          "accepte_null": true,
+          "defaut": null,
+          "min": 0,
+          "type": "entier"
+        }
+      },
+      "defaut": {
+        "align_policy": "drop",
+        "max_ffill_bars": null
+      },
+      "type": "objet"
+    },
+    "rebalance": {
+      "champs": {
+        "kind": {
+          "choix": [
+            "every_row",
+            "every_n_rows"
+          ],
+          "defaut": "every_row",
+          "type": "choix"
+        },
+        "n": {
+          "defaut": 1,
+          "min": 1,
+          "type": "entier"
+        },
+        "offset": {
+          "defaut": 0,
+          "min": 0,
+          "type": "entier"
+        }
+      },
+      "defaut": {
+        "kind": "every_row",
+        "n": 1,
+        "offset": 0
+      },
+      "type": "objet"
+    },
+    "risk": {
+      "champs": {
+        "max_gross_contracts": {
+          "accepte_null": true,
+          "defaut": null,
+          "min": 1,
+          "type": "entier"
+        },
+        "sizing": {
+          "champs": {
+            "atr_multiple": {
+              "defaut": 2.0,
+              "min_exclu": 0.0,
+              "type": "nombre"
+            },
+            "atr_window": {
+              "defaut": 14,
+              "min": 1,
+              "type": "entier"
+            },
+            "contracts": {
+              "accepte_null": true,
+              "defaut": null,
+              "min": 1,
+              "type": "entier"
+            },
+            "fraction": {
+              "accepte_null": true,
+              "defaut": null,
+              "min_exclu": 0.0,
+              "type": "nombre"
+            },
+            "kind": {
+              "choix": [
+                "none",
+                "fixed",
+                "equity_fraction",
+                "risk_fraction"
+              ],
+              "defaut": "none",
+              "type": "choix"
+            }
+          },
+          "defaut": {
+            "atr_multiple": 2.0,
+            "atr_window": 14,
+            "contracts": null,
+            "fraction": null,
+            "kind": "none"
+          },
+          "type": "objet"
+        }
+      },
+      "defaut": {
+        "max_gross_contracts": null,
+        "sizing": {
+          "atr_multiple": 2.0,
+          "atr_window": 14,
+          "contracts": null,
+          "fraction": null,
+          "kind": "none"
+        }
+      },
+      "type": "objet"
+    },
+    "risk_free_annual": {
+      "defaut": 0.0,
+      "min": -0.5,
+      "type": "nombre"
+    },
+    "seed": {
+      "defaut": 0,
+      "type": "entier"
+    },
+    "stop": {
+      "accepte_null": true,
+      "defaut": null,
+      "min": 1,
+      "type": "entier"
+    },
+    "strategy": {
+      "champs": {
+        "params": {
+          "type": "objet"
+        },
+        "ref": {
+          "choix": [
+            "buy_and_hold@1",
+            "cross_sectional_momentum@1",
+            "panel_rules@1",
+            "ranking@1",
+            "rules@1",
+            "sma_crossover@1"
+          ],
+          "note": "les `params` attendus dependent de la strategie choisie",
+          "requis": true,
+          "type": "choix"
+        }
+      },
+      "requis": true,
+      "type": "objet"
+    },
+    "with_data_hash": {
+      "defaut": true,
+      "type": "booleen"
+    }
+  },
+  "strategies": {
+    "buy_and_hold@1": {
+      "params": {
+        "quantity": {
+          "defaut": 1,
+          "type": "entier"
+        },
+        "symbol": {
+          "requis": true,
+          "type": "texte"
+        }
+      },
+      "resume": "Achete a la premiere barre, conserve jusqu'a la fin.",
+      "transversale": false
+    },
+    "cross_sectional_momentum@1": {
+      "params": {
+        "long_short": {
+          "defaut": true,
+          "type": "booleen"
+        },
+        "lookback": {
+          "defaut": 12,
+          "type": "entier"
+        },
+        "n_long": {
+          "defaut": 3,
+          "type": "entier"
+        },
+        "n_short": {
+          "defaut": 3,
+          "type": "entier"
+        },
+        "quantity": {
+          "defaut": 1,
+          "type": "entier"
+        },
+        "skip": {
+          "defaut": 1,
+          "type": "entier"
+        }
+      },
+      "resume": "Momentum transversal 12-1, long-short, rebalance a chaque periode.",
+      "transversale": true
+    },
+    "panel_rules@1": {
+      "params": {
+        "allow_pyramiding": {
+          "defaut": false,
+          "type": "booleen"
+        },
+        "extra_warmup": {
+          "defaut": 0,
+          "type": "entier"
+        },
+        "quantity": {
+          "defaut": 1,
+          "type": "entier"
+        },
+        "rules": {
+          "type": "objet"
+        },
+        "symbol": {
+          "requis": true,
+          "type": "texte"
+        }
+      },
+      "resume": "Regles mono-instrument evaluees sur un panneau : donne acces aux autres instruments via le noeud `peer`.",
+      "transversale": true
+    },
+    "ranking@1": {
+      "params": {
+        "extra_warmup": {
+          "defaut": 0,
+          "type": "entier"
+        },
+        "long_short": {
+          "defaut": true,
+          "type": "booleen"
+        },
+        "n_long": {
+          "defaut": 3,
+          "type": "entier"
+        },
+        "n_short": {
+          "defaut": 3,
+          "type": "entier"
+        },
+        "quantity": {
+          "defaut": 1,
+          "type": "entier"
+        },
+        "score": {
+          "type": "objet"
+        }
+      },
+      "resume": "Classe l'univers par un signal quelconque, prend les extremes. Aucune classe a ecrire.",
+      "transversale": true
+    },
+    "rules@1": {
+      "params": {
+        "allow_pyramiding": {
+          "defaut": false,
+          "type": "booleen"
+        },
+        "extra_warmup": {
+          "defaut": 0,
+          "type": "entier"
+        },
+        "quantity": {
+          "defaut": 1,
+          "type": "entier"
+        },
+        "rules": {
+          "type": "objet"
+        },
+        "symbol": {
+          "requis": true,
+          "type": "texte"
+        }
+      },
+      "resume": "Strategie a regles, decrite entierement par des signaux composes. Aucune classe a ecrire.",
+      "transversale": false
+    },
+    "sma_crossover@1": {
+      "params": {
+        "atr_multiple": {
+          "defaut": 2.0,
+          "type": "nombre"
+        },
+        "atr_window": {
+          "defaut": 14,
+          "type": "entier"
+        },
+        "fast_window": {
+          "defaut": 20,
+          "type": "entier"
+        },
+        "quantity": {
+          "defaut": 1,
+          "type": "entier"
+        },
+        "slow_window": {
+          "defaut": 100,
+          "type": "entier"
+        },
+        "symbol": {
+          "requis": true,
+          "type": "texte"
+        }
+      },
+      "resume": "Croisement de moyennes mobiles, long seulement, stop-loss a N ATR.",
+      "transversale": false
+    }
+  }
+}

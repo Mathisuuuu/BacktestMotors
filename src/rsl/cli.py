@@ -34,6 +34,7 @@ from rsl.errors import RslError
 from rsl.metrics.statistics import AnchoredWalkForward, RollingWalkForward
 from rsl.primitives.registry import describe_registry
 from rsl.report import BacktestReport, run_backtest
+from rsl.skeleton import build_skeleton
 from rsl.strategies.base import describe_strategies
 from rsl.strategies.signals import describe_node_types, signal_json_schema
 from rsl.walkforward import run_walk_forward
@@ -139,6 +140,13 @@ def _build_parser() -> argparse.ArgumentParser:
         help="ouvre le tableau de bord a la fin du run",
     )
     run.set_defaults(handler=_cmd_run)
+
+    squelette = sub.add_parser(
+        "squelette",
+        help="squelette a trous : tout ce qu'on peut ecrire dans une specification",
+    )
+    squelette.add_argument("--out", type=Path, help="ecrit le squelette dans ce fichier")
+    squelette.set_defaults(handler=_cmd_squelette)
 
     gui = sub.add_parser("gui", help="tableau de bord graphique des resultats")
     gui.add_argument(
@@ -305,6 +313,22 @@ def _cmd_run(args: argparse.Namespace) -> int:
         from rsl.gui.app import launch
 
         launch(config=args.config)
+    return EXIT_OK
+
+
+def _cmd_squelette(args: argparse.Namespace) -> int:
+    """Publie le squelette a trous, engendre depuis les registres.
+
+    Complement de `rsl schema` : le schema sert a VALIDER, le squelette a
+    ECRIRE. Les deux sortent du meme registre, donc ne peuvent pas diverger.
+    """
+    rendu = json.dumps(build_skeleton(), indent=2, ensure_ascii=False, sort_keys=True)
+    if args.out is not None:
+        args.out.parent.mkdir(parents=True, exist_ok=True)
+        args.out.write_text(rendu, encoding="utf-8")
+        print(f"Squelette ecrit dans {args.out}")
+    else:
+        print(rendu)
     return EXIT_OK
 
 

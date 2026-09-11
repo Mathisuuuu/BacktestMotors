@@ -18,12 +18,29 @@ autorite: schemas/signals.schema.json (engendre, ne pas editer a la main)
 | Quelles primitives, quels noeuds, quelles strategies sont enregistres **maintenant** ? | `rsl catalogue` |
 | Comment regenerer les schemas ? | `rsl schema --out schemas/signals.schema.json` |
 | Comment un arbre est-il reconstruit depuis du JSON ? | `build_signal(spec)` dans [src/rsl/strategies/signals.py](../../src/rsl/strategies/signals.py) |
+| Que peut-on mettre dans CHAQUE emplacement ? | [schemas/squelette.json](../../schemas/squelette.json) — engendre par `rsl squelette`. Chaque trou y est decrit par ses valeurs acceptees |
 | Par quoi commencer pour ecrire une strategie ? | [examples/_moule.json](../../examples/_moule.json), a copier puis editer |
 | A quoi ressemble CHAQUE type de noeud en JSON ? | [examples/_moule_universel.json](../../examples/_moule_universel.json) — les 20, dans un fichier qui tourne |
 | Comment lisser une EXPRESSION (pas un champ de prix) ? | `rolling` avec `stat: "ema"`. `primitive` est une feuille : elle ne lit que des champs de prix |
 | Wilder ou moyenne simple ? | `atr@1` / `rsi@1` sont des moyennes ARITHMETIQUES ; `atr_wilder@1` / `rsi_wilder@1` sont les variantes de Wilder. Des noms distincts, jamais des versions — voir [[lessons]] L10 |
 | Ou sont les moules de strategie descriptibles ? | [rules.py](../../src/rsl/strategies/rules.py) · [ranking.py](../../src/rsl/strategies/ranking.py) |
 | Ou branchera le futur compilateur de specifications ? | [src/rsl/pipeline.py](../../src/rsl/pipeline.py) — decrit, sans implementation |
+
+## Trois documents, trois usages
+
+| Document | Sert a | Engendre ? |
+|---|---|---|
+| [schemas/squelette.json](../../schemas/squelette.json) | **ecrire** : chaque emplacement avec ses valeurs acceptees, les 10 instruments, les 22 primitives, les 20 noeuds, les 6 strategies | oui, `rsl squelette` |
+| [schemas/signals.schema.json](../../schemas/signals.schema.json) | **valider** : JSON Schema exact | oui, `rsl schema` |
+| [examples/_moule_universel.json](../../examples/_moule_universel.json) | **imiter** : un fichier qui tourne et exerce les 20 noeuds | non, teste |
+
+Le squelette est en **ASCII pur** et se redirige donc sans risque (`rsl schema`
+en sortie standard, lui, sort en CP1252 sur Windows).
+
+Suffisance verifiee : un lecteur qui n'a QUE le squelette peut en tirer une
+specification valide - trois tests de `tests/unit/test_skeleton.py` construisent
+une specification, chaque type de noeud et chaque primitive a partir du seul
+document.
 
 ## Exemples executables
 
