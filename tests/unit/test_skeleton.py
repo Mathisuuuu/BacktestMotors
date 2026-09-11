@@ -71,7 +71,7 @@ class TestFidelite:
     def test_les_cles_de_rules_sont_derivees_pas_recopiees(self, squelette):
         assert squelette["cles_de_rules"] == [
             "entry_long", "exit_long", "entry_short", "exit_short",
-            "stop_loss", "take_profit",
+            "stop_loss", "take_profit", "entry_limit", "entry_stop",
         ]
 
     def test_les_choix_de_rolling_suivent_l_enum(self, squelette):

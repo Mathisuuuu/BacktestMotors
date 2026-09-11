@@ -17,7 +17,7 @@ generated: true
 | Indicateur | Valeur |
 |---|---|
 | Pages de wiki | 22 |
-| Entrees de log | 60 |
+| Entrees de log | 64 |
 | Derniere activite | 2026-09-11 |
 | Idees ecartees (ledger) | 16 |
 | Idees en attente (ledger) | 3 |
@@ -27,7 +27,7 @@ generated: true
 | Pages `reference/` | 7 |
 | Pages `research/` | 1 |
 
-**Activite par type :** note × 35, fix × 9, decision × 7, feat × 6, setup × 1, lint × 1, experiment × 1
+**Activite par type :** note × 37, fix × 9, decision × 8, feat × 7, setup × 1, lint × 1, experiment × 1
 
 ## Experiences
 
@@ -41,14 +41,14 @@ Le total des essais alimente le Deflated Sharpe : un essai non enregistre gonfle
 
 ## Derniere activite — 8 entree(s)
 
+- **2026-09-11** — note | comment ce manque a ete trouve, et deux autres avec lui | en comparant ce que le MOTEUR accepte a ce que le VOCABULAIRE sait produire, pas en lisant la documentation. Les deux autres ecarts restent ouverts : une strategie a regles ne traite qu'un seul symbole, et les sorties sont tout ou rien (pas d'allegement) -> [[lessons]] L13
+- **2026-09-11** — decision | un prix d'entree indefini ABANDONNE l'entree, il ne retombe pas sur un ordre au marche | retomber changerait silencieusement le type d'ordre, donc le comportement, au moment precis ou l'on en sait le moins. Meme regle que partout : « je ne sais pas » n'est pas une raison d'agir
+- **2026-09-11** — note | semantique a connaitre : un ordre a limite vaut pour la SEULE barre d'execution | mesure sur ES quotidien, limite a 1 ATR sous la cloture : 1 trade contre 18 au marche, et 0 pour un stop a 1 ATR au-dessus. Les abandons sont visibles (`n_orders_cancelled_unfilled: 17` sur `n_orders_submitted: 19`) mais rien ne previent -- d'ou un paragraphe dedie dans [[reference/vocabulaire-signaux]]. Ce n'est pas un ordre au carnet
+- **2026-09-11** — feat | `entry_limit` et `entry_stop` : le vocabulaire atteint enfin les ordres a limite et a seuil | le moteur les implementait deja entierement (declenchement, gap, slippage par type, compteurs) mais aucun moule ne les emettait -- `grep order_type src/rsl/strategies/` rendait le vide. Deux cles exclusives dans `rules`, chacune un noeud donnant un prix. Sans elles, ordre au marche : les empreintes des exemples sont inchangees. `panel_rules@1` en herite, il enveloppe `RuleStrategy`. Suite 1485 -> 1494 tests
 - **2026-09-11** — note | les deux murs restants ne sont pas des manques | optimisation de parametres et noeuds a memoire sont au ledger avec leur mecanisme : ils cassent respectivement le perimetre declare du runner et la reproductibilite bit-a-bit. Les lever couterait ce que le depot protege. La table de [[reference/vocabulaire-signaux]] distingue desormais « leve » de « debout, par decision »
 - **2026-09-11** — decision | deux garde-fous rendus DECLARABLES plutot que supprimes | l'unicite du symbole devient l'unicite du NOM publie (un alias distingue une duplication voulue d'un accident), et l'homogeneite des granularites reste le defaut mais s'ouvre par `allow_mixed_granularity`. Motif : le second protege les strategies transversales, ou comparer un rendement hebdomadaire a un rendement quotidien n'a pas de sens. Constate au passage : `Panel.granularity` n'a AUCUN consommateur dans le depot ; il vaut desormais la granularite la plus fine, pour ne pas mentir
 - **2026-09-11** — note | le multi-timeframe est LE piege de look-ahead du backtest : verifie, pas suppose | `tests/adversarial/test_multi_timeframe_closure.py`, 10 tests. Aucune ligne ne voit une barre hebdomadaire cloturant apres elle ; la barre vue est la plus RECENTE close (voir plus ancien serait un autre defaut, aussi silencieux) ; corrompre le futur ne change rien avant la coupure ; le report est borne et marque `is_stale`
 - **2026-09-11** — feat | les deux murs STRUCTURELS du « sans code » sont tombes | (1) `sizing.kind: "signal"` : la taille devient une expression du vocabulaire, avec `max_contracts` obligatoire -- une expression arbitraire n'est pas bornee. `engine.risk` depend du protocole `SupportsSignal`, pas de `strategies.signals` : la dependance continue d'aller de strategies vers engine. (2) `data[].alias` + `panel.allow_mixed_granularity` : le meme instrument a deux granularites, chacune sous son nom. Essai reel : ES quotidien filtre par SMA hebdo, Sharpe 1,14, 90 trades. Suite 1462 -> 1485 tests
-- **2026-09-11** — note | frontiere du « sans code » mesuree apres les ajouts du jour | le vocabulaire RECONSTRUIT `rsi@1` a partir de ses seuls noeuds : 240 points compares, ecart maximum 0.00e+00. Impossible avant `max_of` et `math`. Corollaire : le RSI d'un spread ES/NQ s'ecrit, alors qu'aucune primitive ne le calcule. Restent hors de portee : deux granularites du meme symbole (structurel), taille fonction d'un signal (`sizing` est un enum), optimisation de parametres et noeuds a memoire (tous deux au ledger). Aucun backtest lance : ces verifications construisent des signaux, elles ne consomment pas d'essai
-- **2026-09-11** — note | effet de bord decouvert en designorant : ruff respecte `.gitignore` | la couche donnees n'avait donc JAMAIS ete analysee. 7 defauts dormaient dans du code central (4 `__slots__` non tries, 2 blocs d'imports, 1 generateur). Corriges ; les empreintes de `sma_es_daily`, `paire_es_nq` et `_moule` sont identiques avant et apres, ce qui prouve la neutralite. A ne pas confondre avec les 28 `I001` du ledger, qui etaient des symptomes de l'ABSENCE du paquet -> [[lessons]] L12
-- **2026-09-11** — fix | P1 RESOLU : motif `.gitignore` ancre en `/data/`, couche donnees enfin versionnee | 8 fichiers, 2 446 lignes, dont `session.py` ecrit aujourd'hui. Diagnostic au moment de pousser : `git ls-files src/` rendait 45 fichiers contre 53 sur le disque, et des tests DEJA pousses importaient `rsl.data.session`, absent du depot -- un clone frais etait casse. `data/` a la racine reste ignore, verifie
-- **2026-09-11** — note | pourquoi P6 a survecu a 1400 tests alors qu'un test le visait | le test n'echouait que sur un arbre PROPRE : des que l'arbre etait modifie, `git.is_reproducible` valait deja `False` et masquait tout. Il passait au vert exactement pendant qu'on travaille. Deux tests de regression FIXENT desormais un `GitState` propre au lieu de subir celui du depot -> [[lessons]] L11
 
 ## Next Actions
 

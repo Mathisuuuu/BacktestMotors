@@ -43,6 +43,7 @@ nature :
 |---|---|
 | Deux granularites du MEME symbole | **leve** : `data[].alias` publie la serie sous un nom distinct, et `panel.allow_mixed_granularity` autorise le melange. Causalite verifiee par `tests/adversarial/test_multi_timeframe_closure.py` |
 | Taille fonction d'un signal | **leve** : `sizing.kind: "signal"` prend un noeud quelconque, avec un `max_contracts` obligatoire |
+| Ordres autres qu'au marche | **leve** : `entry_limit` et `entry_stop` dans `rules`. Lire la semantique ci-dessous AVANT de s'en servir |
 | Optimisation de parametres | **debout, par decision** : hors perimetre declare du runner ([[Failed Ideas/ledger]]) |
 | Noeud a memoire entre barres | **debout, par decision** : casserait la reproductibilite bit-a-bit |
 | Primitive vraiment nouvelle | ~30 lignes de Python et un enregistrement `@1` |
@@ -53,6 +54,49 @@ des garanties. Les lever couterait ce que le depot protege.
 Astuce utile : `rolling` n'offre que l'EMA (`alpha = 2/(w+1)`), pas le lissage
 de Wilder (`alpha = 1/n`). Les deux coincident pour `w = 2n - 1` - l'amorce
 differe, les series convergent.
+
+## Type d'ordre a l'entree : `entry_limit` et `entry_stop`
+
+Deux cles de plus dans `rules`, chacune un noeud qui donne un PRIX :
+
+```json
+"entry_limit": { "type": "arith", "op": "-",
+                 "left":  { "type": "price", "field": "close" },
+                 "right": { "type": "primitive", "ref": "atr@1", "params": { "window": 20 } } }
+```
+
+Les deux sont exclusives - un ordre a un seul type. Aucune des deux : ordre au
+marche, comme avant, donc aucune specification existante ne change de sens.
+
+### La semantique surprend, et il faut la connaitre
+
+**Un ordre a limite vaut pour la SEULE barre d'execution.** S'il n'est pas
+touche, l'entree est abandonnee. Ce n'est PAS un ordre au carnet qui attendrait
+plusieurs barres.
+
+Mesure sur ES quotidien, limite posee a une ATR sous la cloture :
+
+| Type d'entree | Trades |
+|---|---|
+| marche | 18 |
+| limite a 1 ATR sous la cloture | **1** |
+| stop a 1 ATR au-dessus | **0** |
+
+Dix-sept entrees sur dix-neuf sont abandonnees, et cela se lit :
+`n_orders_cancelled_unfilled: 17` pour `n_orders_submitted: 19` dans les
+compteurs du rapport. Rien n'est silencieux, mais rien ne previent non plus -
+d'ou ce paragraphe.
+
+Deuxieme regle a connaitre : **un gap remplit a l'OUVERTURE, jamais au niveau
+demande** (`execution.py`). C'est la direction defavorable, et la seule
+realiste.
+
+Troisieme : si le signal de prix est **indefini** a cette barre, l'entree est
+abandonnee - elle ne retombe pas sur un ordre au marche. Retomber changerait
+silencieusement le type d'ordre au moment ou l'on en sait le moins.
+
+La SORTIE reste au marche : `stop_loss` et `take_profit`, attaches a l'ordre
+d'entree, couvrent deja le besoin.
 
 ## Multi-timeframe : comment le declarer
 

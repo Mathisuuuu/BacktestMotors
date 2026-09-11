@@ -26,7 +26,7 @@ from dataclasses import dataclass, field
 from pydantic import Field as PydField
 
 from rsl.data.feed import Context, MultiContext
-from rsl.engine.orders import Fill, Order, Side
+from rsl.engine.orders import Fill, Order, OrderType, Side
 from rsl.errors import ConfigurationError
 from rsl.strategies.base import (
     CrossSectionalStrategy,
@@ -66,6 +66,8 @@ class RuleStrategy(Strategy):
     exit_short: Signal | None = None
     stop_loss: Signal | None = None
     take_profit: Signal | None = None
+    entry_limit: Signal | None = None
+    entry_stop: Signal | None = None
     allow_pyramiding: bool = False
     extra_warmup: int = 0
     _position: int = field(default=0, init=False, repr=False)
@@ -75,6 +77,11 @@ class RuleStrategy(Strategy):
             raise ConfigurationError(f"quantity doit etre > 0, recu {self.quantity}")
         if self.extra_warmup < 0:
             raise ConfigurationError(f"extra_warmup doit etre >= 0, recu {self.extra_warmup}")
+        if self.entry_limit is not None and self.entry_stop is not None:
+            raise ConfigurationError(
+                "`entry_limit` et `entry_stop` sont exclusifs : un ordre a un seul "
+                "type. Choisir d'entrer sur repli (limite) OU sur cassure (stop)."
+            )
         if self.entry_long is None and self.entry_short is None:
             raise ConfigurationError(
                 "une strategie sans entree longue ni entree courte ne peut rien faire. "
@@ -94,6 +101,8 @@ class RuleStrategy(Strategy):
                 self.exit_short,
                 self.stop_loss,
                 self.take_profit,
+                self.entry_limit,
+                self.entry_stop,
             )
             if s is not None
         ]
@@ -116,10 +125,13 @@ class RuleStrategy(Strategy):
 
         projected = self._position + sum(o.signed_quantity for o in orders)
 
+        entree: Order | None = None
         if self._can_open(projected, Side.BUY) and self._fires(self.entry_long, ctx):
-            orders.append(self._open(Side.BUY, ctx, "entry_long"))
+            entree = self._open(Side.BUY, ctx, "entry_long")
         elif self._can_open(projected, Side.SELL) and self._fires(self.entry_short, ctx):
-            orders.append(self._open(Side.SELL, ctx, "entry_short"))
+            entree = self._open(Side.SELL, ctx, "entry_short")
+        if entree is not None:
+            orders.append(entree)
 
         return orders
 
@@ -139,6 +151,8 @@ class RuleStrategy(Strategy):
                     ("exit_short", self.exit_short),
                     ("stop_loss", self.stop_loss),
                     ("take_profit", self.take_profit),
+                    ("entry_limit", self.entry_limit),
+                    ("entry_stop", self.entry_stop),
                 )
             },
         }
@@ -167,6 +181,8 @@ class RuleStrategy(Strategy):
             exit_long=node("exit_long"),
             entry_short=node("entry_short"),
             exit_short=node("exit_short"),
+            entry_limit=node("entry_limit"),
+            entry_stop=node("entry_stop"),
             stop_loss=node("stop_loss"),
             take_profit=node("take_profit"),
             allow_pyramiding=bool(spec.get("allow_pyramiding", False)),
@@ -198,11 +214,37 @@ class RuleStrategy(Strategy):
             tag=tag,
         )
 
-    def _open(self, side: Side, ctx: Context, tag: str) -> Order:
+    def _open(self, side: Side, ctx: Context, tag: str) -> Order | None:
+        """Ordre d'entree, ou `None` si son prix ne peut pas etre calcule.
+
+        Un `entry_limit` declare dont le signal est indefini a cette barre ne
+        donne PAS un ordre au marche : ce serait changer silencieusement le
+        type d'ordre, donc le comportement. L'entree est simplement abandonnee,
+        conformement a la regle du socle - « je ne sais pas » n'est pas une
+        raison d'agir.
+        """
+        order_type = OrderType.MARKET
+        limit_price: float | None = None
+        stop_price: float | None = None
+
+        if self.entry_limit is not None:
+            limit_price = self._level(self.entry_limit, ctx)
+            if limit_price is None:
+                return None
+            order_type = OrderType.LIMIT
+        elif self.entry_stop is not None:
+            stop_price = self._level(self.entry_stop, ctx)
+            if stop_price is None:
+                return None
+            order_type = OrderType.STOP
+
         return Order(
             symbol=self.symbol,
             side=side,
             quantity=self.quantity,
+            order_type=order_type,
+            limit_price=limit_price,
+            stop_price=stop_price,
             stop_loss=self._level(self.stop_loss, ctx),
             take_profit=self._level(self.take_profit, ctx),
             tag=tag,

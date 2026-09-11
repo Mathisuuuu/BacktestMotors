@@ -270,3 +270,26 @@ mypy. Les empreintes des trois exemples sont identiques avant et apres
 correction, ce qui le verifie plutot que de l'affirmer.
 
 Fonde sur [[lessons]] L5 · [[Failed Ideas/ledger]] · [[reference/donnees]]
+
+## L13 -- Une capacite implementee mais inatteignable ne se signale nulle part
+
+`OrderType.LIMIT` et `OrderType.STOP` etaient entierement implementes dans
+`execution.py` : declenchement, traitement du gap, regle de slippage propre a
+chaque type, compteurs dedies. Et aucun moule de strategie ne les emettait.
+`grep order_type src/rsl/strategies/` rendait le vide. La capacite existait,
+personne ne pouvait l'atteindre depuis une specification, et rien - ni test, ni
+avertissement, ni schema - ne le disait.
+
+Un defaut de ce genre n'apparait pas dans les outils : le code est teste, typé,
+lint-propre. Il n'est pas faux, il est **inaccessible**. C'est pourquoi les
+trois questions « est-ce que ca marche ? », « est-ce que c'est juste ? » et
+« est-ce qu'on peut s'en servir ? » ne se repondent pas avec les memes moyens.
+
+**Consequence operationnelle :** quand on demande ou est la frontiere de ce
+qu'on sait faire, comparer ce que le MOTEUR accepte a ce que le VOCABULAIRE
+sait produire - pas lire la documentation, qui decrit l'intention. Concretement
+ici : les valeurs d'un enum du moteur contre les occurrences de cet enum dans
+`strategies/`. Trois autres ecarts du meme genre ont ete trouves de cette
+facon le meme jour (sortie partielle, un seul symbole par moule a regles).
+
+Fonde sur [[reference/vocabulaire-signaux]] · [[log]] (2026-09-11)

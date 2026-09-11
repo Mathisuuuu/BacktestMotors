@@ -13,3 +13,8 @@ runs/
 
 # Racine des donnees propre a chaque machine. Motif ANCRE : voir lecon L5.
 /.env
+
+# Etat d'interface local d'Obsidian : panneaux ouverts, taille de fenetre.
+# Change a chaque ouverture et entre en conflit entre machines. Les AUTRES
+# fichiers de .obsidian/ sont versionnes : ce sont des reglages partages.
+/.obsidian/workspace.json

@@ -6,7 +6,7 @@ import pytest
 
 from fixtures import synthetic
 from rsl.data.feed import BarContext
-from rsl.data.schema import BarStore
+from rsl.data.schema import BarStore, Field
 from rsl.engine.orders import Fill, Order, OrderType, Side
 from rsl.errors import ConfigurationError, RegistryError
 from rsl.strategies.base import (
@@ -21,12 +21,15 @@ from rsl.strategies.base import (
 )
 from rsl.strategies.rules import FlatStrategy, RuleStrategy
 from rsl.strategies.signals import (
+    TRUE,
     Arith,
     ArithOp,
     Compare,
     CompareOp,
     CrossesAbove,
     CrossesBelow,
+    Rolling,
+    RollingStat,
     const,
     price,
     prim,
@@ -341,3 +344,112 @@ class TestStrategyRegistry:
 
     def test_no_params_model_accepts_empty(self):
         assert NoStrategyParams().model_dump() == {}
+
+
+class TestTypeDOrdreALEntree:
+    """`entry_limit` et `entry_stop` : le moteur savait deja, le vocabulaire non.
+
+    Semantique a connaitre, et elle surprend : un ordre a limite vaut pour la
+    SEULE barre d'execution. S'il n'est pas touche, l'entree est abandonnee et
+    comptee dans `n_orders_cancelled_unfilled`. Ce n'est pas un ordre au
+    carnet qui attendrait plusieurs barres.
+    """
+
+    def barre_declenchante(self) -> BarContext:
+        store = synthetic.make_store(synthetic.ramp(60, 100.0, 1.0))
+        ctx = BarContext(store)
+        for _ in range(40):
+            ctx._advance()
+        return ctx
+
+    def ordres(self, **overrides: object) -> list[Order]:
+        """Entree TOUJOURS vraie : ce qui est teste ici est le type d'ordre, pas
+        le declenchement. Dependre d'un croisement ferait echouer ces tests pour
+        une raison sans rapport avec ce qu'ils gardent."""
+        params: dict[str, object] = {
+            "symbol": "SYNTH.v.0", "quantity": 1, "entry_long": const(TRUE),
+        }
+        params.update(overrides)
+        strategie = RuleStrategy(**params)  # type: ignore[arg-type]
+        return list(strategie.on_bar(self.barre_declenchante()))
+
+    def test_sans_rien_declarer_l_ordre_reste_au_marche(self):
+        """Retrocompatibilite : aucune specification existante ne change."""
+        (ordre,) = self.ordres()
+        assert ordre.order_type is OrderType.MARKET
+        assert ordre.limit_price is None and ordre.stop_price is None
+
+    def test_entry_limit_produit_un_ordre_a_limite(self):
+        (ordre,) = self.ordres(entry_limit=const(123.5))
+        assert ordre.order_type is OrderType.LIMIT
+        assert ordre.limit_price == pytest.approx(123.5)
+        assert ordre.stop_price is None
+
+    def test_entry_stop_produit_un_ordre_a_seuil(self):
+        (ordre,) = self.ordres(entry_stop=const(150.0))
+        assert ordre.order_type is OrderType.STOP
+        assert ordre.stop_price == pytest.approx(150.0)
+        assert ordre.limit_price is None
+
+    def test_le_prix_vient_d_une_expression_pas_d_une_constante(self):
+        """C'est tout l'interet : « une ATR sous la cloture » s'ecrit."""
+        niveau = Arith(price("close"), ArithOp.SUB, prim("atr@1", window=5))
+        (ordre,) = self.ordres(entry_limit=niveau)
+        assert ordre.order_type is OrderType.LIMIT
+        assert ordre.limit_price is not None
+        assert ordre.limit_price < self.barre_declenchante().value(Field.CLOSE)
+
+    def test_les_deux_ensemble_sont_refuses(self):
+        """Un ordre a un seul type : repli OU cassure, pas les deux."""
+        with pytest.raises(ConfigurationError, match="exclusifs"):
+            RuleStrategy(symbol="X", quantity=1, entry_long=const(TRUE),
+                         entry_limit=const(1.0), entry_stop=const(2.0))
+
+    def test_un_prix_indefini_abandonne_l_entree(self):
+        """Le point delicat : il ne FAUT PAS retomber sur un ordre au marche.
+
+        Ce serait changer silencieusement le type d'ordre, donc le
+        comportement, au moment ou l'on en sait le moins.
+        """
+        indefini = Rolling(RollingStat.MEAN, 5000, price("close"))
+        assert self.ordres(entry_limit=indefini) == []
+
+    def test_une_sortie_reste_au_marche_et_reduce_only(self):
+        """Le type d'ordre ne concerne que l'ENTREE : `stop_loss` et
+        `take_profit` couvrent deja la sortie, attaches a l'ordre."""
+        strategie = RuleStrategy(
+            symbol="SYNTH.v.0", quantity=1, entry_long=const(TRUE),
+            exit_long=const(TRUE), entry_limit=const(90.0),
+        )
+        strategie.on_fill(fill_for(
+            Order(symbol="SYNTH.v.0", side=Side.BUY, quantity=1)
+        ))
+        sorties = [o for o in strategie.on_bar(self.barre_declenchante())
+                   if o.reduce_only]
+        assert sorties, "la sortie doit etre emise"
+        for ordre in sorties:
+            assert ordre.order_type is OrderType.MARKET
+
+    def test_le_warmup_couvre_le_signal_de_prix(self):
+        strategie = RuleStrategy(
+            symbol="X", quantity=1, entry_long=const(TRUE),
+            entry_limit=Rolling(RollingStat.MEAN, 120, price("close")),
+        )
+        assert strategie.warmup_bars >= 120
+
+    def test_aller_retour_declaratif(self):
+        strategie = RuleStrategy(symbol="SYNTH.v.0", quantity=1,
+                                 entry_long=const(TRUE), entry_stop=const(42.0))
+        decrit = strategie.describe()
+        assert decrit["rules"]["entry_stop"] == {"type": "constant", "version": 1,
+                                                 "value": 42.0}
+        reconstruit = RuleStrategy.from_spec({
+            "symbol": "SYNTH.v.0", "quantity": 1,
+            "rules": {
+                "entry_long": {"type": "constant", "value": 1.0},
+                "entry_stop": {"type": "constant", "value": 42.0},
+            },
+        })
+        (ordre,) = reconstruit.on_bar(self.barre_declenchante())
+        assert ordre.order_type is OrderType.STOP
+        assert ordre.stop_price == pytest.approx(42.0)

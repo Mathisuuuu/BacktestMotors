@@ -5,35 +5,56 @@
   "showAttachments": false,
   "hideUnresolved": false,
   "showOrphans": true,
-  "collapse-color-groups": false,
+  "collapse-color-groups": true,
   "colorGroups": [
     {
       "query": "path:\"wiki/Failed Ideas\"",
-      "color": { "a": 1, "rgb": 5970458 }
+      "color": {
+        "a": 1,
+        "rgb": 5970458
+      }
     },
     {
       "query": "path:\"wiki/experiments\"",
-      "color": { "a": 1, "rgb": 14722136 }
+      "color": {
+        "a": 1,
+        "rgb": 14722136
+      }
     },
     {
       "query": "path:\"wiki/concepts\"",
-      "color": { "a": 1, "rgb": 4955347 }
+      "color": {
+        "a": 1,
+        "rgb": 4955347
+      }
     },
     {
       "query": "path:\"wiki/research\"",
-      "color": { "a": 1, "rgb": 10187471 }
+      "color": {
+        "a": 1,
+        "rgb": 10187471
+      }
     },
     {
       "query": "path:\"wiki/reference\"",
-      "color": { "a": 1, "rgb": 4172139 }
+      "color": {
+        "a": 1,
+        "rgb": 4172139
+      }
     },
     {
       "query": "path:\"wiki/\" -path:\"wiki/Failed Ideas\" -path:\"wiki/experiments\" -path:\"wiki/concepts\" -path:\"wiki/research\" -path:\"wiki/reference\"",
-      "color": { "a": 1, "rgb": 13225169 }
+      "color": {
+        "a": 1,
+        "rgb": 13225169
+      }
     },
     {
       "query": "-path:\"wiki/\"",
-      "color": { "a": 1, "rgb": 8028808 }
+      "color": {
+        "a": 1,
+        "rgb": 8028808
+      }
     }
   ],
   "collapse-display": true,
@@ -46,6 +67,6 @@
   "repelStrength": 11,
   "linkStrength": 0.8,
   "linkDistance": 250,
-  "scale": 1,
+  "scale": 0.16459222932403397,
   "close": false
 }

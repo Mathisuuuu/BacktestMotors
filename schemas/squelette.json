@@ -5,7 +5,9 @@
     "entry_short",
     "exit_short",
     "stop_loss",
-    "take_profit"
+    "take_profit",
+    "entry_limit",
+    "entry_stop"
   ],
   "contraintes": [
     "Un meme instrument ne peut apparaitre qu'une fois dans `data` : deux",
