@@ -133,7 +133,22 @@ def _build_parser() -> argparse.ArgumentParser:
     run.add_argument("config", type=Path)
     run.add_argument("--out", type=Path, help="ecrit le rapport JSON dans ce fichier")
     run.add_argument("--json", action="store_true", help="affiche le rapport JSON")
+    run.add_argument(
+        "--gui",
+        action="store_true",
+        help="ouvre le tableau de bord a la fin du run",
+    )
     run.set_defaults(handler=_cmd_run)
+
+    gui = sub.add_parser("gui", help="tableau de bord graphique des resultats")
+    gui.add_argument(
+        "config",
+        type=Path,
+        nargs="?",
+        help="specification a executer au demarrage. Sans elle, la fenetre "
+        "s'ouvre vide et propose de charger un JSON.",
+    )
+    gui.set_defaults(handler=_cmd_gui)
 
     walk = sub.add_parser(
         "walkforward", help="evalue la strategie par fenetres successives"
@@ -284,6 +299,24 @@ def _cmd_run(args: argparse.Namespace) -> int:
     spec = _load_spec(args.config)
     report = run_backtest(spec)
     _emit(report, as_json=args.json, out=args.out)
+    if args.gui:
+        # Import tardif : tkinter peut manquer sur une machine sans interface,
+        # et `rsl run` sans `--gui` doit continuer d'y fonctionner.
+        from rsl.gui.app import launch
+
+        launch(config=args.config)
+    return EXIT_OK
+
+
+def _cmd_gui(args: argparse.Namespace) -> int:
+    """Ouvre le tableau de bord. Le run, s'il y en a un, est lance par la fenetre."""
+    try:
+        from rsl.gui.app import launch
+    except ImportError as erreur:  # pragma: no cover - depend de l'installation
+        print(f"interface graphique indisponible : {erreur}", file=sys.stderr)
+        return EXIT_ERROR
+
+    launch(config=args.config)
     return EXIT_OK
 
 

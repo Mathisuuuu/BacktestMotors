@@ -16,6 +16,12 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+gui = [
+    # Tableau de bord uniquement. Le moteur n'en depend pas, et le manifeste de
+    # run n'enregistre donc pas sa version : un rapport reste comparable entre
+    # une machine qui a l'interface et une machine qui ne l'a pas.
+    "matplotlib>=3.8",
+]
 dev = [
     "pytest>=8",
     "hypothesis>=6.100",
@@ -65,3 +71,10 @@ disallow_any_generics = true
 mypy_path = "src"
 packages = ["rsl"]
 
+# matplotlib n'est pas entierement typee en amont : `FigureCanvasTkAgg`,
+# `get_tk_widget` et `draw_idle` sont des fonctions sans annotations. L'exception
+# est confinee au SEUL module qui les appelle - tout le reste du depot, y compris
+# `rsl.gui.model` ou se font tous les calculs, garde `strict` entier.
+[[tool.mypy.overrides]]
+module = "rsl.gui.charts"
+disallow_untyped_calls = false

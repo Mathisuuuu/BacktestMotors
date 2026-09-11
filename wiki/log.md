@@ -65,3 +65,13 @@ grep "^## \[" wiki/log.md | tail -5
 ## [2026-09-11] note | correction de l'entree `fix` ci-dessus (log append-only : on corrige par ajout) | `src/rsl/env.py` fait 128 lignes et non 103 -- le chiffre notait l'etat avant le durcissement (borne de depot + encodages) ; le nombre de tests ajoutes est 25
 
 ## [2026-09-11] note | correction finale des chiffres de `src/rsl/env.py` (les deux entrees precedentes sont fausses toutes les deux) | chiffres verifies : **133 lignes**, **20 fonctions de test** dans `tests/unit/test_env.py` soit **23 tests collectes** (une est parametree sur 4 encodages). Total de la suite : 1180 -> 1203
+
+## [2026-09-11] feat | tableau de bord graphique `rsl gui` : indicateurs, filtres annee/long/short, courbes capital et drawdown, carnet d'ordres, export CSV/TXT | tkinter + matplotlib en extra `gui` ; 3 modules (`model` 400 l., `charts`, `app`), 37 tests ajoutes, suite a 1240 ; noir et blanc strict, chrome Windows 95
+
+## [2026-09-11] fix | couture `run_backtest_detailed` ajoutee a `report.py` | le rapport ne porte ni fills ni equity ni trades, seulement leurs agregats ; la rendre par une seconde fonction evite de rejouer le run pour l'afficher. Refactor pur : les 4 empreintes d'exemple sont inchangees
+
+## [2026-09-11] decision | matplotlib declaree en dependance OPTIONNELLE, pas en dependance du projet | `TRACKED_DEPENDENCIES` ne l'enregistre pas : un rapport produit sur une machine avec interface reste comparable a un rapport produit sans. `rsl gui` sans matplotlib rend 1 avec un message, aucune autre commande n'est touchee
+
+## [2026-09-11] note | defaut trouve puis verrouille : l'axe des dates annoncait 2010-2040 pour des donnees 2017-2026 | matplotlib ajoute 5 % de marge et peut reautoscaler au redimensionnement ; bornes fixees ET `set_autoscalex_on(False)` ET rejouees sur `<Configure>`. Couvert par `tests/unit/test_gui_charts.py`
+
+## [2026-09-11] note | defaut de mise en page : la barre d'export etait poussee hors de la fenetre par les zones extensibles | empilee en dernier, elle sortait du cadre sans avertissement. Construite avant les zones extensibles et ancree `side="bottom"` ; geometrie verifiee au widget pres (tous les blocs dans les 793 px de la fenetre)

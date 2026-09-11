@@ -19,6 +19,8 @@ autorite: src/rsl/cli.py + README.md
 | `rsl run CONFIG` | execute un backtest, affiche le rapport, ecrit le JSON |
 | `rsl walkforward CONFIG --train N --test N` | fenetres successives |
 | `rsl verify CONFIG` | execute DEUX fois et compare les empreintes |
+| `rsl gui [CONFIG]` | tableau de bord graphique — voir [[reference/tableau-de-bord]] |
+| `rsl run CONFIG --gui` | run ordinaire, puis ouverture du tableau de bord |
 
 ## Codes de sortie — a lire avant de scripter
 
@@ -53,6 +55,12 @@ python -m venv .venv
 
 ```bash
 .venv/Scripts/python.exe -m pip install -e ".[dev]"
+```
+
+L'interface graphique est un extra distinct — le moteur n'en depend pas :
+
+```bash
+.venv/Scripts/python.exe -m pip install -e ".[gui]"
 ```
 
 ```bash

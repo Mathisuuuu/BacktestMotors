@@ -137,3 +137,28 @@ forme canonique d'un chemin relatif est normalisee en `/` pour cette raison
 precise : sans cela, Windows hacherait `indices\ES` et Linux `indices/ES`.
 
 Fonde sur [[reference/donnees]] · [[concepts/determinisme]] · [[reference/cli]]
+
+## L8 -- Filtrer un resultat produit un chiffre nouveau, pas le meme chiffre restreint
+
+Un tableau de bord invite a cliquer « longs seulement » et a lire le Sharpe qui
+s'affiche comme s'il repondait a « et sans les shorts, ca donnait quoi ? ». Il
+n'y repond pas. Les shorts ont occupe du capital et de la marge pendant tout le
+run ; une courbe « longs seulement » n'a jamais ete vecue, elle est fabriquee
+apres coup en n'accumulant que le P&L des trades retenus.
+
+Ce qu'un filtre mesure vraiment : **la contribution de ce sous-ensemble au
+resultat observe**. Ce qu'il ne mesure pas : le resultat qu'aurait donne une
+strategie qui ne prend que ces trades — pour l'obtenir il faut lancer un autre
+backtest, donc consommer un essai de plus ([[lessons]] L2).
+
+**Consequence operationnelle :** une interface qui filtre doit dire en
+permanence dans quel regime elle est. `rsl gui` affiche `COURBE MESUREE` ou
+`COURBE RECONSTRUITE` a cote des filtres, et l'export texte recopie
+l'avertissement. C'est la meme regle que L3 : ce qui ne peut pas etre ferme par
+du code doit etre rendu **visible**, pas passe sous silence.
+
+Corollaire de mise en oeuvre : sans aucun filtre, le tableau de bord ne
+recalcule rien - il recopie `metrics.sharpe` du moteur, et un test compare les
+deux. Un affichage qui reimplemente un calcul finit par en diverger.
+
+Fonde sur [[reference/tableau-de-bord]] · [[lessons]] L1 · [[lessons]] L3

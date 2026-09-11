@@ -151,6 +151,25 @@ class BacktestReport:
 def run_backtest(spec: BacktestSpec, *, trial_log: TrialLog | None = None) -> BacktestReport:
     """Execute une specification et produit son rapport.
 
+    Enveloppe de `run_backtest_detailed` : la plupart des appelants n'ont que
+    faire du `RunResult` brut.
+    """
+    report, _result = run_backtest_detailed(spec, trial_log=trial_log)
+    return report
+
+
+def run_backtest_detailed(
+    spec: BacktestSpec, *, trial_log: TrialLog | None = None
+) -> tuple[BacktestReport, AnyRunResult]:
+    """Comme `run_backtest`, mais rend AUSSI le resultat brut du runner.
+
+    Le rapport ne porte ni les fills, ni la courbe d'equity, ni les trades
+    fermes : il porte leurs agregats. Un tableau de bord a besoin des trois.
+    Les rendre par une seconde fonction evite a l'appelant de rejouer le run -
+    deux executions donneraient la meme empreinte, mais couteraient le double
+    et ouvriraient la porte a ce que l'affichage montre un run different de
+    celui qui a ete rapporte.
+
     `trial_log` porte le compteur d'essais du Deflated Sharpe. Sans lui, le run
     est traite comme un essai unique - ce qui est vrai pour un run isole, et
     faux des qu'on explore. Le DSR emet alors son avertissement plutot que de
@@ -188,7 +207,7 @@ def run_backtest(spec: BacktestSpec, *, trial_log: TrialLog | None = None) -> Ba
         else None
     )
 
-    return BacktestReport(
+    report = BacktestReport(
         spec=spec,
         manifest=manifest,
         metrics=metrics,
@@ -198,6 +217,7 @@ def run_backtest(spec: BacktestSpec, *, trial_log: TrialLog | None = None) -> Ba
         symbols=symbols,
         cross_sectional=entry.cross_sectional,
     )
+    return report, result
 
 
 def execute_run(

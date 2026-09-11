@@ -16,18 +16,18 @@ generated: true
 
 | Indicateur | Valeur |
 |---|---|
-| Pages de wiki | 20 |
-| Entrees de log | 20 |
+| Pages de wiki | 21 |
+| Entrees de log | 25 |
 | Derniere activite | 2026-09-11 |
 | Idees ecartees (ledger) | 8 |
 | Idees en attente (ledger) | 3 |
 | Pages `Failed Ideas/` | 1 |
 | Pages `concepts/` | 6 |
 | Pages `experiments/` | 3 |
-| Pages `reference/` | 5 |
+| Pages `reference/` | 6 |
 | Pages `research/` | 1 |
 
-**Activite par type :** note × 12, fix × 5, setup × 1, lint × 1, experiment × 1
+**Activite par type :** note × 14, fix × 6, setup × 1, lint × 1, experiment × 1, feat × 1, decision × 1
 
 ## Experiences
 
@@ -41,14 +41,14 @@ Le total des essais alimente le Deflated Sharpe : un essai non enregistre gonfle
 
 ## Derniere activite — 8 entree(s)
 
+- **2026-09-11** — note | defaut de mise en page : la barre d'export etait poussee hors de la fenetre par les zones extensibles | empilee en dernier, elle sortait du cadre sans avertissement. Construite avant les zones extensibles et ancree `side="bottom"` ; geometrie verifiee au widget pres (tous les blocs dans les 793 px de la fenetre)
+- **2026-09-11** — note | defaut trouve puis verrouille : l'axe des dates annoncait 2010-2040 pour des donnees 2017-2026 | matplotlib ajoute 5 % de marge et peut reautoscaler au redimensionnement ; bornes fixees ET `set_autoscalex_on(False)` ET rejouees sur `<Configure>`. Couvert par `tests/unit/test_gui_charts.py`
+- **2026-09-11** — decision | matplotlib declaree en dependance OPTIONNELLE, pas en dependance du projet | `TRACKED_DEPENDENCIES` ne l'enregistre pas : un rapport produit sur une machine avec interface reste comparable a un rapport produit sans. `rsl gui` sans matplotlib rend 1 avec un message, aucune autre commande n'est touchee
+- **2026-09-11** — fix | couture `run_backtest_detailed` ajoutee a `report.py` | le rapport ne porte ni fills ni equity ni trades, seulement leurs agregats ; la rendre par une seconde fonction evite de rejouer le run pour l'afficher. Refactor pur : les 4 empreintes d'exemple sont inchangees
+- **2026-09-11** — feat | tableau de bord graphique `rsl gui` : indicateurs, filtres annee/long/short, courbes capital et drawdown, carnet d'ordres, export CSV/TXT | tkinter + matplotlib en extra `gui` ; 3 modules (`model` 400 l., `charts`, `app`), 37 tests ajoutes, suite a 1240 ; noir et blanc strict, chrome Windows 95
 - **2026-09-11** — note | correction finale des chiffres de `src/rsl/env.py` (les deux entrees precedentes sont fausses toutes les deux) | chiffres verifies : **133 lignes**, **20 fonctions de test** dans `tests/unit/test_env.py` soit **23 tests collectes** (une est parametree sur 4 encodages). Total de la suite : 1180 -> 1203
 - **2026-09-11** — note | correction de l'entree `fix` ci-dessus (log append-only : on corrige par ajout) | `src/rsl/env.py` fait 128 lignes et non 103 -- le chiffre notait l'etat avant le durcissement (borne de depot + encodages) ; le nombre de tests ajoutes est 25
 - **2026-09-11** — note | P6 (`all(())` vaut `True`) est MASQUE, pas corrige | le test `test_missing_data_sources_are_flagged` passe desormais uniquement parce que l'arbre de travail est sale, ce qui met `git.is_reproducible` a `False`. Il redeviendra rouge au prochain commit propre
-- **2026-09-11** — note | question « peut-on creer une strategie sans une ligne de code » : verifie au shell | OUI dans le vocabulaire (13 primitives x 15 noeuds composables, 3 moules) ; NON au-dela : une primitive ou un type de noeud absent est refuse avec rc=1 et l'enumeration de ce qui existe. Ecrire l'un des deux demande du Python et un enregistrement `@1`
-- **2026-09-11** — experiment | rsi-survendu-hors-lundi | `non-conclusif` : Sharpe 0,46 sur 2732 barres, 49 trades, 54 % du resultat dans un pli sur neuf ; le filtre calendaire n'a pas de temoin. Essai fait comme preuve qu'une strategie neuve s'ecrit en JSON seul -- compte quand meme au compteur (L2)
-- **2026-09-11** — note | durcissement trouve par un test que j'ecrivais : la remontee vers le `.env` sortait du depot | elle atteignait `C:\Users\Mathis\.env` (118 o, UTF-16), etranger au projet. Bornee aux marqueurs `.git` / `pyproject.toml`, et lecture UTF-8/UTF-16/CP1252 (PowerShell 5.1 redirige en UTF-16)
-- **2026-09-11** — fix | chemins de donnees rendus portables : `RSL_DATA_DIR` + `.env`, et `config_hash` debarrasse du chemin absolu | nouveau `src/rsl/env.py` (103 l., zero dependance) ; 15 chemins absolus retires de `examples/` et `cli.py` ; 25 tests ajoutes ; les 4 empreintes de resultat sont INCHANGEES, seul le `config_hash` bouge -> voir [[lessons]] L7
-- **2026-09-11** — note | defaut trouve sur `rsl schema` redirige : sortie en CP1252, pas en UTF-8 | `ensure_ascii=False` + stdout Windows ; le `§` sort en octet 0xA7, le fichier est illisible en UTF-8. `--out` ecrit correctement en UTF-8 : le defaut ne touche que la redirection `>`
 
 ## Next Actions
 
