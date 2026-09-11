@@ -87,3 +87,5 @@ grep "^## \[" wiki/log.md | tail -5
 ## [2026-09-11] note | correction de l'entree `feat` ci-dessus (log append-only : on corrige par ajout) | le compte exact est **1263 tests**, pas 1275
 
 ## [2026-09-11] fix | deux tests de graphiques se sautaient en silence ("aucun affichage disponible") alors que Tk fonctionnait | creer puis detruire une racine `Tk()` par test echoue par intermittence sur les derniers. Fixture passee en portee `module` : une seule racine partagee, 3 executions consecutives sans saut
+
+## [2026-09-11] note | gabarit de specification ajoute : `examples/_moule.json` | tous les blocs d'une specification plus une strategie `rules@1` complete (entree composee, sortie a deux conditions, stop ATR, objectif ATR). Verifie en l'executant : 18 trades, Sharpe 0,39, empreinte 58a9d31a2dae3658. **Cette execution consomme un essai** au sens de [[lessons]] L2 -- a promouvoir en page d'experience si le chiffre est conserve

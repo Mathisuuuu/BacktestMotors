@@ -17,7 +17,7 @@ generated: true
 | Indicateur | Valeur |
 |---|---|
 | Pages de wiki | 21 |
-| Entrees de log | 31 |
+| Entrees de log | 32 |
 | Derniere activite | 2026-09-11 |
 | Idees ecartees (ledger) | 8 |
 | Idees en attente (ledger) | 3 |
@@ -27,7 +27,7 @@ generated: true
 | Pages `reference/` | 6 |
 | Pages `research/` | 1 |
 
-**Activite par type :** note × 17, fix × 7, feat × 2, decision × 2, setup × 1, lint × 1, experiment × 1
+**Activite par type :** note × 18, fix × 7, feat × 2, decision × 2, setup × 1, lint × 1, experiment × 1
 
 ## Experiences
 
@@ -41,6 +41,7 @@ Le total des essais alimente le Deflated Sharpe : un essai non enregistre gonfle
 
 ## Derniere activite — 8 entree(s)
 
+- **2026-09-11** — note | gabarit de specification ajoute : `examples/_moule.json` | tous les blocs d'une specification plus une strategie `rules@1` complete (entree composee, sortie a deux conditions, stop ATR, objectif ATR). Verifie en l'executant : 18 trades, Sharpe 0,39, empreinte 58a9d31a2dae3658. **Cette execution consomme un essai** au sens de [[lessons]] L2 -- a promouvoir en page d'experience si le chiffre est conserve
 - **2026-09-11** — fix | deux tests de graphiques se sautaient en silence ("aucun affichage disponible") alors que Tk fonctionnait | creer puis detruire une racine `Tk()` par test echoue par intermittence sur les derniers. Fixture passee en portee `module` : une seule racine partagee, 3 executions consecutives sans saut
 - **2026-09-11** — note | correction de l'entree `feat` ci-dessus (log append-only : on corrige par ajout) | le compte exact est **1263 tests**, pas 1275
 - **2026-09-11** — decision | `mplfinance` ecarte pour les bougies | exigerait pandas, dont le rejet figure au ledger. Le motif du rejet vise la couche donnees et non l'affichage, mais une `LineCollection` plus un `bar` suffisent : pas de raison d'ouvrir le debat pour un graphique
@@ -48,7 +49,6 @@ Le total des essais alimente le Deflated Sharpe : un essai non enregistre gonfle
 - **2026-09-11** — note | defaut trouve et verrouille : l'echelle des prix restait figee au zoom | `Axes.clear()` reinitialise le registre de callbacks de matplotlib, donc le `xlim_changed` connecte a la construction ne survivait pas au premier redessin. Remplace par un point d'extension explicite `_apres_fenetre()` -> voir [[lessons]] L9
 - **2026-09-11** — feat | tableau de bord refondu : 4 onglets, style plat blanc, vert/rouge porteurs de sens, onglet PRIX & ORDRES avec bougies et ordres, duree moyenne en position | style Windows 95 abandonne sur demande ; `RunArtifacts` remplace le tuple rendu par `run_backtest_detailed` pour transporter aussi les barres servies au moteur ; suite a 1275 tests
 - **2026-09-11** — note | defaut de mise en page : la barre d'export etait poussee hors de la fenetre par les zones extensibles | empilee en dernier, elle sortait du cadre sans avertissement. Construite avant les zones extensibles et ancree `side="bottom"` ; geometrie verifiee au widget pres (tous les blocs dans les 793 px de la fenetre)
-- **2026-09-11** — note | defaut trouve puis verrouille : l'axe des dates annoncait 2010-2040 pour des donnees 2017-2026 | matplotlib ajoute 5 % de marge et peut reautoscaler au redimensionnement ; bornes fixees ET `set_autoscalex_on(False)` ET rejouees sur `<Configure>`. Couvert par `tests/unit/test_gui_charts.py`
 
 ## Next Actions
 

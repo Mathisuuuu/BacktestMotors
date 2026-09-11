@@ -1,6 +1,6 @@
 ---
 type: reference
-updated: 2026-09-10
+updated: 2026-09-11
 autorite: schemas/signals.schema.json (engendre, ne pas editer a la main)
 ---
 
@@ -18,6 +18,7 @@ autorite: schemas/signals.schema.json (engendre, ne pas editer a la main)
 | Quelles primitives, quels noeuds, quelles strategies sont enregistres **maintenant** ? | `rsl catalogue` |
 | Comment regenerer les schemas ? | `rsl schema --out schemas/signals.schema.json` |
 | Comment un arbre est-il reconstruit depuis du JSON ? | `build_signal(spec)` dans [src/rsl/strategies/signals.py](../../src/rsl/strategies/signals.py) |
+| Par quoi commencer pour ecrire une strategie ? | [examples/_moule.json](../../examples/_moule.json), a copier puis editer |
 | Ou sont les moules de strategie descriptibles ? | [rules.py](../../src/rsl/strategies/rules.py) · [ranking.py](../../src/rsl/strategies/ranking.py) |
 | Ou branchera le futur compilateur de specifications ? | [src/rsl/pipeline.py](../../src/rsl/pipeline.py) — decrit, sans implementation |
 
@@ -25,6 +26,7 @@ autorite: schemas/signals.schema.json (engendre, ne pas editer a la main)
 
 | Fichier | Ce qu'il montre |
 |---|---|
+| [examples/_moule.json](../../examples/_moule.json) | **le gabarit a copier** : tous les blocs d'une specification, une strategie `rules@1` complete avec entree, sortie, stop et objectif. Tourne tel quel |
 | [examples/sma_es_daily.json](../../examples/sma_es_daily.json) | croisement de moyennes, mono-instrument |
 | [examples/retour_moyenne_dans_tendance.json](../../examples/retour_moyenne_dans_tendance.json) | `rules@1` — strategie ecrite nulle part dans le code |
 | [examples/paire_es_nq.json](../../examples/paire_es_nq.json) | `peer` + `rolling` — paire ES/NQ sur donnees reelles |
