@@ -928,6 +928,11 @@
     "data": {
       "element": {
         "champs": {
+          "alias": {
+            "accepte_null": true,
+            "defaut": null,
+            "type": "texte"
+          },
           "allow_non_positive_prices": {
             "defaut": true,
             "type": "booleen"
@@ -1130,6 +1135,10 @@
           "defaut": "drop",
           "type": "choix"
         },
+        "allow_mixed_granularity": {
+          "defaut": false,
+          "type": "booleen"
+        },
         "max_ffill_bars": {
           "accepte_null": true,
           "defaut": null,
@@ -1139,6 +1148,7 @@
       },
       "defaut": {
         "align_policy": "drop",
+        "allow_mixed_granularity": false,
         "max_ffill_bars": null
       },
       "type": "objet"
@@ -1209,10 +1219,22 @@
                 "fixed",
                 "equity_fraction",
                 "risk_fraction",
-                "vol_target"
+                "vol_target",
+                "signal"
               ],
               "defaut": "none",
               "type": "choix"
+            },
+            "max_contracts": {
+              "accepte_null": true,
+              "defaut": null,
+              "min": 1,
+              "type": "entier"
+            },
+            "signal": {
+              "accepte_null": true,
+              "defaut": null,
+              "type": "objet"
             },
             "vol_max_multiple": {
               "defaut": 4.0,
@@ -1237,6 +1259,8 @@
             "contracts": null,
             "fraction": null,
             "kind": "none",
+            "max_contracts": null,
+            "signal": null,
             "vol_max_multiple": 4.0,
             "vol_target": null,
             "vol_window": 20
@@ -1252,6 +1276,8 @@
           "contracts": null,
           "fraction": null,
           "kind": "none",
+          "max_contracts": null,
+          "signal": null,
           "vol_max_multiple": 4.0,
           "vol_target": null,
           "vol_window": 20

@@ -13,9 +13,10 @@ from fixtures import synthetic
 from rsl.config import SizingSpec
 from rsl.data.feed import BarContext
 from rsl.data.schema import BarStore, InstrumentSpec
-from rsl.engine.risk import RiskFraction, VolatilityTarget
+from rsl.engine.risk import RiskFraction, SignalSizing, VolatilityTarget
 from rsl.errors import ConfigurationError
 from rsl.primitives.registry import bind_primitive
+from rsl.strategies.signals import const, price, rolling
 
 EQUITY = 100_000.0
 
@@ -171,3 +172,73 @@ class TestSpecification:
         """L'ajout d'un mode ne doit pas deplacer les anciens."""
         assert SizingSpec(kind="fixed", contracts=2).build() is not None
         assert SizingSpec(kind="none").build() is None
+
+
+# ---------------------------------------------------------------------------
+# Dimensionnement par EXPRESSION
+# ---------------------------------------------------------------------------
+
+
+class TestSignalSizing:
+    """La taille cesse d'etre un mode fige pour devenir une expression."""
+
+    def ctx(self):
+        return marche(0.01)
+
+    def test_la_taille_est_la_valeur_du_signal(self):
+        regle = SignalSizing(const(7.0), max_contracts=20)
+        assert regle.contracts(self.ctx(), instrument(), EQUITY, 100.0) == 7
+
+    def test_elle_est_tronquee_pas_arrondie(self):
+        """Comme toutes les autres regles : `int()` coupe."""
+        regle = SignalSizing(const(7.9), max_contracts=20)
+        assert regle.contracts(self.ctx(), instrument(), EQUITY, 100.0) == 7
+
+    def test_le_plafond_borne_une_expression_arbitraire(self):
+        """Sans lui, un z-score divise par une volatilite proche de zero
+        produirait une taille absurde."""
+        regle = SignalSizing(const(10_000.0), max_contracts=6)
+        assert regle.contracts(self.ctx(), instrument(), EQUITY, 100.0) == 6
+
+    @pytest.mark.parametrize("valeur", [0.0, -3.0, 0.9])
+    def test_zero_ou_negatif_ne_prend_pas_position(self, valeur):
+        """Le SENS vient des regles d'entree : un signal negatif ne retourne
+        pas la position, il annule la taille."""
+        regle = SignalSizing(const(valeur), max_contracts=20)
+        assert regle.contracts(self.ctx(), instrument(), EQUITY, 100.0) == 0
+
+    def test_un_signal_indefini_rend_zero(self):
+        """Convention du socle : « je ne sais pas » n'est pas une taille."""
+        indefini = rolling("mean", 5000, price("close"))
+        regle = SignalSizing(indefini, max_contracts=20)
+        assert regle.contracts(self.ctx(), instrument(), EQUITY, 100.0) == 0
+
+    def test_le_warmup_est_celui_du_signal(self):
+        regle = SignalSizing(rolling("mean", 30, price("close")), max_contracts=5)
+        assert regle.warmup_bars == 30
+
+    def test_le_plafond_est_obligatoire_et_positif(self):
+        with pytest.raises(ConfigurationError, match="max_contracts"):
+            SignalSizing(const(1.0), max_contracts=0)
+
+    def test_la_specification_exige_le_plafond(self):
+        """Une taille non bornee n'est pas une strategie."""
+        with pytest.raises(ConfigurationError, match="max_contracts"):
+            SizingSpec(kind="signal", signal={"type": "constant", "value": 2.0}).build()
+
+    def test_la_specification_exige_le_signal(self):
+        with pytest.raises(ConfigurationError, match="`signal` est requis"):
+            SizingSpec(kind="signal", max_contracts=5).build()
+
+    def test_la_specification_construit_la_regle(self):
+        spec = SizingSpec(kind="signal", max_contracts=9,
+                          signal={"type": "constant", "value": 4.0})
+        regle = spec.build()
+        assert isinstance(regle, SignalSizing)
+        assert regle.contracts(self.ctx(), instrument(), EQUITY, 100.0) == 4
+
+    def test_le_descripteur_porte_l_arbre(self):
+        regle = SignalSizing(const(3.0), max_contracts=5)
+        decrit = regle.describe()
+        assert decrit["rule"] == "signal"
+        assert decrit["signal"]["type"] == "constant"

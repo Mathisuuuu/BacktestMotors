@@ -24,6 +24,20 @@
         "additionalProperties": false,
         "description": "Un instrument, son fichier, et son eventuelle agregation.",
         "properties": {
+          "alias": {
+            "anyOf": [
+              {
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Nom sous lequel cette serie est publiee. Permet de declarer le MEME instrument a deux granularites, chacune sous son nom.",
+            "title": "Alias"
+          },
           "allow_non_positive_prices": {
             "default": true,
             "title": "Allow Non Positive Prices",
@@ -221,6 +235,12 @@
             "$ref": "#/$defs/AlignPolicy",
             "default": "drop"
           },
+          "allow_mixed_granularity": {
+            "default": false,
+            "description": "Autorise des granularites differentes dans le panneau. Necessaire pour le multi-timeframe, dangereux pour un classement transversal - qui comparerait alors des rendements de natures differentes.",
+            "title": "Allow Mixed Granularity",
+            "type": "boolean"
+          },
           "max_ffill_bars": {
             "anyOf": [
               {
@@ -302,6 +322,8 @@
               "contracts": null,
               "fraction": null,
               "kind": "none",
+              "max_contracts": null,
+              "signal": null,
               "vol_max_multiple": 4.0,
               "vol_target": null,
               "vol_window": 20
@@ -387,10 +409,39 @@
               "fixed",
               "equity_fraction",
               "risk_fraction",
-              "vol_target"
+              "vol_target",
+              "signal"
             ],
             "title": "Kind",
             "type": "string"
+          },
+          "max_contracts": {
+            "anyOf": [
+              {
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Plafond obligatoire pour kind='signal' : une expression arbitraire n'est pas bornee.",
+            "title": "Max Contracts"
+          },
+          "signal": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Noeud de signal donnant la taille. Requis pour kind='signal'.",
+            "title": "Signal"
           },
           "vol_max_multiple": {
             "default": 4.0,
@@ -535,6 +586,7 @@
         "$ref": "#/$defs/PanelSpec",
         "default": {
           "align_policy": "drop",
+          "allow_mixed_granularity": false,
           "max_ffill_bars": null
         }
       },
@@ -556,6 +608,8 @@
             "contracts": null,
             "fraction": null,
             "kind": "none",
+            "max_contracts": null,
+            "signal": null,
             "vol_max_multiple": 4.0,
             "vol_target": null,
             "vol_window": 20

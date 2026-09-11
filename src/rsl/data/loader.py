@@ -140,6 +140,7 @@ def build_panel(
     *,
     align_policy: AlignPolicy = AlignPolicy.DROP,
     max_ffill_bars: int | None = None,
+    allow_mixed_granularity: bool = False,
 ) -> Panel:
     """Aligne plusieurs magasins sur le calendrier UNION de leurs clotures.
 
@@ -167,12 +168,19 @@ def build_panel(
         raise ConfigurationError(f"max_ffill_bars doit etre >= 0, recu {max_ffill_bars}")
 
     granularities = {s.granularity for s in stores.values()}
-    if len(granularities) != 1:
+    if len(granularities) != 1 and not allow_mixed_granularity:
         raise ConfigurationError(
             f"granularites heterogenes dans le panneau : "
-            f"{sorted(str(g) for g in granularities)}"
+            f"{sorted(str(g) for g in granularities)}. Si c'est voulu - un meme "
+            f"instrument declare a deux granularites, par exemple - poser "
+            f"`panel.allow_mixed_granularity: true`. Attention : un classement "
+            f"transversal devient alors incomparable, un rendement hebdomadaire "
+            f"et un rendement quotidien n'etant pas de meme nature."
         )
-    granularity = granularities.pop()
+    # La plus FINE : le calendrier du panneau est l'union des clotures, donc
+    # son pas effectif est celui de la serie la plus dense. Ce champ n'est lu
+    # nulle part dans le socle, mais il ne doit pas mentir pour autant.
+    granularity = min(granularities, key=lambda g: g.nanoseconds)
 
     symbols = tuple(sorted(stores))  # ordre trie : le resultat ne depend pas de l'insertion
     calendar: IntArray = np.unique(

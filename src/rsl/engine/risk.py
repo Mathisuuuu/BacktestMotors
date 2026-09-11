@@ -14,6 +14,7 @@ phenomene visible plutot que silencieux (`docs/execution-model.md` §6.2).
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 from typing import Protocol, runtime_checkable
 
@@ -23,6 +24,7 @@ from rsl.engine.execution import MarginPolicy
 from rsl.engine.orders import Order
 from rsl.engine.portfolio import Portfolio
 from rsl.errors import ConfigurationError
+from rsl.primitives.base import SupportsSignal
 from rsl.primitives.registry import bind_primitive
 
 SpecDict = dict[str, object]
@@ -231,6 +233,69 @@ class VolatilityTarget:
             "vol_window": self.vol_window,
             "vol_max_multiple": self.vol_max_multiple,
             "contracts": self.contracts_base,
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class SignalSizing:
+    """Taille donnee par une EXPRESSION du vocabulaire, pas par un mode fige.
+
+    Les quatre autres regles repondent chacune a une question precise - combien
+    de contrats, quelle fraction d'equity, quel risque au stop, quelle
+    volatilite cible. Celle-ci ne repond a aucune : elle evalue le signal qu'on
+    lui donne et prend le resultat pour un nombre de contrats.
+
+        sizing = { "kind": "signal",
+                   "signal": { ... n'importe quel noeud ... },
+                   "max_contracts": 20 }
+
+    Elle depend du protocole `SupportsSignal`, pas du vocabulaire : le moteur
+    de risque reste ignorant des types de noeuds, et c'est la couche
+    `config` qui construit l'arbre. Sans cela, `engine` dependrait de
+    `strategies`, alors que la dependance va dans l'autre sens.
+
+    Conventions, identiques a celles des autres regles :
+
+    - un signal indefini (`None`) rend 0, donc aucun ordre - "je ne sais pas"
+      n'est pas "une position par defaut" ;
+    - un resultat negatif rend 0 : le SENS vient des regles d'entree, la taille
+      n'est qu'une magnitude. Un signal negatif ne retourne pas la position ;
+    - le nombre est TRONQUE, comme partout ailleurs : un signal qui vaut 0,8
+      ne prend pas position. Mettre le signal a l'echelle attendue.
+
+    `max_contracts` est obligatoire. Une expression arbitraire peut produire
+    n'importe quelle valeur - un z-score divise par une volatilite qui approche
+    zero, par exemple - et une taille non bornee n'est pas une strategie, c'est
+    un accident qui attend son tour.
+    """
+
+    signal: SupportsSignal
+    max_contracts: int
+
+    def __post_init__(self) -> None:
+        if self.max_contracts < 1:
+            raise ConfigurationError(
+                f"max_contracts doit etre >= 1, recu {self.max_contracts}"
+            )
+
+    @property
+    def warmup_bars(self) -> int:
+        return self.signal.warmup_bars
+
+    def contracts(
+        self, ctx: Context, spec: InstrumentSpec, equity: float, reference_price: float
+    ) -> int:
+        valeur = self.signal(ctx)
+        if valeur is None or not math.isfinite(valeur) or valeur <= 0.0:
+            return 0
+        return min(int(valeur), self.max_contracts)
+
+    def describe(self) -> SpecDict:
+        decrire = getattr(self.signal, "describe", None)
+        return {
+            "rule": "signal",
+            "max_contracts": self.max_contracts,
+            "signal": decrire() if callable(decrire) else str(self.signal),
         }
 
 

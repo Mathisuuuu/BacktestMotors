@@ -52,6 +52,7 @@ from rsl.engine.risk import (
     FixedContracts,
     RiskFraction,
     RiskManager,
+    SignalSizing,
     SizingRule,
     VolatilityTarget,
 )
@@ -59,6 +60,7 @@ from rsl.engine.runner import RunConfig
 from rsl.env import resolve_data_path
 from rsl.errors import ConfigurationError
 from rsl.manifest import DataSource
+from rsl.strategies.signals import build_signal
 
 SpecDict = dict[str, object]
 
@@ -109,6 +111,24 @@ class DataSpec(StrictModel):
         default=None,
         description="Calendrier de seance. Sans lui, le noeud `session` leve.",
     )
+    alias: str | None = Field(
+        default=None,
+        min_length=1,
+        description="Nom sous lequel cette serie est publiee. Permet de declarer "
+        "le MEME instrument a deux granularites, chacune sous son nom.",
+    )
+
+    @property
+    def key(self) -> str:
+        """Nom sous lequel la serie est publiee au panneau.
+
+        Sans alias, c'est le symbole du contrat. L'unicite reste verifiee sur
+        CE nom : declarer deux fois la meme serie reste une erreur, mais
+        declarer deux granularites devient possible a condition de les nommer.
+        Nommer est le point : une duplication accidentelle et une duplication
+        voulue ne doivent pas se ressembler.
+        """
+        return self.alias if self.alias is not None else self.instrument.symbol
 
     @property
     def instrument(self) -> InstrumentSpec:
@@ -222,7 +242,9 @@ class ExecutionSpec(StrictModel):
 
 
 class SizingSpec(StrictModel):
-    kind: Literal["none", "fixed", "equity_fraction", "risk_fraction", "vol_target"] = "none"
+    kind: Literal[
+        "none", "fixed", "equity_fraction", "risk_fraction", "vol_target", "signal"
+    ] = "none"
     contracts: int | None = Field(default=None, ge=1)
     fraction: float | None = Field(default=None, gt=0.0)
     atr_window: int = Field(default=14, ge=1)
@@ -234,6 +256,16 @@ class SizingSpec(StrictModel):
     )
     vol_window: int = Field(default=20, ge=2)
     vol_max_multiple: float = Field(default=4.0, gt=0.0)
+    signal: SpecDict | None = Field(
+        default=None,
+        description="Noeud de signal donnant la taille. Requis pour kind='signal'.",
+    )
+    max_contracts: int | None = Field(
+        default=None,
+        ge=1,
+        description="Plafond obligatoire pour kind='signal' : une expression "
+        "arbitraire n'est pas bornee.",
+    )
 
     def build(self) -> SizingRule | None:
         match self.kind:
@@ -253,6 +285,16 @@ class SizingSpec(StrictModel):
                 return RiskFraction(
                     self.fraction, atr_window=self.atr_window, atr_multiple=self.atr_multiple
                 )
+            case "signal":
+                if self.signal is None:
+                    raise ConfigurationError("sizing 'signal' : `signal` est requis")
+                if self.max_contracts is None:
+                    raise ConfigurationError(
+                        "sizing 'signal' : `max_contracts` est requis. Une expression "
+                        "arbitraire peut produire n'importe quelle valeur, et une taille "
+                        "non bornee n'est pas une strategie"
+                    )
+                return SignalSizing(build_signal(self.signal), self.max_contracts)
             case "vol_target":
                 if self.vol_target is None:
                     raise ConfigurationError("sizing 'vol_target' : `vol_target` est requis")
@@ -303,6 +345,13 @@ class RebalanceSpec(StrictModel):
 class PanelSpec(StrictModel):
     align_policy: AlignPolicy = AlignPolicy.DROP
     max_ffill_bars: int | None = Field(default=None, ge=0)
+    allow_mixed_granularity: bool = Field(
+        default=False,
+        description="Autorise des granularites differentes dans le panneau. "
+        "Necessaire pour le multi-timeframe, dangereux pour un classement "
+        "transversal - qui comparerait alors des rendements de natures "
+        "differentes.",
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -421,15 +470,20 @@ def load_stores(
                 f"session:{calendrier.start}-{calendrier.end}@{calendrier.timezone}"
             )
 
-        if instrument.symbol in stores:
+        cle = entry.key
+        if cle in stores:
             raise ConfigurationError(
-                f"'{instrument.symbol}' apparait deux fois dans la specification"
+                f"'{cle}' apparait deux fois dans la specification. Pour declarer "
+                f"le meme instrument a deux granularites, donner un `alias` distinct "
+                f"a l'une des deux entrees."
             )
-        stores[instrument.symbol] = store
-        instruments[instrument.symbol] = instrument
+        stores[cle] = store
+        # Meme contrat, donc memes multiplicateur, tick et frais : un alias
+        # change la SERIE publiee, jamais l'instrument sous-jacent.
+        instruments[cle] = instrument
         sources.append(
             DataSource(
-                symbol=instrument.symbol,
+                symbol=cle,
                 path=str(entry.resolved_path.resolve()),
                 source_hash=store.source_hash,
                 n_bars=store.n_bars,
@@ -449,4 +503,5 @@ def build_panel_from(spec: BacktestSpec, stores: dict[str, BarStore]) -> Panel:
         stores,
         align_policy=spec.panel.align_policy,
         max_ffill_bars=spec.panel.max_ffill_bars,
+        allow_mixed_granularity=spec.panel.allow_mixed_granularity,
     )

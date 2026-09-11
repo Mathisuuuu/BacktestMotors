@@ -36,19 +36,55 @@ identiques a la primitive sur 240 points, ecart maximum `0.00e+00`. Ce qui
 suit de plus important : la meme composition s'applique a une EXPRESSION, donc
 le RSI d'un spread ES/NQ s'ecrit, alors qu'aucune primitive ne le calcule.
 
-Ce qui reste hors de portee sans Python, et pourquoi :
+Deux murs sont tombes le 2026-09-11, deux restent, et ils ne sont pas de meme
+nature :
 
-| Mur | Nature |
+| Mur | Etat |
 |---|---|
-| Deux granularites du MEME symbole | structurel : `'X apparait deux fois'`. Contourne pour le cas quotidien-sur-intraday par `session` |
-| Taille fonction d'un signal | `sizing` est un enum, pas une expression. `contracts` attend un entier |
-| Optimisation de parametres | hors perimetre declare du runner ([[Failed Ideas/ledger]]) |
-| Noeud a memoire entre barres | ecarte deliberement : casserait la reproductibilite bit-a-bit |
+| Deux granularites du MEME symbole | **leve** : `data[].alias` publie la serie sous un nom distinct, et `panel.allow_mixed_granularity` autorise le melange. Causalite verifiee par `tests/adversarial/test_multi_timeframe_closure.py` |
+| Taille fonction d'un signal | **leve** : `sizing.kind: "signal"` prend un noeud quelconque, avec un `max_contracts` obligatoire |
+| Optimisation de parametres | **debout, par decision** : hors perimetre declare du runner ([[Failed Ideas/ledger]]) |
+| Noeud a memoire entre barres | **debout, par decision** : casserait la reproductibilite bit-a-bit |
 | Primitive vraiment nouvelle | ~30 lignes de Python et un enregistrement `@1` |
+
+La distinction compte : les deux murs restants ne sont pas des manques, ce sont
+des garanties. Les lever couterait ce que le depot protege.
 
 Astuce utile : `rolling` n'offre que l'EMA (`alpha = 2/(w+1)`), pas le lissage
 de Wilder (`alpha = 1/n`). Les deux coincident pour `w = 2n - 1` - l'amorce
 differe, les series convergent.
+
+## Multi-timeframe : comment le declarer
+
+Le meme instrument, deux granularites, deux noms - rien n'est devine :
+
+```json
+"data": [
+  { "root": "ES", "path": "indices/ES_v0_1m.parquet", "resample": "day" },
+  { "root": "ES", "path": "indices/ES_v0_1m.parquet", "resample": "week",
+    "alias": "ES.week" }
+],
+"panel": { "align_policy": "ffill", "max_ffill_bars": 7,
+           "allow_mixed_granularity": true }
+```
+
+La serie grossiere se lit ensuite par `peer` : `peer("ES.week", sma@1(10))`.
+
+Trois garde-fous restent actifs, et ce sont eux qui rendent la chose sure :
+
+- **l'unicite est verifiee sur le NOM publie**, pas sur le contrat. Declarer
+  deux fois la meme serie reste une erreur ; un alias rend la duplication
+  voulue impossible a confondre avec une duplication accidentelle ;
+- **le melange de granularites doit etre declare**. Par defaut il leve, parce
+  qu'il rend un classement transversal incomparable - un rendement hebdomadaire
+  et un rendement quotidien ne sont pas de meme nature ;
+- **le report est borne et marque** `is_stale`. Le panneau s'aligne sur l'union
+  des CLOTURES : une ligne ne peut voir qu'une barre grossiere deja close.
+
+Ce dernier point est le piege classique du backtest, et il est teste plutot
+qu'affirme : aucune ligne ne voit une cloture posterieure a la sienne, la barre
+vue est la plus recente close, et corrompre le futur ne change rien avant la
+coupure.
 
 ## Trois documents, trois usages
 
