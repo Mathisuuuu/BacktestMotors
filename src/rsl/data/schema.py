@@ -1,0 +1,527 @@
+"""Format canonique interne : types, specification d'instrument, magasin de barres.
+
+Le magasin (`BarStore`) est immuable et partage. Il est le seul detenteur des
+donnees ; le `Context` n'en detient qu'une reference et un entier. Voir
+`docs/no-lookahead.md` §2.
+
+Convention d'horodatage (`docs/execution-model.md` §1.1) : `ts_event` est
+l'OUVERTURE de la barre, `ts_close = ts_event + granularite` est l'instant ou
+l'information devient disponible. Le moteur raisonne sur `ts_close`.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, replace
+from datetime import UTC, datetime, timedelta
+from enum import StrEnum
+from typing import Final
+
+import numpy as np
+import numpy.typing as npt
+from pydantic import BaseModel, ConfigDict, field_validator
+from pydantic import Field as PydField
+
+from rsl.data.session import SessionIndex
+
+FloatArray = npt.NDArray[np.float64]
+IntArray = npt.NDArray[np.int64]
+
+NS_PER_SECOND: Final[int] = 1_000_000_000
+
+
+class Field(StrEnum):
+    """Colonnes du format canonique."""
+
+    OPEN = "open"
+    HIGH = "high"
+    LOW = "low"
+    CLOSE = "close"
+    VOLUME = "volume"
+
+
+PRICE_FIELDS: Final[tuple[Field, ...]] = (Field.OPEN, Field.HIGH, Field.LOW, Field.CLOSE)
+ALL_FIELDS: Final[tuple[Field, ...]] = (*PRICE_FIELDS, Field.VOLUME)
+TIMESTAMP_COLUMN: Final[str] = "ts_event"
+
+
+@dataclass(frozen=True, slots=True)
+class Granularity:
+    """Duree nominale d'une barre.
+
+    Nominale, et non effective, pour deux raisons distinctes :
+
+    - les donnees comportent des trous (coupures de maintenance, week-ends,
+      feries), donc deux barres consecutives ne sont pas separees de `delta` ;
+    - une barre reechantillonnee sur un calendrier (mois, trimestre) n'a pas de
+      duree fixe du tout. Dans ce cas `name` porte le libelle exact et
+      `ts_close` est fourni explicitement au magasin.
+
+    Voir `docs/execution-model.md` §5.
+    """
+
+    delta: timedelta
+    name: str = ""
+
+    @staticmethod
+    def minutes(n: int) -> Granularity:
+        if n <= 0:
+            raise ValueError(f"granularite en minutes doit etre > 0, recu {n}")
+        return Granularity(timedelta(minutes=n))
+
+    @property
+    def nanoseconds(self) -> int:
+        return int(self.delta.total_seconds() * NS_PER_SECOND)
+
+    def __str__(self) -> str:
+        if self.name:
+            return self.name
+        total = int(self.delta.total_seconds())
+        if total % 86_400 == 0:
+            return f"{total // 86_400}d"
+        if total % 3_600 == 0:
+            return f"{total // 3_600}h"
+        if total % 60 == 0:
+            return f"{total // 60}m"
+        return f"{total}s"
+
+
+class InstrumentSpec(BaseModel):
+    """Specification economique d'un contrat future.
+
+    `multiplier` et `tick_size` conditionnent le P&L et le slippage ; ils n'ont
+    pas de valeur par defaut plausible et sont donc obligatoires.
+
+    Les marges sont statiques et donc anachroniques sur un echantillon de dix
+    ans (`docs/execution-model.md` §6.1). Le manifeste de run le signale.
+    """
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    symbol: str = PydField(min_length=1, description="Symbole continu, ex. 'ES.v.0'")
+    root: str = PydField(min_length=1, description="Racine du contrat, ex. 'ES'")
+    name: str = PydField(min_length=1, description="Libelle lisible, ex. 'S&P 500'")
+    exchange: str = PydField(min_length=1)
+    currency: str = PydField(min_length=3, max_length=3)
+    multiplier: float = PydField(gt=0.0, description="Valeur d'un point de prix, en devise")
+    tick_size: float = PydField(gt=0.0, description="Increment minimal de prix")
+    commission_per_contract: float = PydField(ge=0.0, description="Par contrat et par cote")
+    exchange_fee_per_contract: float = PydField(ge=0.0, description="Par contrat et par cote")
+    initial_margin: float = PydField(gt=0.0)
+    maintenance_margin: float = PydField(gt=0.0)
+
+    @field_validator("maintenance_margin")
+    @classmethod
+    def _maintenance_below_initial(cls, v: float, info: object) -> float:
+        # La marge de maintien est par construction <= marge initiale.
+        data = getattr(info, "data", {})
+        initial = data.get("initial_margin")
+        if isinstance(initial, float) and v > initial:
+            raise ValueError(
+                f"maintenance_margin ({v}) ne peut pas exceder initial_margin ({initial})"
+            )
+        return v
+
+    @property
+    def fee_per_contract_per_side(self) -> float:
+        return self.commission_per_contract + self.exchange_fee_per_contract
+
+
+@dataclass(frozen=True, slots=True)
+class Bar:
+    """Une barre close, valeur scalaire immuable.
+
+    `is_stale` vaut True si la barre a ete produite par un forward-fill
+    explicite (`docs/no-lookahead.md` §4.1), jamais implicitement.
+    """
+
+    ts_event: datetime
+    ts_close: datetime
+    open: float
+    high: float
+    low: float
+    close: float
+    volume: float
+    is_stale: bool = False
+
+    def field(self, field: Field) -> float:
+        match field:
+            case Field.OPEN:
+                return self.open
+            case Field.HIGH:
+                return self.high
+            case Field.LOW:
+                return self.low
+            case Field.CLOSE:
+                return self.close
+            case Field.VOLUME:
+                return self.volume
+
+
+@dataclass(frozen=True, slots=True)
+class BarWindow:
+    """Fenetre de `n` barres closes, la plus recente en derniere position.
+
+    Les tableaux sont des COPIES en lecture seule, pas des vues. Une vue
+    `numpy` expose son tableau parent via `.base`, ce qui redonnerait acces a
+    l'echantillon complet - donc au futur. Le cout d'une copie de quelques
+    centaines de flottants est le prix de la garantie
+    (`docs/no-lookahead.md` §2.2, regle 5).
+    """
+
+    ts_close: IntArray
+    open: FloatArray
+    high: FloatArray
+    low: FloatArray
+    close: FloatArray
+    volume: FloatArray
+
+    def __len__(self) -> int:
+        return int(self.close.shape[0])
+
+    def field(self, field: Field) -> FloatArray:
+        match field:
+            case Field.OPEN:
+                return self.open
+            case Field.HIGH:
+                return self.high
+            case Field.LOW:
+                return self.low
+            case Field.CLOSE:
+                return self.close
+            case Field.VOLUME:
+                return self.volume
+
+
+def _freeze(array: npt.NDArray[np.generic]) -> npt.NDArray[np.generic]:
+    """Rend un tableau non modifiable, apres copie contigue si necessaire."""
+    frozen = np.ascontiguousarray(array)
+    if frozen is array:
+        frozen = array.copy()
+    frozen.setflags(write=False)
+    return frozen
+
+
+@dataclass(frozen=True, slots=True)
+class BarStore:
+    """Magasin de barres immuable pour un instrument.
+
+    Construit une seule fois par le loader, jamais mute ensuite. Les tableaux
+    portent `writeable = False` : aucune strategie, aucun run, aucune primitive
+    ne peut alterer l'historique d'un autre.
+
+    Les horodatages sont des entiers de nanosecondes UTC depuis l'epoque, pour
+    que la comparaison et le hachage soient exacts et deterministes.
+    """
+
+    symbol: str
+    granularity: Granularity
+    ts_event: IntArray
+    ts_close: IntArray
+    open: FloatArray
+    high: FloatArray
+    low: FloatArray
+    close: FloatArray
+    volume: FloatArray
+    is_stale: npt.NDArray[np.bool_]
+    source_hash: str = ""
+    sessions: SessionIndex | None = None
+    """Index de seance, present UNIQUEMENT si le run en a declare un.
+
+    Optionnel par construction : sans declaration, le socle n'a pas de notion
+    de seance et le dit en levant, plutot que d'en inventer une. Porte par le
+    magasin plutot que par le contexte pour que `shifted`, `peer` et les deux
+    feeds en heritent sans plomberie supplementaire."""
+
+    @staticmethod
+    def build(
+        *,
+        symbol: str,
+        granularity: Granularity,
+        ts_event: IntArray,
+        open_: FloatArray,
+        high: FloatArray,
+        low: FloatArray,
+        close: FloatArray,
+        volume: FloatArray,
+        is_stale: npt.NDArray[np.bool_] | None = None,
+        ts_close: IntArray | None = None,
+        source_hash: str = "",
+    ) -> BarStore:
+        """Gele un magasin.
+
+        `ts_close` n'est a fournir que pour les barres agregees sur un
+        calendrier : un mois n'a pas de duree fixe, donc
+        `ts_event + granularite` y serait faux. Pour une granularite reguliere,
+        il est calcule.
+        """
+        n = ts_event.shape[0]
+        for label, arr in (
+            ("open", open_),
+            ("high", high),
+            ("low", low),
+            ("close", close),
+            ("volume", volume),
+        ):
+            if arr.shape[0] != n:
+                raise ValueError(f"colonne '{label}' de longueur {arr.shape[0]}, attendu {n}")
+        stale = np.zeros(n, dtype=np.bool_) if is_stale is None else is_stale
+        if stale.shape[0] != n:
+            raise ValueError(f"is_stale de longueur {stale.shape[0]}, attendu {n}")
+
+        ts_event_i = np.ascontiguousarray(ts_event, dtype=np.int64)
+        if ts_close is None:
+            ts_close_i = ts_event_i + granularity.nanoseconds
+        else:
+            ts_close_i = np.ascontiguousarray(ts_close, dtype=np.int64)
+            if ts_close_i.shape[0] != n:
+                raise ValueError(f"ts_close de longueur {ts_close_i.shape[0]}, attendu {n}")
+            if bool(np.any(ts_close_i < ts_event_i)):
+                raise ValueError("ts_close ne peut pas preceder ts_event")
+        return BarStore(
+            symbol=symbol,
+            granularity=granularity,
+            ts_event=_freeze(ts_event_i),  # type: ignore[arg-type]
+            ts_close=_freeze(ts_close_i),  # type: ignore[arg-type]
+            open=_freeze(np.ascontiguousarray(open_, dtype=np.float64)),  # type: ignore[arg-type]
+            high=_freeze(np.ascontiguousarray(high, dtype=np.float64)),  # type: ignore[arg-type]
+            low=_freeze(np.ascontiguousarray(low, dtype=np.float64)),  # type: ignore[arg-type]
+            close=_freeze(np.ascontiguousarray(close, dtype=np.float64)),  # type: ignore[arg-type]
+            volume=_freeze(np.ascontiguousarray(volume, dtype=np.float64)),  # type: ignore[arg-type]
+            is_stale=_freeze(np.ascontiguousarray(stale, dtype=np.bool_)),  # type: ignore[arg-type]
+            source_hash=source_hash,
+        )
+
+    @property
+    def n_bars(self) -> int:
+        """Nombre total de barres.
+
+        ATTENTION : cette propriete est destinee au loader, au runner et aux
+        tests. Elle n'est PAS exposee au travers du `Context` - une strategie
+        qui connait la longueur de l'echantillon peut s'en servir
+        (`docs/no-lookahead.md` §2.2, regle 4).
+        """
+        return int(self.ts_event.shape[0])
+
+    def column(self, field: Field) -> FloatArray:
+        match field:
+            case Field.OPEN:
+                return self.open
+            case Field.HIGH:
+                return self.high
+            case Field.LOW:
+                return self.low
+            case Field.CLOSE:
+                return self.close
+            case Field.VOLUME:
+                return self.volume
+
+    def bar_at(self, index: int) -> Bar:
+        """Barre a un index absolu. Reserve au moteur ; jamais expose tel quel."""
+        return Bar(
+            ts_event=ns_to_datetime(int(self.ts_event[index])),
+            ts_close=ns_to_datetime(int(self.ts_close[index])),
+            open=float(self.open[index]),
+            high=float(self.high[index]),
+            low=float(self.low[index]),
+            close=float(self.close[index]),
+            volume=float(self.volume[index]),
+            is_stale=bool(self.is_stale[index]),
+        )
+
+    def slice(self, start: int, stop: int) -> BarStore:
+        """Sous-magasin `[start, stop)`, utilise par les tests de corruption."""
+        return BarStore.build(
+            symbol=self.symbol,
+            granularity=self.granularity,
+            ts_event=self.ts_event[start:stop],
+            open_=self.open[start:stop],
+            high=self.high[start:stop],
+            low=self.low[start:stop],
+            close=self.close[start:stop],
+            volume=self.volume[start:stop],
+            is_stale=self.is_stale[start:stop],
+            ts_close=self.ts_close[start:stop],
+            source_hash=self.source_hash,
+        ).with_sessions(
+            None if self.sessions is None else self.sessions.slice(start, stop)
+        )
+
+    def with_sessions(self, index: SessionIndex | None) -> BarStore:
+        """Copie portant un index de seance. Le magasin reste immuable."""
+        if index is None:
+            return self
+        return replace(self, sessions=index)
+
+
+def ns_to_datetime(ns: int) -> datetime:
+    """Nanosecondes UTC depuis l'epoque -> `datetime` conscient du fuseau."""
+    return datetime.fromtimestamp(ns / NS_PER_SECOND, tz=UTC)
+
+
+def datetime_to_ns(dt: datetime) -> int:
+    """`datetime` conscient du fuseau -> nanosecondes UTC depuis l'epoque."""
+    if dt.tzinfo is None:
+        raise ValueError("datetime naif refuse : le socle ne travaille qu'en UTC explicite")
+    return int(dt.timestamp() * NS_PER_SECOND)
+
+
+@dataclass(frozen=True, slots=True)
+class PositionState:
+    """Ce qu'une strategie sait de SA propre position, a la barre courante.
+
+    Pourquoi cela ne rompt pas le contrat anti-look-ahead
+    ------------------------------------------------------
+    Ces valeurs decrivent le PASSE de la strategie, pas l'avenir du marche.
+    Elles sont calculees par le runner a partir des fills - qui viennent de
+    barres deja closes - et des extremes des barres traversees depuis
+    l'entree. Aucune n'existe avant que la position n'existe.
+
+    Pourquoi c'est le runner qui les calcule, et non un noeud a memoire
+    -------------------------------------------------------------------
+    Un noeud de signal qui memoriserait son etat survivrait d'un run a
+    l'autre : deux backtests identiques donneraient des resultats differents
+    selon ce qui a tourne avant, et le test de corruption du futur perdrait son
+    sens. Le runner, lui, repart de zero a chaque run par construction.
+
+    `bars_held` compte les barres depuis l'ENTREE, l'entree valant zero.
+    """
+
+    quantity: int = 0
+    """Signee : positive en position longue, negative en courte, nulle a plat."""
+
+    bars_held: int = 0
+    entry_price: float = 0.0
+    high_since_entry: float = 0.0
+    low_since_entry: float = 0.0
+
+    @property
+    def is_flat(self) -> bool:
+        return self.quantity == 0
+
+    @property
+    def direction(self) -> int:
+        if self.quantity > 0:
+            return 1
+        return -1 if self.quantity < 0 else 0
+
+    def field(self, name: str) -> float:
+        match name:
+            case "quantity":
+                return float(self.quantity)
+            case "bars_held":
+                return float(self.bars_held)
+            case "entry_price":
+                return self.entry_price
+            case "high_since_entry":
+                return self.high_since_entry
+            case "low_since_entry":
+                return self.low_since_entry
+            case "direction":
+                return float(self.direction)
+        raise ValueError(f"champ de position inconnu : '{name}'")
+
+
+FLAT: Final[PositionState] = PositionState()
+"""Etat par defaut. Un `Context` non pilote par un runner est toujours a plat :
+il ne peut pas inventer une position qui n'existe pas."""
+
+
+TIME_FIELDS: Final[tuple[str, ...]] = (
+    "weekday",
+    "hour",
+    "minute",
+    "day",
+    "month",
+    "day_of_year",
+    "year",
+)
+"""Champs calendaires lisibles depuis un `Context`.
+
+Le calendrier n'est pas de l'information de marche : la date de la barre
+courante est connue de tous, y compris a l'avance. L'exposer n'ouvre aucune
+fuite - contrairement au PRIX de la barre suivante, qui lui n'existe pas
+encore.
+
+`weekday` suit la convention Python : lundi vaut 0, dimanche 6.
+"""
+
+
+def time_field(moment: datetime, name: str) -> float:
+    """Extrait un champ calendaire d'un instant UTC."""
+    match name:
+        case "weekday":
+            return float(moment.weekday())
+        case "hour":
+            return float(moment.hour)
+        case "minute":
+            return float(moment.minute)
+        case "day":
+            return float(moment.day)
+        case "month":
+            return float(moment.month)
+        case "day_of_year":
+            return float(moment.timetuple().tm_yday)
+        case "year":
+            return float(moment.year)
+    raise ValueError(f"champ calendaire inconnu : '{name}'")
+
+
+POSITION_FIELDS: Final[tuple[str, ...]] = (
+    "quantity",
+    "direction",
+    "bars_held",
+    "entry_price",
+    "high_since_entry",
+    "low_since_entry",
+)
+
+
+class AlignPolicy(StrEnum):
+    """Politique d'alignement multi-instruments (`docs/no-lookahead.md` §4.1)."""
+
+    DROP = "drop"
+    """Un instrument sans barre a `t` est absent de la coupe. Defaut."""
+
+    FFILL = "ffill"
+    """Report explicite de la derniere barre close, borne et compte."""
+
+    ERROR = "error"
+    """Toute absence fait echouer la construction du panneau."""
+
+
+ABSENT: Final[int] = -1
+
+
+@dataclass(frozen=True, slots=True)
+class Panel:
+    """Plusieurs `BarStore` alignes sur un calendrier commun.
+
+    Le calendrier est l'UNION des horodatages de cloture, pas leur
+    intersection : une intersection sur dix futures de places differentes
+    ampute l'echantillon et introduit un biais de selection
+    (`docs/execution-model.md` §7.2).
+
+    `row_index[symbole][k]` donne l'index de barre de `symbole` a la ligne `k`
+    du panneau, ou `ABSENT` (-1). Absent ne veut pas dire "dernier prix connu" :
+    sans forward-fill explicite, l'instrument ne figure tout simplement pas
+    dans la coupe transversale.
+    """
+
+    granularity: Granularity
+    ts_close: IntArray
+    symbols: tuple[str, ...]
+    stores: dict[str, BarStore]
+    row_index: dict[str, IntArray]
+    is_stale: dict[str, npt.NDArray[np.bool_]]
+    align_policy: AlignPolicy
+
+    @property
+    def n_rows(self) -> int:
+        return int(self.ts_close.shape[0])
+
+    def present_symbols(self, row: int) -> tuple[str, ...]:
+        """Instruments cotant a cette ligne, dans l'ordre trie (deterministe)."""
+        return tuple(s for s in self.symbols if self.row_index[s][row] != ABSENT)
+
+    def n_stale(self, symbol: str) -> int:
+        return int(np.count_nonzero(self.is_stale[symbol]))

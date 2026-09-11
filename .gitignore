@@ -1,4 +1,6 @@
-data/
+# Motif ANCRE : sans le '/' initial il attrapait aussi src/rsl/data/,
+# c'est-a-dire toute la couche donnees. Voir lecon L5.
+/data/
 __pycache__/
 *.pyc
 .venv/

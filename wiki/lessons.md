@@ -242,3 +242,31 @@ condition porte sur une collection, la non-vacuite est une condition **a part
 entiere**, pas une consequence.
 
 Fonde sur [[concepts/determinisme]] · [[log]] (2026-09-11) · [[lessons]] L3
+
+## L12 -- Un fichier ignore par git est aussi invisible pour les outils
+
+`.gitignore:1` `data/` cachait `src/rsl/data/` a git. La lecon L5 en tirait la
+regle du motif ancre. Ce qu'elle ne disait pas, et qui est apparu au moment de
+versionner enfin le paquet : **ruff respecte `.gitignore`**. La couche donnees
+n'avait donc jamais ete analysee - 7 defauts de style y dormaient depuis le
+debut, dans du code central.
+
+Le meme raisonnement vaut pour tout outil qui parcourt un arbre : formateurs,
+analyseurs, compteurs de couverture, scanners de securite. Un fichier ignore ne
+declenche aucune alerte, et l'absence d'alerte se lit comme une absence de
+probleme.
+
+**Consequence operationnelle :** apres tout ajout a `.gitignore`, se demander
+non seulement « qu'est-ce que git va cesser de suivre ? » mais aussi « quel
+outil va cesser de regarder ? ». Et au moment de desigorer un chemin, s'attendre
+a une vague de signalements qui ne sont pas des regressions : ce sont des
+defauts qui etaient deja la, simplement invisibles.
+
+Precision qui evite un contresens : le ledger interdit `ruff --fix` sur un arbre
+INCOMPLET, et les 28 `I001` qu'il cite etaient des symptomes de l'absence de
+`rsl.data`. Ces 7 defauts-ci sont d'une autre nature - de vrais defauts, dans
+les fichiers du paquet lui-meme, sur un arbre desormais complet et vert sous
+mypy. Les empreintes des trois exemples sont identiques avant et apres
+correction, ce qui le verifie plutot que de l'affirmer.
+
+Fonde sur [[lessons]] L5 · [[Failed Ideas/ledger]] · [[reference/donnees]]

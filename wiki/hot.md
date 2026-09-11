@@ -17,7 +17,7 @@ generated: true
 | Indicateur | Valeur |
 |---|---|
 | Pages de wiki | 22 |
-| Entrees de log | 53 |
+| Entrees de log | 55 |
 | Derniere activite | 2026-09-11 |
 | Idees ecartees (ledger) | 16 |
 | Idees en attente (ledger) | 3 |
@@ -27,7 +27,7 @@ generated: true
 | Pages `reference/` | 7 |
 | Pages `research/` | 1 |
 
-**Activite par type :** note × 31, fix × 8, decision × 6, feat × 5, setup × 1, lint × 1, experiment × 1
+**Activite par type :** note × 32, fix × 9, decision × 6, feat × 5, setup × 1, lint × 1, experiment × 1
 
 ## Experiences
 
@@ -41,14 +41,14 @@ Le total des essais alimente le Deflated Sharpe : un essai non enregistre gonfle
 
 ## Derniere activite — 8 entree(s)
 
+- **2026-09-11** — note | effet de bord decouvert en designorant : ruff respecte `.gitignore` | la couche donnees n'avait donc JAMAIS ete analysee. 7 defauts dormaient dans du code central (4 `__slots__` non tries, 2 blocs d'imports, 1 generateur). Corriges ; les empreintes de `sma_es_daily`, `paire_es_nq` et `_moule` sont identiques avant et apres, ce qui prouve la neutralite. A ne pas confondre avec les 28 `I001` du ledger, qui etaient des symptomes de l'ABSENCE du paquet -> [[lessons]] L12
+- **2026-09-11** — fix | P1 RESOLU : motif `.gitignore` ancre en `/data/`, couche donnees enfin versionnee | 8 fichiers, 2 446 lignes, dont `session.py` ecrit aujourd'hui. Diagnostic au moment de pousser : `git ls-files src/` rendait 45 fichiers contre 53 sur le disque, et des tests DEJA pousses importaient `rsl.data.session`, absent du depot -- un clone frais etait casse. `data/` a la racine reste ignore, verifie
 - **2026-09-11** — note | pourquoi P6 a survecu a 1400 tests alors qu'un test le visait | le test n'echouait que sur un arbre PROPRE : des que l'arbre etait modifie, `git.is_reproducible` valait deja `False` et masquait tout. Il passait au vert exactement pendant qu'on travaille. Deux tests de regression FIXENT desormais un `GitState` propre au lieu de subir celui du depot -> [[lessons]] L11
 - **2026-09-11** — fix | P6 corrige : `RunManifest.is_reproducible` ne ment plus par vacuite | `all(())` vaut `True`, donc un run sans AUCUNE source enregistree se declarait `Rejouable oui` -- le cas ou l'on en sait le moins etait celui ou l'on affirmait le plus. `bool(self.data_sources)` devient une condition a part entiere. Verifie en isolant l'etat git : aucune source -> False, une source hachee -> True, source sans hash -> False, arbre sale -> False. Les runs reels sont inchanges
 - **2026-09-11** — note | P6 est ressorti puis re-masque, comme annonce | la suite a echoue sur `test_missing_data_sources_are_flagged` des que l'arbre est devenu propre (le hook avait commite), puis a repasse au vert des mes modifications suivantes. Le defaut `all(())` est intact : il n'est visible que sur un arbre propre
 - **2026-09-11** — note | VWAP ancre sur la seance : exprimable par COMPOSITION, sans primitive nouvelle | `arith(/, cumulative(sum, prix*volume), cumulative(sum, volume))`. Verifie analytiquement : a volumes constants il vaut la moyenne des clotures depuis l'ouverture, exact au 1e-9. C'etait l'exemple motivant de la proposition
 - **2026-09-11** — note | la surface publique du `Context` s'est elargie, et un test adversarial l'a signale | `test_public_surface_is_the_declared_one` a echoue a l'ajout de `session_value` : il fait exactement son travail. Avant d'elargir la liste blanche, j'ai ecrit `tests/adversarial/test_session_closure.py` -- 26 tests dont le decisif : corrompre toutes les barres apres un point ne change AUCUNE valeur de seance lue avant. Les agregats de seance sont calcules a la construction du magasin, donc c'etait le canal de fuite plausible
 - **2026-09-11** — decision | deux lignes du ledger REPRISES le jour meme de leur ecriture | `session` et `cumulative` avaient ete ecartes parce qu'il aurait fallu DEVINER la frontiere de seance. Une declaration ne devine rien : le motif du rejet tombe, et les deux lignes de reprise le disent en citant les anciennes. `reset: never` de `cumulative` reste ecarte -- son motif (historique non borne, warmup indefinissable) ne depend pas du calendrier
-- **2026-09-11** — feat | calendrier de seance DECLARE par instrument, et les deux noeuds qu'il debloque | nouveau `src/rsl/data/session.py` ; `data[].session` (start, end, timezone IANA) entre dans le `config_hash` ; `BarStore` porte un champ optionnel `sessions`, ce qui fait que `shifted`, `peer` et les deux feeds en heritent sans plomberie. Noeuds 20 -> 22 : `session@1` (feuille) et `cumulative@1` (fenetre a longueur variable). Suite 1434 -> 1460 tests
-- **2026-09-11** — note | `vol_target` verifie sur le mecanisme, pas sur un resultat | doubler la volatilite divise la taille par deux : 494, 197, 98, 49, 19 contrats pour des volatilites de 0,002 a 0,050 par barre. Piege d'interpretation observe au passage : une cible de 1 % PAR BARRE sur du quotidien avec une base de 20 donne ~18 contrats ES sur 100 k d'equity -- un levier considerable, meme famille de piege que celui deja documente pour `equity_fraction`. **3 executions sur donnees reelles, donc 3 essais** (L2)
 
 ## Next Actions
 
@@ -61,13 +61,15 @@ donnees reelles) : **1179 tests passent, 1 echoue** ; `ruff` et `mypy` sont
 propres sur `src` et `tests` ; les deux experiences seminales se reproduisent au
 chiffre pres.
 
-- [ ] **P1 toujours ouvert, sous une autre forme** -- `rsl.data` est **revenu
+- [x] **P1 RESOLU (2026-09-11)** -- `rsl.data` est **revenu
       sur le disque** (7 fichiers, 2063 lignes, tests verts) mais reste **non
       versionne** : `.gitignore:1` porte encore `data/` non ancre.
       `git ls-files src/` = 36 fichiers contre 43 sur le disque, et
       `git status` affiche « propre ». Un `git clean -xfd` ou un clone frais
-      reperd tout. Correctif : `/data/` dans `.gitignore`, puis committer
-      `src/rsl/data/`. **C'est le point le plus urgent du depot.**
+      reperd tout. **Corrige** : motif ancre en `/data/`, et les 8 fichiers de
+      `src/rsl/data/` (2 446 lignes) sont versionnes. `data/` a la racine reste
+      ignore. Effet de bord decouvert a cette occasion : ruff n'avait jamais
+      analyse ce paquet -- 7 defauts corriges, empreintes inchangees ([[lessons]] L12).
 - [x] **P6 resolu (2026-09-11)** -- `RunManifest.is_reproducible` mentait par vacuite :
       `all(s.source_hash for s in self.data_sources)` vaut `True` sur un tuple
       vide, donc un run **sans aucune source enregistree** se declare
