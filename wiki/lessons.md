@@ -293,3 +293,75 @@ ici : les valeurs d'un enum du moteur contre les occurrences de cet enum dans
 facon le meme jour (sortie partielle, un seul symbole par moule a regles).
 
 Fonde sur [[reference/vocabulaire-signaux]] · [[log]] (2026-09-11)
+
+---
+
+## L14 -- Un cycle d'import qui ne plante jamais coute quand meme
+
+`rsl.engine.runner` importait `rsl.strategies.base` (il lui faut le protocole
+`Strategy`), qui importait `rsl.engine.orders` (il lui faut `Order` pour
+declarer ce qu'une strategie rend). `import rsl.strategies` chargeait donc
+**sept modules de moteur**, mesure au 2026-09-11.
+
+Ce cycle ne cassait pas, et c'est ce qui le rendait durable : trois tentatives
+de le briser en reordonnant les imports ont echoue. La raison est mecanique --
+`orders` est une **feuille**, donc `from rsl.engine.orders import X` se resout
+meme quand `rsl.engine` n'est qu'a moitie initialise. Un cycle de paquets dont
+le point de fermeture est une feuille est stable par construction.
+
+Le cout n'etait donc pas un risque de plantage, et le presenter ainsi aurait
+ete faux. Il etait ailleurs : **impossible de raisonner sur une couche sans
+l'autre**. On ne peut ni charger la couche decision seule, ni affirmer qu'elle
+ignore l'execution, ni le verifier.
+
+Le remede n'est pas de supprimer une dependance mais de reconnaitre ce qu'elle
+dit : `Order` et `Fill` n'appartiennent a aucune des deux couches, ils sont le
+vocabulaire par lequel elles se parlent. Ils se placent donc **sous** les deux
+(`rsl/orders.py`, aux cotes de `errors.py`), et la dependance redevient un
+sens unique.
+
+**Consequence operationnelle :** aucun outil du depot ne detecte un cycle de
+paquets -- ni `ruff`, ni `mypy --strict`, qui sont tous deux passes dessus
+pendant des semaines. Ce qui le tient fermé est un test qui lance un
+interpreteur NEUF et regarde `sys.modules` ([`test_couches.py`](../tests/unit/test_couches.py)) :
+dans le processus de pytest, tout est deja importe et la question n'a plus de
+sens.
+
+Fonde sur [[reference/modele-execution]] · [[log]] (2026-09-11)
+
+---
+
+## L15 -- Une liste enumeree a la main en N endroits est fausse a partir de N=2
+
+Les neuf cles de `rules` (`entry_long`, `exit_long`, ...) etaient recopiees en
+quatre endroits : la declaration des champs, `warmup_bars`, `describe()` et
+`from_spec`. Plus une cinquieme, de contournement, dans `rsl/skeleton.py` --
+qui construisait une strategie temoin uniquement pour lire les cles de son
+descripteur, parce qu'aucune liste n'etait importable.
+
+Les quatre copies etaient d'accord. Ce n'est pas le probleme : le probleme est
+que chaque ajout de regle exigeait quatre modifications coordonnees, et qu'en
+oublier une echoue **en silence** et differemment a chaque endroit --
+
+- oubliee dans `warmup_bars` : la regle est lue avant que son indicateur soit
+  defini ;
+- oubliee dans `describe()` : elle disparait du rapport de run et du squelette ;
+- oubliee dans `from_spec` : elle est ignoree, et la strategie tourne sans elle.
+
+Aucun de ces trois echecs ne produit d'erreur. Le troisieme produit un backtest
+faux.
+
+La liste est desormais **derivee** des champs de la classe (`RULE_KEYS`), donc
+il n'y a plus de copie a synchroniser. Un effet de bord l'a prouve utile
+immediatement : avec une liste, on peut enfin **refuser une cle inconnue**.
+`rules` est un `dict[str, object]` -- `extra="forbid"` ne s'y applique pas --
+donc `exit_lng` au lieu de `exit_long` donnait une strategie qui entre et ne
+sort jamais, sans un mot. Le schema publie annonçait meme
+`additionalProperties: true`, plus permissif que le code.
+
+**Consequence operationnelle :** quand une liste doit etre connue a plusieurs
+endroits, la deriver d'une declaration existante plutot que la republier. Et
+verifier au passage ce que son absence permettait : ici, une faute de frappe
+silencieuse.
+
+Fonde sur [[reference/vocabulaire-signaux]] · [[log]] (2026-09-11)

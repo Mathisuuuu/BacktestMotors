@@ -27,9 +27,9 @@ from rsl.engine.execution import (
     ZeroFee,
     ZeroSlippage,
 )
-from rsl.engine.orders import Order, OrderType, Side
 from rsl.engine.risk import FixedContracts, RiskManager
 from rsl.engine.runner import RunConfig, SingleAssetRunner
+from rsl.orders import Order, OrderType, Side
 from rsl.strategies.handwritten import BuyAndHold
 from rsl.strategies.rules import FlatStrategy, RuleStrategy
 from rsl.strategies.signals import CrossesAbove, CrossesBelow, prim

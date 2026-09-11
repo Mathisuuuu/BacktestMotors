@@ -42,8 +42,8 @@ from dataclasses import dataclass, field
 from pydantic import Field as PydField
 
 from rsl.data.feed import Context, MultiContext
-from rsl.engine.orders import Fill, Order, Side
 from rsl.errors import ConfigurationError
+from rsl.orders import Fill, Order, Side
 from rsl.strategies.base import CrossSectionalStrategy, StrategyParams, strategy
 from rsl.strategies.signals import Signal, SpecDict, build_signal
 

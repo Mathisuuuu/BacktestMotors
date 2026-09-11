@@ -14,7 +14,7 @@ autorite: src/rsl/cli.py + README.md
 | `rsl validate FICHIER...` | valide des fichiers de donnees |
 | `rsl instruments` | table des contrats |
 | `rsl catalogue` | primitives, noeuds et strategies enregistres |
-| `rsl schema [--what signals\|strategies\|spec\|all]` | JSON Schema du vocabulaire |
+| `rsl schema [--what signals\|strategies\|spec\|all]` | JSON Schema du vocabulaire. **Le defaut est `signals`** : regenerer `schemas/rsl.schema.json` exige `--what all`, sinon le fichier complet est ecrase par le seul schema des signaux |
 | `rsl example` | specification d'exemple, a rediriger dans un fichier |
 | `rsl run CONFIG` | execute un backtest, affiche le rapport, ecrit le JSON |
 | `rsl walkforward CONFIG --train N --test N` | fenetres successives |

@@ -22,9 +22,9 @@ from rsl.data.loader import build_panel
 from rsl.data.schema import Granularity, InstrumentSpec, Panel
 from rsl.engine.cross_sectional import CrossSectionalRunner
 from rsl.engine.execution import ExecutionConfig, ZeroFee, ZeroSlippage
-from rsl.engine.orders import Fill, Order, Side
 from rsl.engine.runner import RunConfig
 from rsl.errors import ConfigurationError
+from rsl.orders import Fill, Order, Side
 from rsl.report import run_backtest
 from rsl.strategies.base import build_strategy, get_strategy
 from rsl.strategies.handwritten import CrossSectionalMomentum

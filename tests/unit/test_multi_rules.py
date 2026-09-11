@@ -188,7 +188,7 @@ class TestDescription:
 
 def synthetic_fill(order):
     """Fill complet de l'ordre, au prix de reference."""
-    from rsl.engine.orders import Fill
+    from rsl.orders import Fill
 
     return Fill(
         order_id=id(order), symbol=order.symbol, side=order.side,

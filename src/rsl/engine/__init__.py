@@ -21,10 +21,10 @@ from rsl.engine.execution import (
     ZeroFee,
     ZeroSlippage,
 )
-from rsl.engine.orders import Fill, Order, OrderType, Side
 from rsl.engine.portfolio import AccountingError, Portfolio, Position
 from rsl.engine.risk import EquityFraction, FixedContracts, RiskFraction, RiskManager
 from rsl.engine.runner import RunConfig, RunResult, SingleAssetRunner
+from rsl.orders import Fill, Order, OrderType, Side
 
 __all__ = [
     "AccountingError",

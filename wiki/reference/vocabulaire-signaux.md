@@ -234,6 +234,23 @@ document.
 | [examples/paire_es_nq.json](../../examples/paire_es_nq.json) | `peer` + `rolling` — paire ES/NQ sur donnees reelles |
 | [examples/momentum_12_1_mensuel.json](../../examples/momentum_12_1_mensuel.json) | transversal, classement |
 
+## Les cles de `rules` : une liste, et elle est fermee
+
+Les neuf cles acceptees sont `entry_long`, `exit_long`, `entry_short`,
+`exit_short`, `stop_loss`, `take_profit`, `entry_limit`, `entry_stop`,
+`exit_quantity`. Cette liste n'est pas maintenue ici : elle est **derivee** des
+champs de `RuleStrategy` (`RULE_KEYS`), publiee par `rsl squelette` sous
+`cles_de_rules`, et par `rsl schema --what strategies` sous `propertyNames`.
+La lire ailleurs qu'a ces deux endroits, c'est risquer une copie perimee.
+
+Depuis le 2026-09-11, une cle **inconnue est refusee**. Avant, elle etait
+ignoree : `exit_lng` au lieu de `exit_long` donnait une strategie qui entre et
+ne sort jamais, sans un mot -- un backtest faux, pas un backtest en erreur.
+`rules` est un `dict[str, object]`, donc le `extra="forbid"` de pydantic ne
+s'y applique pas ; le refus est fait par `RuleStrategy.from_spec`, et le schema
+publie porte desormais la meme contrainte. Meme regle que pour les champs d'un
+noeud, ou `build_signal` refuse deja `oprands` au lieu de `operands`.
+
 ## A savoir avant d'etendre
 
 - `peer` et `rolling` vont ensemble : acces a un autre instrument au meme
@@ -243,6 +260,10 @@ document.
   barre. Voir les idees en attente du [[Failed Ideas/ledger]].
 - Ajouter un type de noeud **sans regenerer les schemas** fait echouer la suite
   de tests, avec la commande a lancer.
+- Ajouter une **regle** a `RuleStrategy` ne demande qu'un champ `Signal | None` :
+  `warmup_bars`, `describe()`, `from_spec`, le squelette et le schema la
+  reprennent seuls. Il reste a regenerer les schemas et a l'ajouter a la liste
+  attendue par `tests/unit/test_rules_keys.py` ([[lessons]] L15).
 
 ## Liens wiki
 

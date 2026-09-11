@@ -36,8 +36,8 @@ from rsl.config import BacktestSpec
 from rsl.data.instruments import known_roots
 from rsl.primitives.registry import describe_registry
 from rsl.strategies.base import describe_strategies
-from rsl.strategies.rules import RuleStrategy
-from rsl.strategies.signals import const, describe_node_types
+from rsl.strategies.rules import RULE_KEYS
+from rsl.strategies.signals import describe_node_types
 
 SpecDict = dict[str, Any]
 
@@ -232,7 +232,7 @@ def _assembler() -> SpecDict:
         "contraintes": CONTRAINTES,
         "specification": _depuis_modele(BacktestSpec.model_json_schema()),
         "instruments": sorted(known_roots()),
-        "cles_de_rules": _cles_de_rules(),
+        "cles_de_rules": list(RULE_KEYS),
         "strategies": {
             str(entree["ref"]): {
                 "resume": entree["summary"],
@@ -256,21 +256,6 @@ def _assembler() -> SpecDict:
             for entree in describe_registry()
         },
     }
-
-
-def _cles_de_rules() -> list[str]:
-    """Les cles acceptees par , DERIVEES et non recopiees.
-
-     les enumere dans son  ; les relister ici en
-    ferait une quatrieme copie, donc une quatrieme occasion de diverger.
-    """
-    # Une entree est exigee a la construction - une strategie sans entree ne
-    # peut rien faire, et le moteur le refuse. On en fournit une factice : seule
-    # la LISTE des cles nous interesse, pas leur contenu.
-    temoin = RuleStrategy(symbol="X", quantity=1, entry_long=const(1.0))
-    regles = temoin.describe()["rules"]
-    assert isinstance(regles, dict)
-    return list(regles)
 
 
 def _champs_de_noeud(schema: SpecDict) -> SpecDict:

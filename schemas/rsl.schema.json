@@ -1443,6 +1443,19 @@
         },
         "rules": {
           "additionalProperties": true,
+          "propertyNames": {
+            "enum": [
+              "entry_long",
+              "exit_long",
+              "entry_short",
+              "exit_short",
+              "stop_loss",
+              "take_profit",
+              "entry_limit",
+              "entry_stop",
+              "exit_quantity"
+            ]
+          },
           "title": "Rules",
           "type": "object"
         },
@@ -1516,6 +1529,19 @@
         },
         "rules": {
           "additionalProperties": true,
+          "propertyNames": {
+            "enum": [
+              "entry_long",
+              "exit_long",
+              "entry_short",
+              "exit_short",
+              "stop_loss",
+              "take_profit",
+              "entry_limit",
+              "entry_stop",
+              "exit_quantity"
+            ]
+          },
           "title": "Rules",
           "type": "object"
         },

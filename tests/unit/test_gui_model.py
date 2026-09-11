@@ -16,7 +16,6 @@ import pytest
 
 from rsl.data.schema import InstrumentSpec
 from rsl.engine.execution import ExecutionConfig, ZeroFee, ZeroSlippage
-from rsl.engine.orders import Fill, Side
 from rsl.engine.portfolio import ClosedTrade, EquityRecorder, Portfolio
 from rsl.engine.runner import RunConfig
 from rsl.gui.model import (
@@ -37,6 +36,7 @@ from rsl.gui.model import (
     year_mask,
 )
 from rsl.metrics.performance import NS_PER_DAY, compute_performance
+from rsl.orders import Fill, Side
 
 SYMBOL = "TEST.v.0"
 CASH = 100_000.0

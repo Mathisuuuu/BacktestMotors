@@ -9,9 +9,9 @@ from __future__ import annotations
 
 import pytest
 
-from rsl.engine.orders import Fill, Side
 from rsl.engine.portfolio import AccountingError, EquityRecorder, Portfolio, Position
 from rsl.errors import ConfigurationError
+from rsl.orders import Fill, Side
 
 SYMBOL = "TEST.v.0"
 CASH = 100_000.0

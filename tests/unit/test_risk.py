@@ -7,7 +7,6 @@ import pytest
 from rsl.data.feed import BarContext
 from rsl.data.schema import BarStore
 from rsl.engine.execution import MarginPolicy
-from rsl.engine.orders import Fill, Order, Side
 from rsl.engine.portfolio import Portfolio
 from rsl.engine.risk import (
     EquityFraction,
@@ -17,6 +16,7 @@ from rsl.engine.risk import (
     SizingRule,
 )
 from rsl.errors import ConfigurationError
+from rsl.orders import Fill, Order, Side
 
 SYMBOL = "TEST.v.0"
 CASH = 100_000.0

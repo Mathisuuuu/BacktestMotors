@@ -7,8 +7,8 @@ import pytest
 from fixtures import synthetic
 from rsl.data.feed import BarContext
 from rsl.data.schema import BarStore, Field, PositionState
-from rsl.engine.orders import Fill, Order, OrderType, Side
 from rsl.errors import ConfigurationError, RegistryError
+from rsl.orders import Fill, Order, OrderType, Side
 from rsl.strategies.base import (
     NoStrategyParams,
     Strategy,

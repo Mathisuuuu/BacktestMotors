@@ -58,8 +58,8 @@ from dataclasses import dataclass, field
 
 from rsl.data.feed import Context, MultiContext
 from rsl.data.schema import Field
-from rsl.engine.orders import Fill, Order, Side
 from rsl.errors import ConfigurationError
+from rsl.orders import Fill, Order, Side
 from rsl.strategies.base import CrossSectionalStrategy, StrategyParams, strategy
 
 SpecDict = dict[str, object]

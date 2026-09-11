@@ -17,7 +17,6 @@ import pytest
 
 from fixtures import synthetic
 from rsl.engine.execution import ExecutionConfig, ZeroFee, ZeroSlippage
-from rsl.engine.orders import Fill, Side
 from rsl.engine.portfolio import EquityRecorder, Portfolio
 from rsl.engine.runner import RunConfig, SingleAssetRunner
 from rsl.errors import ConfigurationError
@@ -30,6 +29,7 @@ from rsl.metrics.performance import (
     skewness,
     to_daily,
 )
+from rsl.orders import Fill, Side
 from rsl.strategies.handwritten import BuyAndHold
 from rsl.strategies.rules import FlatStrategy
 

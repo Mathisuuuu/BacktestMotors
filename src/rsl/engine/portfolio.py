@@ -42,8 +42,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from rsl.data.schema import InstrumentSpec
-from rsl.engine.orders import Fill
 from rsl.errors import ConfigurationError, RslError
+from rsl.orders import Fill
 
 SpecDict = dict[str, object]
 

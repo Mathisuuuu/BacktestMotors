@@ -17,7 +17,7 @@ generated: true
 | Indicateur | Valeur |
 |---|---|
 | Pages de wiki | 22 |
-| Entrees de log | 73 |
+| Entrees de log | 77 |
 | Derniere activite | 2026-09-11 |
 | Idees ecartees (ledger) | 16 |
 | Idees en attente (ledger) | 3 |
@@ -27,7 +27,7 @@ generated: true
 | Pages `reference/` | 7 |
 | Pages `research/` | 1 |
 
-**Activite par type :** note × 41, fix × 11, feat × 9, decision × 8, setup × 1, lint × 1, experiment × 1, audit × 1
+**Activite par type :** note × 42, fix × 14, feat × 9, decision × 8, setup × 1, lint × 1, experiment × 1, audit × 1
 
 ## Experiences
 
@@ -41,14 +41,14 @@ Le total des essais alimente le Deflated Sharpe : un essai non enregistre gonfle
 
 ## Derniere activite — 8 entree(s)
 
+- **2026-09-11** — note | erreur de manipulation rattrapee, a ne pas refaire | `rsl schema --out schemas/rsl.schema.json` sans `--what all` ecrase le schema complet par le SEUL schema des signaux : le defaut de `--what` est `signals`. Le diff (616 insertions, 1505 suppressions) m'a d'abord fait croire que le fichier commite etait perime. Il ne l'etait pas -- verifie en le regenerant depuis un worktree au commit precedent
+- **2026-09-11** — fix | effet de bord de P1.b : une cle de `rules` inconnue etait IGNOREE | `rules` est un `dict[str, object]`, le `extra=forbid` de pydantic ne s'y applique pas. `exit_lng` au lieu de `exit_long` donnait une strategie qui entre et ne sort jamais, sans un mot -- un backtest faux, pas un backtest en erreur. Le schema publie annoncait meme `additionalProperties: true`, donc plus permissif que le code : il porte maintenant `propertyNames.enum`, derive de la meme liste. 1548 -> 1552 tests, 7 empreintes d'exemples inchangees
+- **2026-09-11** — fix | P1.b : les neuf cles de `rules` cessent d'etre recopiees quatre fois | champs de la classe, `warmup_bars`, `describe()`, `from_spec`, plus une derivation de contournement dans `skeleton.py` qui construisait une strategie temoin pour lire les cles de son descripteur. Desormais `RULE_KEYS`, derive des champs `Signal | None`. Les quatre copies etaient d'accord : le defaut n'etait pas une divergence mais le fait qu'un oubli echoue en silence, et differemment selon l'endroit
+- **2026-09-11** — fix | P1.a : `orders.py` sort de `engine/` et le sens unique redevient verifiable | `import rsl.strategies` chargeait SEPT modules de moteur : le runner a besoin du protocole `Strategy`, les strategies ont besoin d'`Order`. Le cycle ne plantait pas -- trois tentatives de le casser en reordonnant les imports ont echoue, `orders` etant une feuille -- donc le cout etait l'impossibilite de raisonner sur une couche seule, pas un risque d'erreur. `Order` et `Fill` n'appartiennent a aucune des deux couches : places sous les deux, avec `errors.py`. 33 modules charges -> 27. `tests/unit/test_couches.py` le tient ferme dans un interpreteur neuf, ce qu'aucun outil du depot ne sait faire
 - **2026-09-11** — note | mesures de performance de l'audit, a conserver | `primitive sma@1(20)` 5,9 us/barre ; `rolling(mean,20)` 44,9 us ; `rolling(zscore,120)` sur un `arith` de deux primitives **1549 us**. Extrapole sur les 3,7 M de barres minute d'ES : 1,6 h pour UN signal, 14,4 h sur l'univers de dix. `cumulative` est quadratique par seance : 952 890 evaluations de sous-arbre sur une seance d'une minute. C'est la dette qui empeche le vocabulaire compose de servir a l'echelle minute
 - **2026-09-11** — fix | P0.2 : `ExecutionStats` etait calcule puis jete | `n_limit_not_touched`, `n_stop_not_triggered` et `n_slippage_clamped` etaient incrementes sans que `describe()` soit appele nulle part. Remontes dans un bloc `execution_stats` SEPARE de `counters` -- ce dernier entre dans l'empreinte, l'y fusionner aurait change toutes les empreintes archivees. Verifie : une strategie a limite rapporte `n_limit_not_touched: 17`
 - **2026-09-11** — fix | P0.1 : la strategie est construite AVANT le chargement des donnees | `report.py` lisait le parquet puis decouvrait que la specification etait fausse. Mesure sur dix instruments : 6,1 s avant, 0,89 s apres -- dont 0,786 s de demarrage de l'interpreteur, donc le cout de rejet est desormais negligeable. Meme sonde de validation ajoutee a `walkforward.py`. Les 6 empreintes d'exemples sont inchangees
 - **2026-09-11** — audit | audit complet du socle : securite, architecture, performance | securite EXEMPLAIRE (zero eval/exec/pickle, 5 modeles pydantic tous `frozen`+`extra=forbid`, un seul subprocess a arguments litteraux). Ouvert/Ferme verifie : 16 ajouts dans la journee sans toucher au noyau, et le squelette les a publies seul. Trois dettes chiffrees : validation apres I/O, cycle `engine <-> strategies`, et le cout des boucles Python de `rolling`
-- **2026-09-11** — note | distinction mise au jour par un test qui echouait | `RuleStrategy._position` (compteur interne, alimente par `on_fill`) et `ctx.position` (etat expose par le RUNNER) sont deux choses differentes. En run reel le runner les garde d'accord ; dans un test sur `BarContext` nu, il faut renseigner les deux, sinon le noeud `position` lit une position a plat
-- **2026-09-11** — note | premier essai de verification trompeur, rattrape | mes trois variantes donnaient des chiffres quasi identiques : `_moule.json` porte `sizing: {fixed, contracts: 1}`, qui ECRASE la quantite de la strategie. Chaque position ne faisait qu'un contrat, il n'y avait rien a alleger. Refait avec `contracts: 4` : 8 trades en sortie totale, 9 en moitie, 9 en un contrat, facteurs de profit distincts
-- **2026-09-11** — feat | `exit_quantity` : les sorties cessent d'etre tout ou rien | troisieme et derniere brique des manques trouves en comparant le moteur au vocabulaire. Un noeud donnant un nombre de contrats ; absent, la position entiere est fermee comme avant. La valeur est une MAGNITUDE, son signe ignore, ce qui permet d'ecrire `position.quantity * 0.5` sans `abs` et d'alleger de moitie long comme court. Suite 1512 -> 1523 tests, empreintes inchangees
-- **2026-09-11** — note | deux defauts de conception trouves par les tests, pas par relecture | (1) je construisais chaque livre en appelant `RuleStrategy.from_spec` directement, ce qui contournait les defauts et la validation de `RuleStrategyParams` -- un livre sans `quantity` levait un message obscur. Corrige en passant par le modele. (2) une verification `isinstance(brut, dict)` etait du code mort : l'annotation `dict[str, dict[str, object]]` rejette deja la valeur avant le constructeur. Retiree, et le test dit maintenant ce qui se passe vraiment
 
 ## Next Actions
 
@@ -56,10 +56,36 @@ Le total des essais alimente le Deflated Sharpe : un essai non enregistre gonfle
 > Bloc edite a la main. Le generateur le recopie tel quel a chaque passage :
 > c'est le seul endroit de ce fichier ou ecrire.
 
-Etat verifie par l'audit du 2026-09-11 (suite complete, CLI de bout en bout sur
-donnees reelles) : **1179 tests passent, 1 echoue** ; `ruff` et `mypy` sont
-propres sur `src` et `tests` ; les deux experiences seminales se reproduisent au
-chiffre pres.
+Etat au 2026-09-11, apres P1 de l'audit d'architecture : **1552 tests passent,
+aucun n'echoue** ; `ruff` et `mypy --strict` sont propres sur `src` et `tests` ;
+les **7 empreintes d'exemples sont inchangees** depuis l'avant-derniere
+session. (L'audit du meme jour partait de 1179 tests dont 1 echouait ; cet
+echec est le P6 ci-dessous, corrige.)
+
+## Plan de l'audit d'architecture (2026-09-11)
+
+Numerotation PROPRE a cet audit, sans rapport avec les P1..P7 de la liste
+suivante, qui viennent de l'audit fonctionnel du 2026-09-10.
+
+- [x] **A-P0 fait** -- valider avant de lire (6,1 s -> 0,89 s pour rejeter une
+      specification fausse), et rapporter `execution_stats`, qui etait calcule
+      puis jete.
+- [x] **A-P1 fait** -- `orders.py` sort de `engine/` : le sens unique entre les
+      couches redevient verifiable ([[lessons]] L14). Et les neuf cles de
+      `rules` cessent d'etre recopiees quatre fois, ce qui permet enfin de
+      **refuser une cle inconnue** ([[lessons]] L15).
+- [ ] **A-P2 -- arbitrage a rendre, pas tache a executer.** `rolling(zscore,120)`
+      sur un `arith` de deux primitives coute **1549 us/barre**, soit 1,6 h pour
+      un signal sur les 3,7 M de barres minute d'ES et 14,4 h sur l'univers de
+      dix. Trois voies, aucune gratuite : elimination des sous-expressions
+      communes DANS une barre (~2x, sans toucher a une garantie) ;
+      memoisation ENTRE barres (rapide, mais se heurte au rejet des noeuds a
+      etat, [[Failed Ideas/ledger]]) ; primitives dediees (deja « en attente »
+      au ledger). Recommandation : la troisieme, apres avoir mesure quels cas
+      la justifient.
+- [ ] **A-P3** -- `signals.py` fait 1915 lignes ; `gui/app.py:275` injecte un
+      attribut `teinte` sur un `tk.Label` ; un seul test porte le marqueur
+      `slow`.
 
 - [x] **P1 RESOLU (2026-09-11)** -- `rsl.data` est **revenu
       sur le disque** (7 fichiers, 2063 lignes, tests verts) mais reste **non

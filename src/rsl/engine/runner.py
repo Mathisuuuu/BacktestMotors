@@ -34,10 +34,10 @@ from rsl.engine.execution import (
     IntrabarPriority,
     assert_within_bar,
 )
-from rsl.engine.orders import Fill, Order, OrderType, Side
 from rsl.engine.portfolio import EquityRecorder, Portfolio
 from rsl.engine.risk import RiskManager
 from rsl.errors import ConfigurationError
+from rsl.orders import Fill, Order, OrderType, Side
 from rsl.strategies.base import Strategy
 
 SpecDict = dict[str, object]

@@ -30,9 +30,9 @@ from enum import StrEnum
 import numpy as np
 import numpy.typing as npt
 
-from rsl.engine.orders import Fill
 from rsl.engine.portfolio import ClosedTrade
 from rsl.metrics.performance import DrawdownStats, PerformanceMetrics, drawdown_stats
+from rsl.orders import Fill
 from rsl.report import BacktestReport
 
 FloatArray = npt.NDArray[np.float64]

@@ -25,8 +25,8 @@ from enum import StrEnum
 from typing import Protocol, runtime_checkable
 
 from rsl.data.schema import Bar, InstrumentSpec
-from rsl.engine.orders import Fill, Order, OrderType, Side
 from rsl.errors import ConfigurationError
+from rsl.orders import Fill, Order, OrderType, Side
 
 SpecDict = dict[str, object]
 

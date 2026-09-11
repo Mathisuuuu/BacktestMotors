@@ -38,7 +38,6 @@ from typing import Protocol, runtime_checkable
 from rsl.data.feed import MultiContext, PanelFeed
 from rsl.data.schema import Bar, InstrumentSpec, Panel
 from rsl.engine.execution import ExecutionEngine, IntrabarPriority, assert_within_bar
-from rsl.engine.orders import Fill, Order, OrderType, Side
 from rsl.engine.portfolio import EquityRecorder, Portfolio
 from rsl.engine.risk import RiskManager
 from rsl.engine.runner import (
@@ -53,6 +52,7 @@ from rsl.engine.runner import (
     would_trigger,
 )
 from rsl.errors import ConfigurationError
+from rsl.orders import Fill, Order, OrderType, Side
 from rsl.strategies.base import CrossSectionalStrategy
 
 

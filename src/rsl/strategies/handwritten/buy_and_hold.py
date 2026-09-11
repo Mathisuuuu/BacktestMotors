@@ -24,8 +24,8 @@ from collections.abc import Sequence
 from dataclasses import dataclass, field
 
 from rsl.data.feed import Context
-from rsl.engine.orders import Order, Side
 from rsl.errors import ConfigurationError
+from rsl.orders import Order, Side
 from rsl.strategies.base import Strategy, StrategyParams, strategy
 
 SpecDict = dict[str, object]

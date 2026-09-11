@@ -21,9 +21,9 @@ from typing import Protocol, runtime_checkable
 from rsl.data.feed import Context
 from rsl.data.schema import InstrumentSpec
 from rsl.engine.execution import MarginPolicy
-from rsl.engine.orders import Order
 from rsl.engine.portfolio import Portfolio
 from rsl.errors import ConfigurationError
+from rsl.orders import Order
 from rsl.primitives.base import SupportsSignal
 from rsl.primitives.registry import bind_primitive
 

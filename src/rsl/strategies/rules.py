@@ -20,14 +20,15 @@ regles - une sortie qui, faute de position, ouvre une position inverse.
 
 from __future__ import annotations
 
-from collections.abc import Sequence
-from dataclasses import dataclass, field
+from collections.abc import Iterator, Sequence
+from dataclasses import dataclass, field, fields
+from typing import Final, cast
 
 from pydantic import Field as PydField
 
 from rsl.data.feed import Context, MultiContext
-from rsl.engine.orders import Fill, Order, OrderType, Side
 from rsl.errors import ConfigurationError
+from rsl.orders import Fill, Order, OrderType, Side
 from rsl.strategies.base import (
     CrossSectionalStrategy,
     Strategy,
@@ -93,22 +94,8 @@ class RuleStrategy(Strategy):
 
     @property
     def warmup_bars(self) -> int:
-        signals = [
-            s
-            for s in (
-                self.entry_long,
-                self.exit_long,
-                self.entry_short,
-                self.exit_short,
-                self.stop_loss,
-                self.take_profit,
-                self.entry_limit,
-                self.entry_stop,
-                self.exit_quantity,
-            )
-            if s is not None
-        ]
-        return warmup_of(signals) + self.extra_warmup
+        declares = [s for _, s in self._rules() if s is not None]
+        return warmup_of(declares) + self.extra_warmup
 
     def reset(self) -> None:
         self._position = 0
@@ -149,18 +136,8 @@ class RuleStrategy(Strategy):
             "allow_pyramiding": self.allow_pyramiding,
             "extra_warmup": self.extra_warmup,
             "rules": {
-                name: (signal.describe() if signal is not None else None)
-                for name, signal in (
-                    ("entry_long", self.entry_long),
-                    ("exit_long", self.exit_long),
-                    ("entry_short", self.entry_short),
-                    ("exit_short", self.exit_short),
-                    ("stop_loss", self.stop_loss),
-                    ("take_profit", self.take_profit),
-                    ("entry_limit", self.entry_limit),
-                    ("entry_stop", self.entry_stop),
-                    ("exit_quantity", self.exit_quantity),
-                )
+                nom: (signal.describe() if signal is not None else None)
+                for nom, signal in self._rules()
             },
         }
 
@@ -177,27 +154,39 @@ class RuleStrategy(Strategy):
         if not isinstance(rules, dict):
             raise ConfigurationError("'rules' doit etre un objet")
 
+        inconnues = sorted(set(rules) - set(RULE_KEYS))
+        if inconnues:
+            raise ConfigurationError(
+                f"cle(s) de `rules` inconnue(s) : {inconnues}. Cles acceptees : "
+                f"{list(RULE_KEYS)}. Une cle mal orthographiee serait sinon "
+                f"ignoree en silence, et la strategie tournerait sans la regle "
+                f"qu'on croyait lui avoir donnee."
+            )
+
         def node(key: str) -> Signal | None:
             raw = rules.get(key)
             return build_signal(raw) if isinstance(raw, dict) else None
 
+        signaux: dict[str, Signal | None] = {cle: node(cle) for cle in RULE_KEYS}
         return RuleStrategy(
             symbol=symbol,
             quantity=quantity,
-            entry_long=node("entry_long"),
-            exit_long=node("exit_long"),
-            entry_short=node("entry_short"),
-            exit_short=node("exit_short"),
-            exit_quantity=node("exit_quantity"),
-            entry_limit=node("entry_limit"),
-            entry_stop=node("entry_stop"),
-            stop_loss=node("stop_loss"),
-            take_profit=node("take_profit"),
             allow_pyramiding=bool(spec.get("allow_pyramiding", False)),
             extra_warmup=_as_int(spec.get("extra_warmup", 0), "extra_warmup"),
+            **signaux,
         )
 
     # -- interne -----------------------------------------------------------
+
+    def _rules(self) -> Iterator[tuple[str, Signal | None]]:
+        """Les regles, dans l'ordre de declaration des champs.
+
+        Cet ordre est celui que `describe()` publie, donc celui qui se retrouve
+        dans le rapport de run et dans le squelette : le changer changerait la
+        sortie sans changer un comportement.
+        """
+        for cle in RULE_KEYS:
+            yield cle, cast("Signal | None", getattr(self, cle))
 
     @staticmethod
     def _fires(signal: Signal | None, ctx: Context) -> bool:
@@ -301,6 +290,26 @@ class RuleStrategy(Strategy):
         return value
 
 
+RULE_KEYS: Final[tuple[str, ...]] = tuple(
+    champ.name for champ in fields(RuleStrategy) if champ.type == "Signal | None"
+)
+"""Les cles acceptees dans `rules`, DERIVEES des champs de `RuleStrategy`.
+
+Source unique, et non une copie de plus. Elles etaient enumerees a la main en
+quatre endroits - la declaration des champs, `warmup_bars`, `describe()` et
+`from_spec` - plus une derivation de contournement dans `rsl/skeleton.py`.
+Ajouter une dixieme regle demandait donc quatre modifications coordonnees, et
+en oublier une echouait EN SILENCE : oubliee dans `warmup_bars`, la regle se
+lit avant que son indicateur soit defini ; oubliee dans `describe()`, elle
+disparait du rapport de run et du squelette sans que rien ne le signale.
+
+La derivation repose sur l'annotation ecrite : `Signal | None`. La forme
+`Optional[Signal]` ne produirait pas la meme chaine, mais `ruff` (regles `UP`)
+la reecrit. `tests/unit/test_rules_keys.py` fixe la liste attendue, pour qu'un
+champ `Signal | None` ajoute sans etre une regle ne se glisse pas dedans.
+"""
+
+
 @dataclass(eq=False)
 class FlatStrategy(Strategy):
     """Ne prend jamais position. Support du test exige n° 4.
@@ -335,7 +344,16 @@ class RuleStrategyParams(StrategyParams):
 
     symbol: str
     quantity: int = 1
-    rules: dict[str, object] = PydField(default_factory=dict)
+    rules: dict[str, object] = PydField(
+        default_factory=dict,
+        # Le schema publie enumere les cles, DERIVEES de `RULE_KEYS` : sans
+        # cela il annonce `additionalProperties: true`, donc plus permissif que
+        # le code, et un editeur qui valide contre lui laisserait passer la
+        # faute de frappe que `from_spec` refuse. C'est le defaut symetrique de
+        # celui que `build_signal` evite - un schema plus STRICT que le code
+        # interdirait ce que le code accepte ; ici il l'etait moins.
+        json_schema_extra={"propertyNames": {"enum": list(RULE_KEYS)}},
+    )
     allow_pyramiding: bool = False
     extra_warmup: int = 0
 

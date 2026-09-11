@@ -20,8 +20,8 @@ from rsl.engine.execution import (
     ZeroSlippage,
     assert_within_bar,
 )
-from rsl.engine.orders import Order, OrderType, Side
 from rsl.errors import ConfigurationError
+from rsl.orders import Order, OrderType, Side
 
 TS = datetime(2024, 3, 14, 13, 30, tzinfo=UTC)
 

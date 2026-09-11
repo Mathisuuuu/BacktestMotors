@@ -30,8 +30,8 @@ from typing import Final
 from pydantic import BaseModel, ConfigDict
 
 from rsl.data.feed import Context, MultiContext
-from rsl.engine.orders import Fill, Order
 from rsl.errors import ConfigurationError, RegistryError
+from rsl.orders import Fill, Order
 
 SpecDict = dict[str, object]
 

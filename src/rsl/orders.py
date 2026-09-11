@@ -1,8 +1,34 @@
-"""Types d'ordres et de fills.
+"""Types d'ordres et de fills - le CONTRAT entre les strategies et le moteur.
 
 Structures de donnees pures : aucune logique d'execution ici (elle est dans
-`execution.py`). Les regles de fill et les bornes de prix sont decrites dans
-`docs/execution-model.md` §3.
+`rsl/engine/execution.py`). Les regles de fill et les bornes de prix sont
+decrites dans `docs/execution-model.md` §3.
+
+Pourquoi a la racine du paquet, et pas dans `rsl/engine/`
+---------------------------------------------------------
+Ce module y a vecu jusqu'au 2026-09-11, et cela creait un cycle d'import :
+`rsl.engine.runner` importe `rsl.strategies.base` (il lui faut le protocole
+`Strategy`), qui importait `rsl.engine.orders` (il lui faut `Order` pour
+declarer ce qu'une strategie rend). Importer `rsl.strategies` executait donc
+`rsl/engine/__init__.py`, lui-meme en train d'importer les strategies : 7
+modules de moteur charges pour se servir d'une couche qui ne touche pas aux
+donnees.
+
+Ce cycle ne PLANTAIT pas, et il faut le dire : trois tentatives de le casser
+en reordonnant les imports ont echoue, parce que `orders` est une feuille -
+`from rsl.engine.orders import X` se resout meme quand `rsl.engine` n'est
+qu'a moitie initialise. Le cout n'etait donc pas un risque d'erreur, mais
+l'impossibilite de raisonner sur l'une des deux couches sans l'autre.
+
+Le cycle n'etait pas fortuit : `Order` et `Fill` n'appartiennent a AUCUNE des
+deux couches. Ils sont le vocabulaire par lequel elles se parlent - une
+strategie emet des `Order`, le moteur rend des `Fill` - donc ils se placent
+sous les deux, avec `errors.py`, dont ils dependent seuls.
+
+`rsl.engine` continue de les reexporter : le moteur travaille sur des ordres,
+sa facade a le droit de les nommer. Ce qui garde le cycle ferme n'est pas
+cette facade mais `tests/unit/test_couches.py`, qui verifie qu'importer
+`rsl.strategies` ne charge pas `rsl.engine`.
 
 Un `Order` ne porte pas d'identifiant : c'est le moteur qui attribue des
 numeros sequentiels a la soumission. Un identifiant genere par la strategie

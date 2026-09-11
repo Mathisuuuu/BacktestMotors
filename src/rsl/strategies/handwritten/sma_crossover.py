@@ -26,8 +26,8 @@ from collections.abc import Sequence
 from dataclasses import dataclass, field
 
 from rsl.data.feed import Context
-from rsl.engine.orders import Fill, Order, Side
 from rsl.errors import ConfigurationError
+from rsl.orders import Fill, Order, Side
 from rsl.primitives.base import BoundPrimitive
 from rsl.primitives.registry import bind_primitive
 from rsl.strategies.base import Strategy, StrategyParams, strategy
