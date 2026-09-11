@@ -162,3 +162,26 @@ recalcule rien - il recopie `metrics.sharpe` du moteur, et un test compare les
 deux. Un affichage qui reimplemente un calcul finit par en diverger.
 
 Fonde sur [[reference/tableau-de-bord]] · [[lessons]] L1 · [[lessons]] L3
+
+## L9 -- Un callback dont la bibliotheque possede le cycle de vie n'est pas un point d'extension
+
+`PricePanel` reajustait l'echelle des prix a la fenetre visible via le signal
+`xlim_changed` de matplotlib, connecte a la construction. Le reglage ne s'est
+jamais applique : `Axes.clear()`, appele a chaque redessin, **reinitialise le
+registre de callbacks**. La connexion disparaissait au premier trace, sans
+erreur, sans avertissement.
+
+Le symptome ne designait pas la cause : on voyait une echelle Y figee entre
+2 000 et 7 000 pour une fenetre qui ne couvrait que 2 000-2 900, et l'hypothese
+naturelle etait une erreur de calcul des bornes - alors que le calcul n'etait
+simplement jamais execute.
+
+**Consequence operationnelle :** quand un comportement doit survivre a chaque
+cycle de vie d'un objet d'une bibliotheque tierce, l'appeler explicitement
+depuis notre propre code plutot que s'abonner a un signal dont on ne controle
+pas la duree de vie. Ici, une methode `_apres_fenetre()` appelee par notre
+`_apply()` - trois lignes, et le comportement ne peut plus disparaitre.
+
+Meme famille que L3 : preferer ce qui ne peut pas etre silencieusement defait.
+
+Fonde sur [[reference/tableau-de-bord]] · `tests/unit/test_gui_charts.py`

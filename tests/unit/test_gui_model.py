@@ -20,6 +20,7 @@ from rsl.engine.orders import Fill, Side
 from rsl.engine.portfolio import ClosedTrade, EquityRecorder, Portfolio
 from rsl.engine.runner import RunConfig
 from rsl.gui.model import (
+    Bars,
     Dashboard,
     Filters,
     SideFilter,
@@ -27,7 +28,9 @@ from rsl.gui.model import (
     build_trade_rows,
     compute_stats,
     drawdown_series,
+    format_duration,
     format_ts,
+    mean_holding,
     reconstruct,
     select_trades,
     vwap,
@@ -108,6 +111,7 @@ def dashboard_of(trades: tuple[TradeRow, ...], equity_values: list[float] | None
         trades=trades,
         metrics=metrics_for(values, stamps),
         is_reproducible=True,
+        bars={},
     )
 
 
@@ -356,3 +360,76 @@ class TestAccordAvecLeMoteur:
         assert s.calmar == pytest.approx(
             d.metrics.cagr / abs(attendu.max_drawdown), rel=0.02
         )
+
+
+# ---------------------------------------------------------------------------
+# Duree en position
+# ---------------------------------------------------------------------------
+
+
+class TestDureeEnPosition:
+    def test_duree_d_un_trade(self):
+        row = TradeRow(symbol=SYMBOL, entry_ts_ns=ts_of(2021, 1, 1),
+                       exit_ts_ns=ts_of(2021, 1, 3), direction=1, quantity=1,
+                       entry_price=1.0, exit_price=2.0, gross_pnl=1.0, fees=0.0)
+        assert row.holding_seconds == pytest.approx(2 * 86400)
+
+    def test_duree_absente_si_un_fill_manque(self):
+        """Un trade dont le fill n'a pas ete retrouve n'a pas de duree
+        connue - zero serait un chiffre faux, pas une absence."""
+        row = TradeRow(symbol=SYMBOL, entry_ts_ns=0, exit_ts_ns=ts_of(2021), direction=1,
+                       quantity=1, entry_price=1.0, exit_price=2.0, gross_pnl=1.0, fees=0.0)
+        assert row.holding_seconds is None
+
+    def test_moyenne_sur_plusieurs_trades(self):
+        a = TradeRow(symbol=SYMBOL, entry_ts_ns=ts_of(2021, 1, 1),
+                     exit_ts_ns=ts_of(2021, 1, 3), direction=1, quantity=1,
+                     entry_price=1.0, exit_price=2.0, gross_pnl=1.0, fees=0.0)
+        b = TradeRow(symbol=SYMBOL, entry_ts_ns=ts_of(2021, 2, 1),
+                     exit_ts_ns=ts_of(2021, 2, 5), direction=1, quantity=1,
+                     entry_price=1.0, exit_price=2.0, gross_pnl=1.0, fees=0.0)
+        assert mean_holding((a, b)) == pytest.approx(3 * 86400)
+
+    def test_les_trades_sans_duree_sont_exclus_pas_comptes_zero(self):
+        bon = TradeRow(symbol=SYMBOL, entry_ts_ns=ts_of(2021, 1, 1),
+                       exit_ts_ns=ts_of(2021, 1, 3), direction=1, quantity=1,
+                       entry_price=1.0, exit_price=2.0, gross_pnl=1.0, fees=0.0)
+        orphelin = TradeRow(symbol=SYMBOL, entry_ts_ns=0, exit_ts_ns=0, direction=1,
+                            quantity=1, entry_price=0.0, exit_price=0.0,
+                            gross_pnl=0.0, fees=0.0)
+        assert mean_holding((bon, orphelin)) == pytest.approx(2 * 86400)
+
+    def test_aucune_duree_connue(self):
+        assert mean_holding(()) is None
+
+    def test_la_duree_moyenne_entre_dans_les_stats(self):
+        d = dashboard_of((trade(year=2021, direction=1, gross=100.0),))
+        stats = compute_stats(d, Filters())
+        assert stats.average_holding_seconds is not None
+        assert stats.average_holding_seconds > 0.0
+
+    @pytest.mark.parametrize(("secondes", "attendu"), [
+        (None, "n/d"),
+        (600.0, "10 min"),
+        (7200.0, "2 h 00"),
+        (9000.0, "2 h 30"),
+        (86400.0, "1 j 00 h"),
+        (2 * 86400 + 3 * 3600, "2 j 03 h"),
+    ])
+    def test_format_lisible(self, secondes, attendu):
+        assert format_duration(secondes) == attendu
+
+
+class TestBarres:
+    def test_le_dashboard_porte_les_barres_par_symbole(self):
+        barres = Bars(symbol=SYMBOL, ts_ns=np.asarray(days_ns(5), dtype=np.int64),
+                      open=np.ones(5), high=np.ones(5) * 2, low=np.ones(5) * 0.5,
+                      close=np.ones(5) * 1.5)
+        d = dashboard_of(())
+        enrichi = Dashboard(
+            name=d.name, fingerprint=d.fingerprint, symbols=d.symbols,
+            equity_ts_ns=d.equity_ts_ns, equity=d.equity, trades=d.trades,
+            metrics=d.metrics, is_reproducible=d.is_reproducible,
+            bars={SYMBOL: barres},
+        )
+        assert enrichi.bars[SYMBOL].close.size == 5

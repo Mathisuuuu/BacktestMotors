@@ -11,8 +11,19 @@ autorite: src/rsl/gui/
 > [charts.py](../../src/rsl/gui/charts.py) pour les courbes,
 > [app.py](../../src/rsl/gui/app.py) pour la fenetre.
 
-Fenetre de resultats d'un backtest : indicateurs, courbes de capital et de
-drawdown, carnet d'ordres, export. Noir et blanc strict, chrome Windows 95.
+Fenetre de resultats d'un backtest, en **quatre onglets**. Fond blanc, mise en
+page plate ; **vert et rouge portent le sens** (gain / perte, hausse / baisse)
+et ne decorent jamais.
+
+| Onglet | Contenu |
+|---|---|
+| `SYNTHESE` | les indicateurs, groupes en Performance / Risque / Activite |
+| `COURBES` | capital et drawdown, abscisse partagee |
+| `PRIX & ORDRES` | bougies de l'instrument, avec les ordres poses dessus |
+| `CARNET D'ORDRES` | une ligne par aller-retour, teintee gain ou perte |
+
+Les filtres (annee, sens) sont au-dessus des onglets : ils s'appliquent aux
+quatre a la fois.
 
 ## Lancer
 
@@ -63,10 +74,11 @@ Sans aucun filtre, l'autorite reste le moteur : `compute_stats` recopie
 
 | Bloc | Contenu |
 |---|---|
-| Indicateurs | Sharpe, Calmar, DD, DD max, gain net/brut, perte nette/brute, profit factor, taux de reussite, nombre de trades, gain/perte moyens |
+| Indicateurs | Sharpe, Calmar, DD, DD max, gain net/brut, perte nette/brute, profit factor, taux de reussite, nombre de trades, **duree moyenne en position**, gain/perte moyens |
 | Filtres | annee (sur la date de **sortie**), sens (tous / long / short) |
 | Courbes | capital et drawdown, abscisse partagee, molette = zoom, glisser = defiler |
-| Carnet | date d'entree, date de sortie, sens, prix d'entree, prix de sortie, PnL, frais |
+| Prix | bougies **apres reechantillonnage** — celles que le moteur a vues — avec fleche d'entree, marqueur de sortie et trait pointille vert (gain) ou rouge (perte) |
+| Carnet | date d'entree, date de sortie, sens, **duree**, prix d'entree, prix de sortie, PnL, frais |
 | Export | carnet en CSV (`;`), statistiques en TXT — tous deux en UTF-8 explicite |
 
 ## Limites connues
@@ -82,6 +94,15 @@ Sans aucun filtre, l'autorite reste le moteur : `compute_stats` recopie
   maximum atteint par la position.
 - Le zoom est reinitialise a chaque changement de filtre : garder l'ancien
   cadrage montrerait une fenetre temporelle qui ne correspond plus aux donnees.
+- **Les etiquettes d'ordres n'apparaissent qu'au zoom** (au plus 12 trades
+  visibles). Sur dix ans, des centaines d'etiquettes se recouvrent et masquent
+  le prix.
+- **La duree moyenne exclut** les trades dont un fill n'a pas ete retrouve :
+  les compter pour zero abaisserait la moyenne sans qu'aucun trade n'ait ete
+  si court.
+- Les bougies sont dessinees a la main. `mplfinance` exigerait **pandas**,
+  ecarte au [[Failed Ideas/ledger]] ; le motif du rejet vise la couche donnees,
+  mais une `LineCollection` suffit ici et evite d'avoir a rouvrir le debat.
 
 ## Liens wiki
 

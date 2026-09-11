@@ -75,3 +75,15 @@ grep "^## \[" wiki/log.md | tail -5
 ## [2026-09-11] note | defaut trouve puis verrouille : l'axe des dates annoncait 2010-2040 pour des donnees 2017-2026 | matplotlib ajoute 5 % de marge et peut reautoscaler au redimensionnement ; bornes fixees ET `set_autoscalex_on(False)` ET rejouees sur `<Configure>`. Couvert par `tests/unit/test_gui_charts.py`
 
 ## [2026-09-11] note | defaut de mise en page : la barre d'export etait poussee hors de la fenetre par les zones extensibles | empilee en dernier, elle sortait du cadre sans avertissement. Construite avant les zones extensibles et ancree `side="bottom"` ; geometrie verifiee au widget pres (tous les blocs dans les 793 px de la fenetre)
+
+## [2026-09-11] feat | tableau de bord refondu : 4 onglets, style plat blanc, vert/rouge porteurs de sens, onglet PRIX & ORDRES avec bougies et ordres, duree moyenne en position | style Windows 95 abandonne sur demande ; `RunArtifacts` remplace le tuple rendu par `run_backtest_detailed` pour transporter aussi les barres servies au moteur ; suite a 1275 tests
+
+## [2026-09-11] note | defaut trouve et verrouille : l'echelle des prix restait figee au zoom | `Axes.clear()` reinitialise le registre de callbacks de matplotlib, donc le `xlim_changed` connecte a la construction ne survivait pas au premier redessin. Remplace par un point d'extension explicite `_apres_fenetre()` -> voir [[lessons]] L9
+
+## [2026-09-11] note | defaut trouve : le bouton de filtre actif s'affichait vide | avec `indicatoron=False`, Tk peint l'etat selectionne avec `selectcolor` et ignore `bg` ; libelle blanc sur fond blanc. `selectcolor` regle en meme temps que `bg`
+
+## [2026-09-11] decision | `mplfinance` ecarte pour les bougies | exigerait pandas, dont le rejet figure au ledger. Le motif du rejet vise la couche donnees et non l'affichage, mais une `LineCollection` plus un `bar` suffisent : pas de raison d'ouvrir le debat pour un graphique
+
+## [2026-09-11] note | correction de l'entree `feat` ci-dessus (log append-only : on corrige par ajout) | le compte exact est **1263 tests**, pas 1275
+
+## [2026-09-11] fix | deux tests de graphiques se sautaient en silence ("aucun affichage disponible") alors que Tk fonctionnait | creer puis detruire une racine `Tk()` par test echoue par intermittence sur les derniers. Fixture passee en portee `module` : une seule racine partagee, 3 executions consecutives sans saut

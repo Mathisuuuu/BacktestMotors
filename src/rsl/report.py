@@ -154,21 +154,34 @@ def run_backtest(spec: BacktestSpec, *, trial_log: TrialLog | None = None) -> Ba
     Enveloppe de `run_backtest_detailed` : la plupart des appelants n'ont que
     faire du `RunResult` brut.
     """
-    report, _result = run_backtest_detailed(spec, trial_log=trial_log)
-    return report
+    return run_backtest_detailed(spec, trial_log=trial_log).report
+
+
+@dataclass(frozen=True, slots=True)
+class RunArtifacts:
+    """Tout ce qu'un run a produit, y compris ce que le rapport ne porte pas.
+
+    Le rapport porte des agregats. Un tableau de bord a besoin des fills, des
+    trades fermes, de la courbe d'equity et des barres effectivement servies au
+    moteur - les barres APRES reechantillonnage, pas les fichiers d'origine,
+    sans quoi le graphe de prix ne montrerait pas ce sur quoi la strategie a
+    decide.
+    """
+
+    report: BacktestReport
+    result: AnyRunResult
+    stores: dict[str, BarStore]
+    instruments: dict[str, InstrumentSpec]
 
 
 def run_backtest_detailed(
     spec: BacktestSpec, *, trial_log: TrialLog | None = None
-) -> tuple[BacktestReport, AnyRunResult]:
-    """Comme `run_backtest`, mais rend AUSSI le resultat brut du runner.
+) -> RunArtifacts:
+    """Comme `run_backtest`, mais rend AUSSI la matiere brute du run.
 
-    Le rapport ne porte ni les fills, ni la courbe d'equity, ni les trades
-    fermes : il porte leurs agregats. Un tableau de bord a besoin des trois.
-    Les rendre par une seconde fonction evite a l'appelant de rejouer le run -
-    deux executions donneraient la meme empreinte, mais couteraient le double
-    et ouvriraient la porte a ce que l'affichage montre un run different de
-    celui qui a ete rapporte.
+    Une seconde fonction plutot qu'un second appel : rejouer le run pour
+    l'afficher couterait le double et ouvrirait la porte a ce que la fenetre
+    montre un run different de celui qui a ete rapporte.
 
     `trial_log` porte le compteur d'essais du Deflated Sharpe. Sans lui, le run
     est traite comme un essai unique - ce qui est vrai pour un run isole, et
@@ -217,7 +230,9 @@ def run_backtest_detailed(
         symbols=symbols,
         cross_sectional=entry.cross_sectional,
     )
-    return report, result
+    return RunArtifacts(
+        report=report, result=result, stores=stores, instruments=instruments
+    )
 
 
 def execute_run(

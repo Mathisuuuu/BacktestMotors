@@ -78,6 +78,13 @@ class TradeRow:
         return "LONG" if self.direction > 0 else "SHORT"
 
     @property
+    def holding_seconds(self) -> float | None:
+        """Temps passe en position, en secondes. `None` si un fill manque."""
+        if self.entry_ts_ns <= 0 or self.exit_ts_ns <= 0:
+            return None
+        return (self.exit_ts_ns - self.entry_ts_ns) / NS_PER_SECOND
+
+    @property
     def exit_year(self) -> int:
         """Annee de SORTIE : c'est la que le P&L est realise.
 
@@ -86,6 +93,22 @@ class TradeRow:
         pas le resultat total.
         """
         return to_datetime(self.exit_ts_ns).year
+
+
+@dataclass(frozen=True, slots=True)
+class Bars:
+    """Barres OHLC d'un instrument, telles que le moteur les a vues.
+
+    APRES reechantillonnage : un graphe de prix trace sur les barres d'origine
+    montrerait autre chose que ce sur quoi la strategie a decide.
+    """
+
+    symbol: str
+    ts_ns: IntArray
+    open: FloatArray
+    high: FloatArray
+    low: FloatArray
+    close: FloatArray
 
 
 @dataclass(frozen=True, slots=True)
@@ -117,6 +140,7 @@ class Dashboard:
     trades: tuple[TradeRow, ...]
     metrics: PerformanceMetrics
     is_reproducible: bool
+    bars: dict[str, Bars]
 
     @property
     def years(self) -> tuple[int, ...]:
@@ -145,6 +169,7 @@ class Stats:
     n_trades: int
     average_win: float | None
     average_loss: float | None
+    average_holding_seconds: float | None
     fees_total: float
     regime: str
     curve_ts_ns: IntArray
@@ -162,9 +187,11 @@ def build_dashboard(
     trades: Sequence[ClosedTrade],
     equity_ts_ns: Sequence[int],
     equity: Sequence[float],
+    bars: dict[str, Bars] | None = None,
 ) -> Dashboard:
     """Assemble le jeu de donnees du tableau de bord."""
     return Dashboard(
+        bars=bars if bars is not None else {},
         name=report.spec.name,
         fingerprint=report.result_fingerprint,
         symbols=report.symbols,
@@ -346,11 +373,38 @@ def compute_stats(dashboard: Dashboard, filters: Filters) -> Stats:
         n_trades=len(trades),
         average_win=(net_profit / len(gagnants)) if gagnants else None,
         average_loss=(-net_loss / len(perdants)) if perdants else None,
+        average_holding_seconds=mean_holding(trades),
         fees_total=sum(t.fees for t in trades),
         regime=regime,
         curve_ts_ns=ts,
         curve=courbe,
     )
+
+
+def mean_holding(trades: Sequence[TradeRow]) -> float | None:
+    """Duree moyenne en position, en secondes.
+
+    Les trades dont un fill n'a pas ete retrouve sont exclus du calcul plutot
+    que comptes pour zero : une duree nulle tirerait la moyenne vers le bas
+    sans qu'aucun trade n'ait reellement ete si court.
+    """
+    durees = [d for t in trades if (d := t.holding_seconds) is not None]
+    if not durees:
+        return None
+    return sum(durees) / len(durees)
+
+
+def format_duration(secondes: float | None) -> str:
+    """Duree lisible : jours et heures, ou heures et minutes si moins d'un jour."""
+    if secondes is None:
+        return "n/d"
+    if secondes < 3600:
+        return f"{secondes / 60:.0f} min"
+    if secondes < 86400:
+        heures, reste = divmod(secondes, 3600)
+        return f"{heures:.0f} h {reste / 60:02.0f}"
+    jours, reste = divmod(secondes, 86400)
+    return f"{jours:.0f} j {reste / 3600:02.0f} h"
 
 
 def current_drawdown(courbe: FloatArray) -> float | None:
