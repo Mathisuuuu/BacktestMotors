@@ -6,7 +6,7 @@ import pytest
 
 from fixtures import synthetic
 from rsl.data.feed import BarContext
-from rsl.data.schema import BarStore, Field
+from rsl.data.schema import BarStore, Field, PositionState
 from rsl.engine.orders import Fill, Order, OrderType, Side
 from rsl.errors import ConfigurationError, RegistryError
 from rsl.strategies.base import (
@@ -21,6 +21,7 @@ from rsl.strategies.base import (
 )
 from rsl.strategies.rules import FlatStrategy, RuleStrategy
 from rsl.strategies.signals import (
+    FALSE,
     TRUE,
     Arith,
     ArithOp,
@@ -28,6 +29,7 @@ from rsl.strategies.signals import (
     CompareOp,
     CrossesAbove,
     CrossesBelow,
+    Position,
     Rolling,
     RollingStat,
     const,
@@ -453,3 +455,113 @@ class TestTypeDOrdreALEntree:
         (ordre,) = reconstruit.on_bar(self.barre_declenchante())
         assert ordre.order_type is OrderType.STOP
         assert ordre.stop_price == pytest.approx(42.0)
+
+
+class TestSortiePartielle:
+    """`exit_quantity` : alleger au lieu de tout fermer.
+
+    Sans cette cle, une sortie est tout ou rien - c'etait la troisieme des
+    limites trouvees en comparant le moteur au vocabulaire.
+    """
+
+    def contexte(self) -> BarContext:
+        store = synthetic.make_store(synthetic.ramp(60, 100.0, 1.0))
+        ctx = BarContext(store)
+        for _ in range(40):
+            ctx._advance()
+        return ctx
+
+    def en_position(self, taille: int, **overrides: object) -> RuleStrategy:
+        """Strategie deja en position, sortie declenchee a la prochaine barre."""
+        params: dict[str, object] = {
+            "symbol": "SYNTH.v.0", "quantity": abs(taille),
+            "entry_long": const(FALSE), "entry_short": const(FALSE),
+            "exit_long": const(TRUE), "exit_short": const(TRUE),
+        }
+        params.update(overrides)
+        strategie = RuleStrategy(**params)  # type: ignore[arg-type]
+        cote = Side.BUY if taille > 0 else Side.SELL
+        strategie.on_fill(fill_for(
+            Order(symbol="SYNTH.v.0", side=cote, quantity=abs(taille))
+        ))
+        return strategie
+
+    def test_sans_la_cle_la_position_entiere_est_fermee(self):
+        """Retrocompatibilite : le comportement d'avant, inchange."""
+        (ordre,) = self.en_position(5).on_bar(self.contexte())
+        assert ordre.quantity == 5
+        assert ordre.side is Side.SELL and ordre.reduce_only
+
+    def test_une_quantite_partielle_est_respectee(self):
+        (ordre,) = self.en_position(5, exit_quantity=const(2.0)).on_bar(self.contexte())
+        assert ordre.quantity == 2
+
+    def test_la_demande_est_bornee_a_ce_qui_est_detenu(self):
+        """L'ordre est `reduce_only` de toute facon ; mieux vaut le dire ici."""
+        (ordre,) = self.en_position(3, exit_quantity=const(99.0)).on_bar(self.contexte())
+        assert ordre.quantity == 3
+
+    def test_le_signe_est_ignore_car_la_quantite_est_une_magnitude(self):
+        """C'est ce qui permet d'ecrire `position.quantity * 0.5` et d'alleger
+        de moitie qu'on soit long ou court, `quantity` etant signee."""
+        moitie = Arith(Position("quantity"), ArithOp.MUL, const(0.5))
+
+        def avec_position(taille: int):
+            """Le compteur interne de la strategie et l'etat expose par le
+            contexte sont deux choses distinctes : en run reel le runner les
+            garde d'accord, ici il faut renseigner les deux."""
+            ctx = self.contexte()
+            ctx._set_position(PositionState(quantity=taille))
+            return self.en_position(taille, exit_quantity=moitie).on_bar(ctx)
+
+        (long_,) = avec_position(4)
+        (court,) = avec_position(-4)
+        assert long_.quantity == 2 and long_.side is Side.SELL
+        assert court.quantity == 2 and court.side is Side.BUY
+
+    def test_moins_d_un_contrat_n_emet_rien(self):
+        """On ne ferme pas une fraction de contrat, et arrondir a 1 trahirait
+        l'intention."""
+        assert self.en_position(1, exit_quantity=const(0.4)).on_bar(self.contexte()) == []
+
+    def test_une_quantite_nulle_ou_negative_n_emet_rien(self):
+        assert self.en_position(5, exit_quantity=const(0.0)).on_bar(self.contexte()) == []
+
+    def test_un_signal_indefini_n_emet_rien(self):
+        """Meme convention que partout : « je ne sais pas » n'est pas une
+        raison d'agir."""
+        indefini = Rolling(RollingStat.MEAN, 5000, price("close"))
+        assert self.en_position(5, exit_quantity=indefini).on_bar(self.contexte()) == []
+
+    def test_la_sortie_partielle_reste_reduce_only(self):
+        (ordre,) = self.en_position(5, exit_quantity=const(2.0)).on_bar(self.contexte())
+        assert ordre.reduce_only is True
+
+    def test_alleger_laisse_la_position_ouverte(self):
+        """La propriete qui definit la sortie partielle."""
+        strategie = self.en_position(5, exit_quantity=const(2.0))
+        (ordre,) = strategie.on_bar(self.contexte())
+        strategie.on_fill(fill_for(ordre))
+        assert strategie._position == 3
+
+    def test_le_warmup_couvre_le_signal_de_quantite(self):
+        strategie = RuleStrategy(
+            symbol="X", quantity=1, entry_long=const(TRUE),
+            exit_quantity=Rolling(RollingStat.MEAN, 150, price("close")),
+        )
+        assert strategie.warmup_bars >= 150
+
+    def test_aller_retour_declaratif(self):
+        reconstruit = RuleStrategy.from_spec({
+            "symbol": "SYNTH.v.0", "quantity": 5,
+            "rules": {
+                "entry_long": {"type": "constant", "value": 0.0},
+                "exit_long": {"type": "constant", "value": 1.0},
+                "exit_quantity": {"type": "constant", "value": 2.0},
+            },
+        })
+        reconstruit.on_fill(fill_for(
+            Order(symbol="SYNTH.v.0", side=Side.BUY, quantity=5)
+        ))
+        (ordre,) = reconstruit.on_bar(self.contexte())
+        assert ordre.quantity == 2

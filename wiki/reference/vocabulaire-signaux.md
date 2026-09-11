@@ -45,6 +45,7 @@ nature :
 | Taille fonction d'un signal | **leve** : `sizing.kind: "signal"` prend un noeud quelconque, avec un `max_contracts` obligatoire |
 | Ordres autres qu'au marche | **leve** : `entry_limit` et `entry_stop` dans `rules`. Lire la semantique ci-dessous AVANT de s'en servir |
 | Un seul instrument par strategie a regles | **leve** : `multi_rules@1` prend un jeu de regles PAR instrument, dans un portefeuille commun |
+| Sorties tout ou rien | **leve** : `exit_quantity` dans `rules` alleger au lieu de tout fermer |
 | Optimisation de parametres | **debout, par decision** : hors perimetre declare du runner ([[Failed Ideas/ledger]]) |
 | Noeud a memoire entre barres | **debout, par decision** : casserait la reproductibilite bit-a-bit |
 | Primitive vraiment nouvelle | ~30 lignes de Python et un enregistrement `@1` |
@@ -55,6 +56,45 @@ des garanties. Les lever couterait ce que le depot protege.
 Astuce utile : `rolling` n'offre que l'EMA (`alpha = 2/(w+1)`), pas le lissage
 de Wilder (`alpha = 1/n`). Les deux coincident pour `w = 2n - 1` - l'amorce
 differe, les series convergent.
+
+## Alleger une position : `exit_quantity`
+
+Une cle de plus dans `rules`, un noeud qui donne un NOMBRE DE CONTRATS.
+Absente, la sortie ferme tout - le comportement d'avant.
+
+```json
+"exit_quantity": { "type": "arith", "op": "*",
+                   "left":  { "type": "position", "field": "quantity" },
+                   "right": { "type": "constant", "value": 0.5 } }
+```
+
+La valeur est une **magnitude** : son signe est ignore. C'est ce qui permet
+d'ecrire l'exemple ci-dessus sans `abs` et d'alleger de moitie qu'on soit long
+ou court, `position.quantity` etant signee.
+
+> Cela DIFFERE de `sizing.kind: "signal"`, ou une valeur negative annule la
+> taille. La, le sens vient des regles d'entree et un negatif n'a pas de
+> lecture ; ici la position existe deja, donc le sens est connu.
+
+Trois cas n'emettent aucun ordre, et l'ordre manquant se lit dans les
+compteurs :
+
+| Cas | Pourquoi |
+|---|---|
+| signal indefini | « je ne sais pas » n'est pas une raison d'agir |
+| moins d'un contrat apres troncature | on ne ferme pas une fraction de contrat, et arrondir a 1 trahirait l'intention |
+| valeur nulle ou negative | rien a fermer |
+
+Une demande superieure a la position est **bornee** a ce qui est detenu.
+L'ordre reste `reduce_only`, comme toute sortie.
+
+Mesure sur ES quotidien, quatre contrats par position :
+
+| Sortie | Trades | Profit factor |
+|---|---|---|
+| totale | 8 | 0.68 |
+| moitie | 9 | 0.52 |
+| un contrat | 9 | 0.50 |
 
 ## Plusieurs instruments, chacun ses regles : `multi_rules@1`
 

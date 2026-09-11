@@ -68,6 +68,7 @@ class RuleStrategy(Strategy):
     take_profit: Signal | None = None
     entry_limit: Signal | None = None
     entry_stop: Signal | None = None
+    exit_quantity: Signal | None = None
     allow_pyramiding: bool = False
     extra_warmup: int = 0
     _position: int = field(default=0, init=False, repr=False)
@@ -103,6 +104,7 @@ class RuleStrategy(Strategy):
                 self.take_profit,
                 self.entry_limit,
                 self.entry_stop,
+                self.exit_quantity,
             )
             if s is not None
         ]
@@ -119,9 +121,13 @@ class RuleStrategy(Strategy):
         orders: list[Order] = []
 
         if self._position > 0 and self._fires(self.exit_long, ctx):
-            orders.append(self._close(Side.SELL, abs(self._position), "exit_long"))
+            taille = self._exit_size(ctx)
+            if taille is not None:
+                orders.append(self._close(Side.SELL, taille, "exit_long"))
         elif self._position < 0 and self._fires(self.exit_short, ctx):
-            orders.append(self._close(Side.BUY, abs(self._position), "exit_short"))
+            taille = self._exit_size(ctx)
+            if taille is not None:
+                orders.append(self._close(Side.BUY, taille, "exit_short"))
 
         projected = self._position + sum(o.signed_quantity for o in orders)
 
@@ -153,6 +159,7 @@ class RuleStrategy(Strategy):
                     ("take_profit", self.take_profit),
                     ("entry_limit", self.entry_limit),
                     ("entry_stop", self.entry_stop),
+                    ("exit_quantity", self.exit_quantity),
                 )
             },
         }
@@ -181,6 +188,7 @@ class RuleStrategy(Strategy):
             exit_long=node("exit_long"),
             entry_short=node("entry_short"),
             exit_short=node("exit_short"),
+            exit_quantity=node("exit_quantity"),
             entry_limit=node("entry_limit"),
             entry_stop=node("entry_stop"),
             stop_loss=node("stop_loss"),
@@ -204,6 +212,39 @@ class RuleStrategy(Strategy):
         if not self.allow_pyramiding:
             return False
         return (projected > 0) == (side is Side.BUY)
+
+    def _exit_size(self, ctx: Context) -> int | None:
+        """Combien de contrats fermer. `None` signifie : n'emettre aucun ordre.
+
+        Sans `exit_quantity`, la position entiere - le comportement d'avant,
+        donc aucune specification existante ne change de sens.
+
+        La valeur rendue par le signal est une **magnitude** : son signe est
+        ignore. C'est ce qui permet d'ecrire `position.quantity * 0.5` et
+        d'alleger de moitie qu'on soit long ou court, `quantity` etant signee.
+        Cela DIFFERE de `SignalSizing`, ou une valeur negative annule la taille :
+        la, le sens vient des regles d'entree et un negatif n'a pas de lecture ;
+        ici la position existe deja, et le sens est donc connu.
+
+        Trois refus, tous silencieux mais visibles dans les compteurs d'ordres :
+
+        - signal indefini : « je ne sais pas » n'est pas une raison d'agir,
+          meme convention que `_fires` ;
+        - moins d'un contrat apres troncature : on ne ferme pas une fraction
+          de contrat, et arrondir a 1 trahirait l'intention ;
+        - plus que la position : borne a ce qui est detenu, l'ordre etant de
+          toute facon `reduce_only`.
+        """
+        detenu = abs(self._position)
+        if self.exit_quantity is None:
+            return detenu
+        valeur = self.exit_quantity(ctx)
+        if valeur is None:
+            return None
+        demande = int(abs(valeur))
+        if demande < 1:
+            return None
+        return min(demande, detenu)
 
     def _close(self, side: Side, quantity: int, tag: str) -> Order:
         return Order(
