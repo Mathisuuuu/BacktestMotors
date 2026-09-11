@@ -289,7 +289,10 @@
               "atr_window": 14,
               "contracts": null,
               "fraction": null,
-              "kind": "none"
+              "kind": "none",
+              "vol_max_multiple": 4.0,
+              "vol_target": null,
+              "vol_window": 20
             }
           }
         },
@@ -343,10 +346,37 @@
               "none",
               "fixed",
               "equity_fraction",
-              "risk_fraction"
+              "risk_fraction",
+              "vol_target"
             ],
             "title": "Kind",
             "type": "string"
+          },
+          "vol_max_multiple": {
+            "default": 4.0,
+            "exclusiveMinimum": 0.0,
+            "title": "Vol Max Multiple",
+            "type": "number"
+          },
+          "vol_target": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Ecart-type cible des rendements PAR BARRE, jamais annualise.",
+            "title": "Vol Target"
+          },
+          "vol_window": {
+            "default": 20,
+            "minimum": 2,
+            "title": "Vol Window",
+            "type": "integer"
           }
         },
         "title": "SizingSpec",
@@ -485,7 +515,10 @@
             "atr_window": 14,
             "contracts": null,
             "fraction": null,
-            "kind": "none"
+            "kind": "none",
+            "vol_max_multiple": 4.0,
+            "vol_target": null,
+            "vol_window": 20
           }
         }
       },
@@ -1077,6 +1110,11 @@
                   "count_true"
                 ],
                 "type": "string"
+              },
+              "stride": {
+                "default": 1,
+                "minimum": 1,
+                "type": "integer"
               },
               "type": {
                 "const": "rolling"

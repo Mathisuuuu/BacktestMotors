@@ -399,6 +399,11 @@
           "requis": true,
           "type": "choix"
         },
+        "stride": {
+          "defaut": 1,
+          "min": 1,
+          "type": "entier"
+        },
         "window": {
           "min": 1,
           "requis": true,
@@ -1137,10 +1142,27 @@
                 "none",
                 "fixed",
                 "equity_fraction",
-                "risk_fraction"
+                "risk_fraction",
+                "vol_target"
               ],
               "defaut": "none",
               "type": "choix"
+            },
+            "vol_max_multiple": {
+              "defaut": 4.0,
+              "min_exclu": 0.0,
+              "type": "nombre"
+            },
+            "vol_target": {
+              "accepte_null": true,
+              "defaut": null,
+              "min_exclu": 0.0,
+              "type": "nombre"
+            },
+            "vol_window": {
+              "defaut": 20,
+              "min": 2,
+              "type": "entier"
             }
           },
           "defaut": {
@@ -1148,7 +1170,10 @@
             "atr_window": 14,
             "contracts": null,
             "fraction": null,
-            "kind": "none"
+            "kind": "none",
+            "vol_max_multiple": 4.0,
+            "vol_target": null,
+            "vol_window": 20
           },
           "type": "objet"
         }
@@ -1160,7 +1185,10 @@
           "atr_window": 14,
           "contracts": null,
           "fraction": null,
-          "kind": "none"
+          "kind": "none",
+          "vol_max_multiple": 4.0,
+          "vol_target": null,
+          "vol_window": 20
         }
       },
       "type": "objet"

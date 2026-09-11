@@ -271,3 +271,57 @@ class TestBarsSince:
     def test_aller_retour_declaratif(self):
         noeud = bars_since(4, Compare(price("close"), CompareOp.GT, const(0.0)))
         assert build_signal(noeud.describe())(dernier(rampe(20))) == pytest.approx(0.0)
+
+
+# ---------------------------------------------------------------------------
+# Pas d'echantillonnage de `rolling`
+# ---------------------------------------------------------------------------
+
+
+class TestStride:
+    def ctx(self) -> BarContext:
+        return dernier(rampe(12))
+
+    def test_le_defaut_ne_change_rien(self):
+        """Aucune specification ecrite avant l'ajout ne change de sens."""
+        ctx = self.ctx()
+        assert rolling("mean", 5, price("close"))(ctx) == pytest.approx(
+            rolling("mean", 5, price("close"), 1)(ctx)
+        )
+
+    def test_il_echantillonne_une_barre_sur_n(self):
+        """Rampe 10..21 : lags 0, 2, 4 valent 21, 19, 17 -> moyenne 19."""
+        assert rolling("mean", 3, price("close"), 2)(self.ctx()) == pytest.approx(19.0)
+
+    def test_un_pas_de_trois(self):
+        """Lags 0, 3, 6 valent 21, 18, 15 -> moyenne 18."""
+        assert rolling("mean", 3, price("close"), 3)(self.ctx()) == pytest.approx(18.0)
+
+    def test_le_warmup_suit_le_pas(self):
+        sans = rolling("mean", 5, price("close")).warmup_bars
+        avec = rolling("mean", 5, price("close"), 4).warmup_bars
+        assert avec == sans + 4 * (5 - 1) - (5 - 1)
+        assert avec == 1 + (5 - 1) * 4
+
+    def test_la_pente_est_par_echantillon_pas_par_barre(self):
+        """Piege documente : sur une rampe de +1/barre et un pas de 2, `slope`
+        vaut 2. Diviser par `stride` pour revenir a des unites par barre."""
+        assert rolling("slope", 4, price("close"), 2)(self.ctx()) == pytest.approx(2.0)
+
+    def test_un_pas_nul_ou_negatif_est_refuse(self):
+        with pytest.raises(ConfigurationError, match="stride"):
+            rolling("mean", 3, price("close"), 0)
+
+    def test_un_pas_non_entier_est_refuse(self):
+        with pytest.raises(ConfigurationError, match="stride"):
+            build_signal({"type": "rolling", "stat": "mean", "window": 3, "stride": 2.5,
+                          "inner": {"type": "constant", "value": 1.0}})
+
+    def test_aller_retour_declaratif(self):
+        noeud = rolling("mean", 3, price("close"), 2)
+        assert noeud.describe()["stride"] == 2
+        assert build_signal(noeud.describe())(self.ctx()) == pytest.approx(19.0)
+
+    def test_historique_insuffisant_rend_none(self):
+        """Un pas large epuise l'historique plus vite qu'une fenetre serree."""
+        assert rolling("mean", 5, price("close"), 50)(self.ctx()) is None

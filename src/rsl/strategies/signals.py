@@ -766,6 +766,7 @@ DISPERSION_STATS = (RollingStat.STDEV, RollingStat.ZSCORE, RollingStat.VAR, Roll
             choices=tuple(s.value for s in RollingStat),
         ),
         NodeField("window", FieldKind.INTEGER, minimum=1),
+        NodeField("stride", FieldKind.INTEGER, required=False, default=1, minimum=1),
         NodeField("inner", FieldKind.NODE),
     ),
 )
@@ -779,6 +780,25 @@ class Rolling:
     de prix brut ne se trade pas, son z-score si :
 
         rolling(zscore, 100, arith(close, "-", peer("NQ.v.0", close)))
+
+    Le pas d'echantillonnage (`stride`)
+    -----------------------------------
+    Par defaut `stride = 1` : la fenetre prend les `window` dernieres barres,
+    consecutives. Avec `stride = n`, elle prend une barre sur `n` - lags 0, n,
+    2n, ... Toute specification ecrite avant l'ajout de ce champ garde donc
+    exactement le meme sens.
+
+    A quoi cela sert : comparer une barre a celles qui occupent le MEME RANG
+    dans les periodes precedentes. Sur des barres de 5 minutes et un `stride`
+    de 78, la 12e barre du jour se compare aux 12es barres des jours passes.
+    Le pas est DECLARE par l'utilisateur, jamais devine : le socle ne connait
+    pas de notion de seance, et l'inferer d'un trou serait une supposition
+    (voir le ledger).
+
+    Attention a une statistique : `slope` rend une pente par ECHANTILLON, donc
+    par `stride` barres des que le pas depasse 1. Sur une rampe de +1 par barre
+    et un `stride` de 2, elle vaut 2, pas 1. Diviser par `stride` pour revenir
+    a des unites par barre.
 
     Comment la fenetre est constituee
     ---------------------------------
@@ -805,8 +825,11 @@ class Rolling:
     stat: RollingStat
     window: int
     inner: Signal
+    stride: int = 1
 
     def __post_init__(self) -> None:
+        if self.stride < 1:
+            raise ConfigurationError(f"stride doit etre >= 1, recu {self.stride}")
         if self.window < 1:
             raise ConfigurationError(f"window doit etre >= 1, recu {self.window}")
         if self.stat in DISPERSION_STATS and self.window < 2:
@@ -817,11 +840,11 @@ class Rolling:
 
     @property
     def warmup_bars(self) -> int:
-        return self.inner.warmup_bars + self.window - 1
+        return self.inner.warmup_bars + (self.window - 1) * self.stride
 
     def __call__(self, ctx: Context) -> float | None:
         values: list[float] = []
-        for lag in range(self.window):
+        for lag in range(0, self.window * self.stride, self.stride):
             try:
                 value = self.inner(ctx.shifted(lag))
             except InsufficientHistoryError:
@@ -887,6 +910,7 @@ class Rolling:
             "version": self.NODE_VERSION,
             "stat": self.stat.value,
             "window": self.window,
+            "stride": self.stride,
             "inner": self.inner.describe(),
         }
 
@@ -901,12 +925,15 @@ class Rolling:
         window = spec.get("window")
         if not isinstance(window, int) or isinstance(window, bool):
             raise ConfigurationError(f"'rolling' exige un `window` entier, recu {window!r}")
-        return cls(RollingStat(raw), window, _child(spec, "inner", build))
+        stride = spec.get("stride", 1)
+        if not isinstance(stride, int) or isinstance(stride, bool):
+            raise ConfigurationError(f"'rolling' exige un `stride` entier, recu {stride!r}")
+        return cls(RollingStat(raw), window, _child(spec, "inner", build), stride)
 
 
-def rolling(stat: str, window: int, inner: Signal) -> Rolling:
+def rolling(stat: str, window: int, inner: Signal, stride: int = 1) -> Rolling:
     """Raccourci : `rolling("zscore", 100, spread)`."""
-    return Rolling(RollingStat(stat), window, inner)
+    return Rolling(RollingStat(stat), window, inner, stride)
 
 
 # ---------------------------------------------------------------------------

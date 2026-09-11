@@ -151,6 +151,89 @@ class RiskFraction:
         }
 
 
+@dataclass(frozen=True, slots=True)
+class VolatilityTarget:
+    """Taille inversement proportionnelle a la volatilite realisee.
+
+        facteur   = min(vol_max_multiple, vol_target / volatilite_realisee)
+        contracts = trunc(contracts_de_base * facteur)
+
+    A distinguer de `RiskFraction`, avec laquelle on la confond souvent : celle-ci
+    dimensionne sur la distance au stop, donc sur le risque d'UN trade. Celle-la
+    vise une volatilite de PORTEFEUILLE et ne depend d'aucun stop. Ce sont deux
+    idees differentes, pas deux reglages de la meme.
+
+    `vol_target` est un ecart-type **PAR BARRE**, jamais annualise. Le socle
+    refuse les facteurs d'annualisation supposes : le pas d'annualisation est
+    mesure sur l'echantillon, apres coup, et une regle de dimensionnement ne le
+    connait pas au moment de decider. Exprimer la cible en annuel obligerait a
+    en supposer un - c'est exactement l'erreur que le ledger consigne comme
+    gonflant le Sharpe d'un facteur deux sur des donnees minute.
+
+    Piege a connaitre : le nombre de contrats est TRONQUE, comme dans toutes les
+    autres regles. Avec `contracts: 1` et un facteur d'echelle inferieur a 1,
+    `int(1 * 0.9)` vaut zero - la strategie ne prend alors jamais position, sans
+    erreur. Choisir une base assez grande pour que la troncature ne mange pas
+    tout le signal : `contracts: 10` donne dix paliers, `contracts: 100` en
+    donne cent.
+
+    Pas de decalage explicite : le `Context` n'expose que des barres CLOSES, et
+    l'execution est retardee d'au moins une barre (`lag_bars >= 1`). Lire la
+    barre courante n'est donc pas lire son propre resultat - c'est la meme
+    garantie dont `RiskFraction` herite pour son ATR, sans regle supplementaire.
+    """
+
+    vol_target: float
+    vol_window: int = 20
+    vol_max_multiple: float = 4.0
+    contracts_base: int = 1
+
+    def __post_init__(self) -> None:
+        if self.vol_target <= 0.0:
+            raise ConfigurationError(f"vol_target doit etre > 0, recu {self.vol_target}")
+        if self.vol_window < 2:
+            raise ConfigurationError(
+                f"vol_window doit etre >= 2, recu {self.vol_window} : "
+                f"un seul rendement n'a pas de dispersion"
+            )
+        if self.vol_max_multiple <= 0.0:
+            raise ConfigurationError(
+                f"vol_max_multiple doit etre > 0, recu {self.vol_max_multiple}"
+            )
+        if self.contracts_base < 1:
+            raise ConfigurationError(
+                f"contracts doit etre >= 1, recu {self.contracts_base}"
+            )
+
+    @property
+    def warmup_bars(self) -> int:
+        return self.vol_window + 1
+
+    def contracts(
+        self, ctx: Context, spec: InstrumentSpec, equity: float, reference_price: float
+    ) -> int:
+        """Zero quand la volatilite n'est pas estimable.
+
+        Meme convention que `RiskFraction` : une taille non calculable ne
+        devient pas une taille par defaut. Le compteur `n_dropped_sizing` rend
+        l'evenement visible plutot que silencieux.
+        """
+        realisee = bind_primitive("volatility@1", window=self.vol_window, log=True)(ctx)
+        if realisee is None or realisee <= 0.0:
+            return 0
+        facteur = min(self.vol_max_multiple, self.vol_target / realisee)
+        return int(self.contracts_base * facteur)
+
+    def describe(self) -> SpecDict:
+        return {
+            "rule": "vol_target",
+            "vol_target": self.vol_target,
+            "vol_window": self.vol_window,
+            "vol_max_multiple": self.vol_max_multiple,
+            "contracts": self.contracts_base,
+        }
+
+
 @dataclass(slots=True)
 class RiskStats:
     n_dropped_sizing: int = 0

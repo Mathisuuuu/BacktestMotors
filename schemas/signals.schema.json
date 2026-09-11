@@ -543,6 +543,11 @@
               ],
               "type": "string"
             },
+            "stride": {
+              "default": 1,
+              "minimum": 1,
+              "type": "integer"
+            },
             "type": {
               "const": "rolling"
             },

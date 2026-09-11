@@ -52,6 +52,7 @@ from rsl.engine.risk import (
     RiskFraction,
     RiskManager,
     SizingRule,
+    VolatilityTarget,
 )
 from rsl.engine.runner import RunConfig
 from rsl.env import resolve_data_path
@@ -200,11 +201,18 @@ class ExecutionSpec(StrictModel):
 
 
 class SizingSpec(StrictModel):
-    kind: Literal["none", "fixed", "equity_fraction", "risk_fraction"] = "none"
+    kind: Literal["none", "fixed", "equity_fraction", "risk_fraction", "vol_target"] = "none"
     contracts: int | None = Field(default=None, ge=1)
     fraction: float | None = Field(default=None, gt=0.0)
     atr_window: int = Field(default=14, ge=1)
     atr_multiple: float = Field(default=2.0, gt=0.0)
+    vol_target: float | None = Field(
+        default=None,
+        gt=0.0,
+        description="Ecart-type cible des rendements PAR BARRE, jamais annualise.",
+    )
+    vol_window: int = Field(default=20, ge=2)
+    vol_max_multiple: float = Field(default=4.0, gt=0.0)
 
     def build(self) -> SizingRule | None:
         match self.kind:
@@ -223,6 +231,15 @@ class SizingSpec(StrictModel):
                     raise ConfigurationError("sizing 'risk_fraction' : `fraction` est requis")
                 return RiskFraction(
                     self.fraction, atr_window=self.atr_window, atr_multiple=self.atr_multiple
+                )
+            case "vol_target":
+                if self.vol_target is None:
+                    raise ConfigurationError("sizing 'vol_target' : `vol_target` est requis")
+                return VolatilityTarget(
+                    self.vol_target,
+                    vol_window=self.vol_window,
+                    vol_max_multiple=self.vol_max_multiple,
+                    contracts_base=self.contracts if self.contracts is not None else 1,
                 )
 
 

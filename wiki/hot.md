@@ -17,9 +17,9 @@ generated: true
 | Indicateur | Valeur |
 |---|---|
 | Pages de wiki | 21 |
-| Entrees de log | 41 |
+| Entrees de log | 46 |
 | Derniere activite | 2026-09-11 |
-| Idees ecartees (ledger) | 11 |
+| Idees ecartees (ledger) | 14 |
 | Idees en attente (ledger) | 3 |
 | Pages `Failed Ideas/` | 1 |
 | Pages `concepts/` | 6 |
@@ -27,7 +27,7 @@ generated: true
 | Pages `reference/` | 6 |
 | Pages `research/` | 1 |
 
-**Activite par type :** note × 23, fix × 7, feat × 4, decision × 4, setup × 1, lint × 1, experiment × 1
+**Activite par type :** note × 27, fix × 7, decision × 5, feat × 4, setup × 1, lint × 1, experiment × 1
 
 ## Experiences
 
@@ -41,14 +41,14 @@ Le total des essais alimente le Deflated Sharpe : un essai non enregistre gonfle
 
 ## Derniere activite — 8 entree(s)
 
+- **2026-09-11** — note | `vol_target` verifie sur le mecanisme, pas sur un resultat | doubler la volatilite divise la taille par deux : 494, 197, 98, 49, 19 contrats pour des volatilites de 0,002 a 0,050 par barre. Piege d'interpretation observe au passage : une cible de 1 % PAR BARRE sur du quotidien avec une base de 20 donne ~18 contrats ES sur 100 k d'equity -- un levier considerable, meme famille de piege que celui deja documente pour `equity_fraction`. **3 executions sur donnees reelles, donc 3 essais** (L2)
+- **2026-09-11** — note | piege trouve en testant `vol_target` : la troncature peut annuler la strategie | `int(1 * 0.9)` vaut 0 : avec `contracts: 1` et un facteur d'echelle sous 1, aucune position n'est jamais prise, sans erreur ni avertissement. Documente dans la regle et couvert par un test ; remede = une base assez grande (`contracts: 10` donne dix paliers)
+- **2026-09-11** — note | le decalage d'une periode exige par la proposition est inutile ICI, et je l'ai omis | le `Context` n'expose que des barres closes et l'execution est retardee (`lag_bars >= 1`) : lire la barre courante n'est pas lire son propre resultat. `RiskFraction` herite deja de cette garantie pour son ATR sans regle supplementaire. Ajouter un decalage aurait ete un reglage sans effet, donc une fausse precaution
+- **2026-09-11** — note | la cible de `vol_target` est PAR BARRE, pas annualisee -- correction de la proposition | elle demandait `vol_window` "en SEANCES" et une cible implicitement annuelle. Le ledger a deja ecarte les fenetres exprimees autrement qu'en barres, et l'annualisation par facteur suppose (gonflement d'un facteur ~2 sur donnees minute). Une regle de dimensionnement ne connait pas le pas d'annualisation, qui se mesure apres coup sur l'echantillon
+- **2026-09-11** — decision | proposition d'extensions "seance" recue et arbitree : 2 ajouts sur 4 retenus | RETENUS : `sizing.kind: "vol_target"` (dimensionnement en volatilite cible, distinct de `risk_fraction` qui dimensionne sur la distance au stop) et `rolling.stride` (pas d'echantillonnage, qui couvre le besoin de `across: sessions_same_offset` sans deviner de frontiere). ECARTES : noeuds `session` et `cumulative` -> ledger. Suite 1405 -> 1434 tests, 4 empreintes d'exemples inchangees
 - **2026-09-11** — note | les cles de `rules` ne sont plus recopiees nulle part | elles etaient enumerees trois fois dans `rules.py` ; le squelette les DERIVE de `RuleStrategy.describe()` plutot que d'en faire une quatrieme copie
 - **2026-09-11** — note | suffisance du squelette verifiee, pas supposee | trois tests construisent, a partir du SEUL document, une specification valide, puis chaque type de noeud, puis chaque primitive. Verification pratique en plus : un script n'important pas `rsl` a lu le squelette, ecrit une strategie MACD + ADX + stop ATR de Wilder, et l'a executee -> 50 trades, +65,59 %, code 0, empreinte 104e266aa7bdfaf6. **Cette execution consomme un essai** (L2)
 - **2026-09-11** — feat | `rsl squelette` : le vocabulaire presente comme un formulaire a remplir | nouveau `src/rsl/skeleton.py` + `schemas/squelette.json` (33 ko, ASCII pur). Chaque emplacement d'une specification y porte son type, ses choix, son defaut. Trois renvois croises rendus enumerables : `root` (10 instruments), `strategy.ref` (6), `primitive.ref` (22). ENGENDRE depuis les registres, garde par un test de derive comme `schemas/` (L4)
-- **2026-09-11** — note | MACD verifie analytiquement, pas contre une seconde implementation | sur une droite de pente `s`, une EMA de fenetre `w` retarde de `s*(w-1)/2`, donc la ligne MACD vaut `s*(slow-fast)/2`. Mesure : 7,000000 pour s=1, fast=12, slow=26. ADX sature a 100 en tendance pure, OBV vaut exactement la somme des volumes, ratio d'efficience vaut 1 sur un chemin droit
-- **2026-09-11** — note | `examples/_moule_universel.json` : reference exhaustive du vocabulaire | 20/20 types de noeuds, 7 primitives nouvelles, long et short, stop adaptatif par `if_then_else`, objectif borne par `min_of`/`max_of`. Verifie a l'execution (66 trades, Sharpe 0,29, empreinte 5dd6973012b4c68b) et garde par `tests/unit/test_moule_universel.py`, qui nomme les types manquants. Mutation testee : retirer `time` fait echouer le test. **Cette execution consomme un essai** (L2)
-- **2026-09-11** — decision | variantes de Wilder publiees sous des NOMS distincts, pas en `@2` | `registry.py:124` resout une reference sans version vers la plus recente : `atr@2` aurait fait basculer tout `"ref": "atr"` non epingle d'une moyenne simple a une exponentielle, en silence. Les docstrings de `atr@1` et `rsi@1` recommandent pourtant ce chemin -> ledger + [[lessons]] L10
-- **2026-09-11** — decision | `rolling@1` gagne 6 statistiques par extension ADDITIVE, sans `rolling@2` | le levier structurel est `stat: "ema"` : avant lui, lisser une EXPRESSION etait impossible (`primitive` est une feuille), donc la ligne de signal d'un MACD etait inexprimable. Verification : les empreintes de `sma_es_daily`, `paire_es_nq`, `momentum`, `retour_moyenne` et `_moule` sont identiques avant et apres -> ledger
-- **2026-09-11** — feat | vocabulaire etendu : 9 primitives et 5 types de noeuds ajoutes, plus 6 statistiques sur `rolling@1` | primitives 13 -> 22 (`macd@1` avec ligne de signal et histogramme, `atr_wilder@1`, `rsi_wilder@1`, `adx@1`, `cci@1`, `williams_r@1`, `efficiency_ratio@1`, `vwap@1`, `obv@1`) ; noeuds 15 -> 20 (`if_then_else`, `math`, `min_of`, `max_of`, `bars_since`) ; `rolling` gagne `ema`, `median`, `var`, `slope`, `rank`, `count_true`. Suite 1263 -> 1387 tests. **Les 5 empreintes d'exemples sont inchangees**
 
 ## Next Actions
 
