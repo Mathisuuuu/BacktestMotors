@@ -17,7 +17,7 @@ generated: true
 | Indicateur | Valeur |
 |---|---|
 | Pages de wiki | 22 |
-| Entrees de log | 69 |
+| Entrees de log | 73 |
 | Derniere activite | 2026-09-11 |
 | Idees ecartees (ledger) | 16 |
 | Idees en attente (ledger) | 3 |
@@ -27,7 +27,7 @@ generated: true
 | Pages `reference/` | 7 |
 | Pages `research/` | 1 |
 
-**Activite par type :** note × 40, fix × 9, feat × 9, decision × 8, setup × 1, lint × 1, experiment × 1
+**Activite par type :** note × 41, fix × 11, feat × 9, decision × 8, setup × 1, lint × 1, experiment × 1, audit × 1
 
 ## Experiences
 
@@ -41,14 +41,14 @@ Le total des essais alimente le Deflated Sharpe : un essai non enregistre gonfle
 
 ## Derniere activite — 8 entree(s)
 
+- **2026-09-11** — note | mesures de performance de l'audit, a conserver | `primitive sma@1(20)` 5,9 us/barre ; `rolling(mean,20)` 44,9 us ; `rolling(zscore,120)` sur un `arith` de deux primitives **1549 us**. Extrapole sur les 3,7 M de barres minute d'ES : 1,6 h pour UN signal, 14,4 h sur l'univers de dix. `cumulative` est quadratique par seance : 952 890 evaluations de sous-arbre sur une seance d'une minute. C'est la dette qui empeche le vocabulaire compose de servir a l'echelle minute
+- **2026-09-11** — fix | P0.2 : `ExecutionStats` etait calcule puis jete | `n_limit_not_touched`, `n_stop_not_triggered` et `n_slippage_clamped` etaient incrementes sans que `describe()` soit appele nulle part. Remontes dans un bloc `execution_stats` SEPARE de `counters` -- ce dernier entre dans l'empreinte, l'y fusionner aurait change toutes les empreintes archivees. Verifie : une strategie a limite rapporte `n_limit_not_touched: 17`
+- **2026-09-11** — fix | P0.1 : la strategie est construite AVANT le chargement des donnees | `report.py` lisait le parquet puis decouvrait que la specification etait fausse. Mesure sur dix instruments : 6,1 s avant, 0,89 s apres -- dont 0,786 s de demarrage de l'interpreteur, donc le cout de rejet est desormais negligeable. Meme sonde de validation ajoutee a `walkforward.py`. Les 6 empreintes d'exemples sont inchangees
+- **2026-09-11** — audit | audit complet du socle : securite, architecture, performance | securite EXEMPLAIRE (zero eval/exec/pickle, 5 modeles pydantic tous `frozen`+`extra=forbid`, un seul subprocess a arguments litteraux). Ouvert/Ferme verifie : 16 ajouts dans la journee sans toucher au noyau, et le squelette les a publies seul. Trois dettes chiffrees : validation apres I/O, cycle `engine <-> strategies`, et le cout des boucles Python de `rolling`
 - **2026-09-11** — note | distinction mise au jour par un test qui echouait | `RuleStrategy._position` (compteur interne, alimente par `on_fill`) et `ctx.position` (etat expose par le RUNNER) sont deux choses differentes. En run reel le runner les garde d'accord ; dans un test sur `BarContext` nu, il faut renseigner les deux, sinon le noeud `position` lit une position a plat
 - **2026-09-11** — note | premier essai de verification trompeur, rattrape | mes trois variantes donnaient des chiffres quasi identiques : `_moule.json` porte `sizing: {fixed, contracts: 1}`, qui ECRASE la quantite de la strategie. Chaque position ne faisait qu'un contrat, il n'y avait rien a alleger. Refait avec `contracts: 4` : 8 trades en sortie totale, 9 en moitie, 9 en un contrat, facteurs de profit distincts
 - **2026-09-11** — feat | `exit_quantity` : les sorties cessent d'etre tout ou rien | troisieme et derniere brique des manques trouves en comparant le moteur au vocabulaire. Un noeud donnant un nombre de contrats ; absent, la position entiere est fermee comme avant. La valeur est une MAGNITUDE, son signe ignore, ce qui permet d'ecrire `position.quantity * 0.5` sans `abs` et d'alleger de moitie long comme court. Suite 1512 -> 1523 tests, empreintes inchangees
 - **2026-09-11** — note | deux defauts de conception trouves par les tests, pas par relecture | (1) je construisais chaque livre en appelant `RuleStrategy.from_spec` directement, ce qui contournait les defauts et la validation de `RuleStrategyParams` -- un livre sans `quantity` levait un message obscur. Corrige en passant par le modele. (2) une verification `isinstance(brut, dict)` etait du code mort : l'annotation `dict[str, dict[str, object]]` rejette deja la valeur avant le constructeur. Retiree, et le test dit maintenant ce qui se passe vraiment
-- **2026-09-11** — feat | `multi_rules@1` : un jeu de regles PAR instrument, dans un portefeuille commun | leve la brique 2 des trois manques trouves en comparant le moteur au vocabulaire. Un livre est un jeu de parametres `rules@1` moins le symbole, VALIDE par le meme modele -- memes defauts, meme `extra=forbid`. Livres tries par symbole pour que l'ordre des cles JSON n'entre pas dans l'empreinte. `peer` continue de fonctionner dans chaque livre. Essai reel : ES en 20/100 et NQ en 10/40 quantite double, 46 trades, Sharpe 0,85. Suite 1494 -> 1512 tests
-- **2026-09-11** — note | comment ce manque a ete trouve, et deux autres avec lui | en comparant ce que le MOTEUR accepte a ce que le VOCABULAIRE sait produire, pas en lisant la documentation. Les deux autres ecarts restent ouverts : une strategie a regles ne traite qu'un seul symbole, et les sorties sont tout ou rien (pas d'allegement) -> [[lessons]] L13
-- **2026-09-11** — decision | un prix d'entree indefini ABANDONNE l'entree, il ne retombe pas sur un ordre au marche | retomber changerait silencieusement le type d'ordre, donc le comportement, au moment precis ou l'on en sait le moins. Meme regle que partout : « je ne sais pas » n'est pas une raison d'agir
-- **2026-09-11** — note | semantique a connaitre : un ordre a limite vaut pour la SEULE barre d'execution | mesure sur ES quotidien, limite a 1 ATR sous la cloture : 1 trade contre 18 au marche, et 0 pour un stop a 1 ATR au-dessus. Les abandons sont visibles (`n_orders_cancelled_unfilled: 17` sur `n_orders_submitted: 19`) mais rien ne previent -- d'ou un paragraphe dedie dans [[reference/vocabulaire-signaux]]. Ce n'est pas un ordre au carnet
 
 ## Next Actions
 

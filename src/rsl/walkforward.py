@@ -314,6 +314,11 @@ def run_walk_forward(
     continuite qu'on cherche a rompre.
     """
     entry = get_strategy(*_parse_ref(spec.strategy.ref))
+    # Sonde de validation : l'arbre de signaux est construit puis jete, pour
+    # qu'une specification fausse soit refusee avant de lire les donnees. Le
+    # pli construira sa propre strategie - en reutiliser une ferait heriter au
+    # pli suivant la position du precedent.
+    build_strategy(spec.strategy.as_dict())
     stores, instruments, sources = load_stores(spec)
     n_bars = _available_bars(spec, stores, cross_sectional=entry.cross_sectional)
 

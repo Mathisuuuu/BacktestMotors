@@ -147,6 +147,15 @@ class CrossSectionalRunResult:
     strategy_spec: SpecDict = field(default_factory=dict)
     warnings: tuple[str, ...] = ()
     stale_bars: dict[str, int] = field(default_factory=dict)
+    execution_stats: SpecDict = field(default_factory=dict)
+    """Compteurs du moteur d'execution : fills, slippage borne, ordres a limite
+    non touches, stops non declenches.
+
+    Bloc SEPARE de `counters`, et non fusionne avec lui, parce que `counters`
+    entre dans l'empreinte de resultat : l'y ajouter changerait l'empreinte de
+    tous les runs deja archives, pour une information qui decrit le moteur et
+    non la decision."""
+
 
     @property
     def final_equity(self) -> float:
@@ -164,6 +173,7 @@ class CrossSectionalRunResult:
             "total_return": self.total_return,
             "n_fills": len(self.fills),
             "counters": self.counters.describe(),
+            "execution_stats": dict(self.execution_stats),
             "portfolio": self.portfolio.describe(),
             "config": self.config.describe(),
             "strategy": self.strategy_spec,
@@ -264,6 +274,7 @@ class CrossSectionalRunner:
             strategy_spec=strategy.describe(),
             warnings=self.risk.warnings,
             stale_bars={s: self.panel.n_stale(s) for s in self.panel.symbols},
+            execution_stats=self._execution.stats.describe(),
         )
 
     # -- etapes ------------------------------------------------------------

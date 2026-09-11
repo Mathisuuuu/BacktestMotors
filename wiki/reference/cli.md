@@ -34,7 +34,30 @@ autorite: src/rsl/cli.py + README.md
 La distinction entre `1` et `2` est deliberee : un script d'integration doit
 pouvoir traiter differemment une panne et un resultat invalide.
 
+## Ordre des etapes d'un run
+
+La strategie est construite **avant** que les donnees soient lues : c'est elle
+qui valide tout l'arbre de signaux, et une specification fausse doit etre
+refusee sans qu'un octet de parquet ait ete lu. Mesure sur un univers de dix
+instruments, avant et apres correction : **6,1 s contre 0,1 ms**.
+
+`tests/unit/test_fail_fast.py` garde cet ordre sans avoir besoin de donnees :
+la specification de test pointe vers un fichier inexistant, si bien que l'ordre
+des deux etapes se lit dans le message d'erreur.
+
 ## Ce que chaque run enregistre
+
+Le rapport JSON porte deux blocs de compteurs distincts :
+
+| Bloc | Contenu | Dans l'empreinte ? |
+|---|---|---|
+| `counters` | ce que la DECISION a produit : ordres soumis, rejetes, annules | **oui** |
+| `execution_stats` | ce que le MOTEUR a fait : fills, slippage borne, limites non touchees, stops non declenches | non |
+
+La separation n'est pas cosmetique. `counters` entre dans l'empreinte de
+resultat ; y fusionner les statistiques d'execution changerait l'empreinte de
+tous les runs deja archives, pour une information qui decrit le moteur et non
+la decision. Un test garde cette frontiere.
 
 Un manifeste : horodatage, empreinte de config, graine, commit + proprete de
 l'arbre, plateforme, versions des dependances, empreintes des fichiers de

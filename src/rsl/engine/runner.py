@@ -223,6 +223,15 @@ class RunResult:
     config: RunConfig
     strategy_spec: SpecDict = field(default_factory=dict)
     warnings: tuple[str, ...] = ()
+    execution_stats: SpecDict = field(default_factory=dict)
+    """Compteurs du moteur d'execution : fills, slippage borne, ordres a limite
+    non touches, stops non declenches.
+
+    Bloc SEPARE de `counters`, et non fusionne avec lui, parce que `counters`
+    entre dans l'empreinte de resultat : l'y ajouter changerait l'empreinte de
+    tous les runs deja archives, pour une information qui decrit le moteur et
+    non la decision."""
+
 
     @property
     def final_equity(self) -> float:
@@ -240,6 +249,7 @@ class RunResult:
             "total_return": self.total_return,
             "n_fills": len(self.fills),
             "counters": self.counters.describe(),
+            "execution_stats": dict(self.execution_stats),
             "portfolio": self.portfolio.describe(),
             "config": self.config.describe(),
             "strategy": self.strategy_spec,
@@ -343,6 +353,7 @@ class SingleAssetRunner:
             config=self.config,
             strategy_spec=strategy.describe(),
             warnings=self.risk.warnings,
+            execution_stats=self._execution.stats.describe(),
         )
 
     # -- etapes ------------------------------------------------------------
