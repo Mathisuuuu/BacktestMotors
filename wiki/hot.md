@@ -17,17 +17,17 @@ generated: true
 | Indicateur | Valeur |
 |---|---|
 | Pages de wiki | 23 |
-| Entrees de log | 125 |
+| Entrees de log | 127 |
 | Derniere activite | 2026-09-12 |
 | Idees ecartees (ledger) | 18 |
-| Idees en attente (ledger) | 3 |
+| Idees en attente (ledger) | 4 |
 | Pages `Failed Ideas/` | 1 |
 | Pages `concepts/` | 6 |
 | Pages `experiments/` | 4 |
 | Pages `reference/` | 7 |
 | Pages `research/` | 1 |
 
-**Activite par type :** note × 61, fix × 25, decision × 17, feat × 16, experiment × 2, setup × 1, lint × 1, audit × 1, refactor × 1
+**Activite par type :** note × 61, fix × 26, feat × 17, decision × 17, experiment × 2, setup × 1, lint × 1, audit × 1, refactor × 1
 
 ## Experiences
 
@@ -42,14 +42,14 @@ Le total des essais alimente le Deflated Sharpe : un essai non enregistre gonfle
 
 ## Derniere activite — 8 entree(s)
 
+- **2026-09-12** — fix | Les plafonds etaient evalues ordre par ordre contre le portefeuille commite : un rebalancement transversal de dix ordres les franchissait tous ensemble | `max_positions=2` laissait detenir SIX instruments sur momentum_12_1 ; corrige par reservation de fournee, verifie en rejouant les fills. Lecon [[lessons]] L20
+- **2026-09-12** — feat | Contraintes de portefeuille : quatre plafonds sous `risk.limits`, regle de non-aggravation, reservation par fournee | livre ; 3869 tests ; 7 empreintes ET 7 config_hash inchanges
 - **2026-09-12** — note | verification decisive : les dix chemins derives designent des fichiers qui EXISTENT | et les dix-huit entrees `data` des reglages versionnes s'accordent avec la table, sans une divergence. Les 7 empreintes et les contrats engendres sont inchanges -- `InstrumentSpec` n'entre dans aucun hachage, ce qui a ete verifie AVANT de la modifier
 - **2026-09-12** — decision | `category` vaut `None` par defaut, et un instrument sans classe n'a PAS de chemin | les instruments construits dans les tests n'existent sur aucun disque. Leur inventer une classe laisserait croire qu'ils ont un fichier ; `data_path` leve donc plutot que de rendre un chemin plausible -- meme regle que `session` sans calendrier declare, et que `account` hors runner. Les dix contrats de la table en ont tous une, ce qu'un test verifie
 - **2026-09-12** — decision | une classe d'actif plutot qu'un chemin brut | `InstrumentSpec` se decrit comme une specification ECONOMIQUE : y coller un chemin de fichier melangerait le contrat et le disque. La classe d'actif, elle, est une propriete durable -- ES est un future d'indice, ou que soient ses donnees. Le fait que l'arborescence la reproduise est une commodite, portee par `data_path` seul et nommee comme telle
 - **2026-09-12** — fix | le chemin des donnees rejoint `InstrumentSpec`, et la copie disparait | `gui/montage.py` portait une table `DOSSIERS` recopiant l'arborescence (`ES` -> `indices`, `GC` -> `metaux`) : un instrument range ailleurs, ou simplement oublie, l'aurait fait mentir sans prevenir. `InstrumentSpec` gagne une `category` -- la CLASSE D'ACTIF, propriete du contrat et non du disque -- dont `data_path` derive le chemin relatif. Une seule convention, ecrite une seule fois
 - **2026-09-12** — fix | `walkforward` et `verify` appelaient le meme chargeur sans en avoir les options | les commandes documentees dans les pages d'experience etaient donc devenues impossibles. Verifie en les EXECUTANT toutes, extraites du README et du wiki par expression reguliere : quatre commandes, quatre succes. Une commande documentee qu'on n'execute pas est une commande qu'on suppose
 - **2026-09-12** — note | un seul chemin pour charger un exemple : `tests/fixtures/exemples.py` | cinq fichiers de tests chargeaient un exemple, chacun a sa maniere. Avec DEUX morceaux a recoller et un symbole a injecter, cinq manieres seraient devenues cinq occasions de le faire differemment. Le symbole vient de `empreintes_attendues.json`, deja verite terrain : le stocker ailleurs ferait une seconde source
-- **2026-09-12** — note | le test d'aller-retour a disparu, remplace par une garantie PLUS FORTE | il comparait la composition a la specification complete voisine. Celles-ci supprimees, il compare desormais au `config_hash` ARCHIVE dans `empreintes_attendues.json`, mesure AVANT la separation. Comparer a une archive vaut mieux que comparer a un fichier voisin : cela prouve que recoller les deux morceaux redonne le run d'origine, et pas seulement qu'ils sont coherents entre eux. Sans donnees reelles, un `config_hash` ne dependant que de la specification
-- **2026-09-12** — decision | les specifications completes sont SUPPRIMEES de `examples/` | il ne reste que `examples/strategies/` (la decision) et `examples/reglages/` (l'actif, le capital, les couts). Ce qu'on ecrit est une strategie ; le montage se choisit dans l'onglet MONTAGE ou par `--settings`. `rsl example` emet desormais une strategie par defaut, et `--what settings` donne l'autre moitie
 
 ## Next Actions
 
@@ -165,6 +165,21 @@ suivante, qui viennent de l'audit fonctionnel du 2026-09-10.
       (`sma_es_daily` : Sharpe 0,60, empreinte `e96832fb121b91fb`,
       `verify` identique ; walk-forward 9 plis, 57 % dans un pli), mais rien
       n'a ete archive en `runs/` a cette occasion.
+- [x] **Contraintes de portefeuille : FAIT (2026-09-12).** Quatre plafonds sous
+      `risk.limits` ([limites.py](../src/rsl/engine/limites.py)), normes en
+      `docs/execution-model.md` §6.3. Deux choix de conception qui n'etaient pas
+      evidents : un plafond ne refuse un ordre que s'il **aggrave** la mesure
+      qu'il depasse - sinon une baisse d'equity enfermerait le portefeuille
+      au-dessus de son plafond - et un bloc `limits` entierement nul est retire
+      de la forme canonique, sans quoi les 7 `config_hash` archives changeaient
+      pour un champ qui ne dit rien. Defaut trouve au passage et corrige :
+      la contrainte ne contraignait rien sur un rebalancement transversal
+      ([[lessons]] L20).
+- [ ] **Le pendant qui manque encore : l'ALLOCATION.** Les contraintes disent ce
+      qu'on s'interdit ; elles ne disent pas comment repartir. `ranking@1` prend
+      toujours `quantity` contrats par nom, egalement - pas de poids, pas de
+      budget de risque, pas d'inverse-volatilite. C'est une tache distincte, pas
+      un reste de celle-ci.
 - [ ] Obtenir et ingerer la source du Deflated Sharpe (independance des essais).
 <!-- NEXT-ACTIONS:END -->
 

@@ -25,6 +25,7 @@ from pathlib import Path
 from rsl.config import BacktestSpec, build_panel_from, load_stores
 from rsl.data.schema import BarStore, InstrumentSpec
 from rsl.engine.cross_sectional import CrossSectionalRunner, CrossSectionalRunResult
+from rsl.engine.limites import MOTIFS as LIMIT_MOTIFS
 from rsl.engine.runner import RunResult, SingleAssetRunner
 from rsl.errors import ConfigurationError
 from rsl.manifest import RunManifest, apply_seed, canonical_hash
@@ -123,6 +124,40 @@ class BacktestReport:
         path.write_text(self.to_json(), encoding="utf-8")
         return path
 
+    def _lignes_de_plafonds(self) -> list[str]:
+        """Les plafonds de portefeuille, et ce qu'ils ont refuse.
+
+        Rien n'est emis quand aucun plafond n'est declare : c'est le cas de
+        toute specification anterieure au 2026-09-12, et leur rendu doit rester
+        identique au caractere pres.
+
+        Les refus sont affiches meme a zero des qu'un plafond existe. « Zero
+        refus » est une information - le plafond etait peut-etre trop large
+        pour mordre - alors qu'une ligne absente ne se distingue pas d'une
+        fonctionnalite oubliee.
+        """
+        declares = {
+            nom: valeur
+            for nom, valeur in self.spec.risk.limits.model_dump().items()
+            if valeur is not None and nom != "note"
+        }
+        if not declares:
+            return []
+        lignes = [
+            "Plafonds     "
+            + ", ".join(f"{nom} {valeur}" for nom, valeur in sorted(declares.items()))
+        ]
+        stats = self.run.get("risk_stats")
+        if isinstance(stats, dict):
+            refus = [
+                f"{motif} {stats[f'n_rejected_{motif}']}"
+                for motif in LIMIT_MOTIFS
+                if stats.get(f"n_rejected_{motif}")
+            ]
+            detail = ", ".join(refus) if refus else "aucun"
+            lignes.append(f"Refus        {detail}")
+        return lignes
+
     def render(self) -> str:
         rule = "-" * 72
         mode = "transversal" if self.cross_sectional else "mono-instrument"
@@ -137,6 +172,7 @@ class BacktestReport:
             f"slippage {self.spec.execution.slippage.kind}, "
             f"lag {self.spec.execution.lag_bars} barre(s)",
             f"Risque       sizing {self.spec.risk.sizing.kind}",
+            *self._lignes_de_plafonds(),
             rule,
             self.metrics.render(),
             rule,

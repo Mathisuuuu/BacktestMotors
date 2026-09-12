@@ -157,6 +157,17 @@ class CrossSectionalRunResult:
     non la decision."""
 
 
+    risk_stats: SpecDict = field(default_factory=dict)
+    """Compteurs de la couche risque : ordres perdus au dimensionnement,
+    refuses par la marge, par le plafond de contrats de l'instrument, ou par un
+    plafond de PORTEFEUILLE.
+
+    Meme raison d'etre que `execution_stats`, et meme raison d'etre a part :
+    sans eux, un plafond qui refuse tout donne une strategie qui ne trade pas,
+    sans rien dire de pourquoi. Hors de l'empreinte pour ne pas invalider les
+    runs archives - ils decrivent ce que le moteur a EMPECHE, pas ce que la
+    strategie a decide."""
+
     @property
     def final_equity(self) -> float:
         return self.equity.equity[-1] if self.equity.equity else self.config.initial_cash
@@ -174,6 +185,7 @@ class CrossSectionalRunResult:
             "n_fills": len(self.fills),
             "counters": self.counters.describe(),
             "execution_stats": dict(self.execution_stats),
+            "risk_stats": dict(self.risk_stats),
             "portfolio": self.portfolio.describe(),
             "config": self.config.describe(),
             "strategy": self.strategy_spec,
@@ -292,6 +304,7 @@ class CrossSectionalRunner:
             config=self.config,
             strategy_spec=strategy.describe(),
             warnings=self.risk.warnings,
+            risk_stats=self.risk.stats.describe(),
             stale_bars={s: self.panel.n_stale(s) for s in self.panel.symbols},
             execution_stats=self._execution.stats.describe(),
         )
@@ -469,6 +482,10 @@ class CrossSectionalRunner:
         counters: CrossSectionalCounters,
     ) -> None:
         assert isinstance(orders, (list, tuple))
+        # Une FOURNEE : les ordres de ce rebalancement doivent se voir les uns
+        # les autres, sinon dix ordres emis ensemble franchissent ensemble un
+        # plafond qu'aucun ne franchit seul.
+        self.risk.begin_submission()
         present = set(mctx.symbols)
         marks = {s: mctx[s].bar.close for s in mctx.symbols}
         due_index = row + self.config.execution.execution_lag

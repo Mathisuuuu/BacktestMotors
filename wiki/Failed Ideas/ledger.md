@@ -1,6 +1,6 @@
 ---
 type: ledger
-updated: 2026-09-11
+updated: 2026-09-12
 ---
 
 # Ledger des idees abandonnees
@@ -57,3 +57,4 @@ faites. A ne pas confondre avec un echec.
 | 2026-09-10 | PBO / CSCV (probabilite de sur-ajustement) | Protocole ecrit, pas d'implementation | Une implementation et une grille d'essais assez large pour que le chiffre veuille dire quelque chose |
 | 2026-09-10 | Primitive dediee remplacant `rolling` sur les cas couteux | Cout **largement** traite le 2026-09-11 par la memoisation (1 381 -> 116 us), sauf pour les sous-arbres contenant `peer` ou `position`, qui ne sont pas memoisables | Un cas mesure comme trop lent QUI CONTIENNE UN PAIR - c'est desormais le seul segment non couvert, et le z-score d'un ratio ES/NQ en fait partie |
 | 2026-09-10 | Optimisation de parametres dans le runner walk-forward | Hors perimetre de la phase | Une decision explicite : le runner n'optimise rien aujourd'hui, et la fenetre `train` sert d'historique, pas d'echantillon d'apprentissage |
+| 2026-09-12 | Poids et budget de risque dans `ranking@1` (allocation transversale) | Pas fait, et a ne pas confondre avec les contraintes de portefeuille livrees le meme jour | Les plafonds de `risk.limits` disent ce qu'on s'INTERDIT ; ils ne disent pas comment REPARTIR. `RankingParams` prend `quantity` contrats par nom, egalement, sans poids ni inverse-volatilite. Ce qui manque : decider ou vit l'allocation - une regle de dimensionnement qui verrait le panneau, ou un champ de `ranking@1`. La premiere voie demande que `SizingRule` recoive le classement, ce qu'elle ne recoit pas |

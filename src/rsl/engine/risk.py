@@ -21,6 +21,15 @@ from typing import Protocol, runtime_checkable
 from rsl.data.feed import Context
 from rsl.data.schema import InstrumentSpec
 from rsl.engine.execution import MarginPolicy
+from rsl.engine.limites import (
+    AUCUN,
+    AUCUNE_LIMITE,
+    MOTIFS,
+    PortfolioLimits,
+    classe_de,
+    mesurer,
+    projeter,
+)
 from rsl.engine.portfolio import Portfolio
 from rsl.errors import ConfigurationError
 from rsl.orders import Order
@@ -301,33 +310,80 @@ class SignalSizing:
 
 @dataclass(slots=True)
 class RiskStats:
+    """Un compteur par facon de perdre un ordre.
+
+    Un seul compteur global aurait dit qu'on a refuse, jamais pourquoi - et
+    « la strategie ne trade pas » est precisement la question qu'on se pose en
+    lisant ces chiffres. Les quatre derniers sont les plafonds de portefeuille,
+    nommes comme les motifs de `limites.MOTIFS`.
+    """
+
     n_dropped_sizing: int = 0
     n_rejected_margin: int = 0
     n_warned_margin: int = 0
     n_rejected_gross_cap: int = 0
     n_reduce_only_dropped: int = 0
+    n_rejected_gross_exposure: int = 0
+    n_rejected_net_exposure: int = 0
+    n_rejected_positions: int = 0
+    n_rejected_per_category: int = 0
+
+    def compter_refus(self, motif: str) -> None:
+        """Incremente le compteur du motif. Leve si le motif est inconnu.
+
+        Le `getattr`/`setattr` est deliberement garde par `MOTIFS` : sans lui,
+        un motif mal orthographie creerait un attribut fantome sur un
+        `dataclass` a `slots`... ou, pire, passerait inapercu.
+        """
+        if motif not in MOTIFS:
+            raise ValueError(f"motif de refus inconnu : {motif!r}")
+        nom = f"n_rejected_{motif}"
+        setattr(self, nom, int(getattr(self, nom)) + 1)
+
+    @property
+    def n_rejected_portfolio(self) -> int:
+        """Total des refus de plafond de portefeuille, tous motifs confondus."""
+        return sum(int(getattr(self, f"n_rejected_{motif}")) for motif in MOTIFS)
 
     def describe(self) -> SpecDict:
-        return {
+        decrit: SpecDict = {
             "n_dropped_sizing": self.n_dropped_sizing,
             "n_rejected_margin": self.n_rejected_margin,
             "n_warned_margin": self.n_warned_margin,
             "n_rejected_gross_cap": self.n_rejected_gross_cap,
             "n_reduce_only_dropped": self.n_reduce_only_dropped,
         }
+        for motif in MOTIFS:
+            decrit[f"n_rejected_{motif}"] = getattr(self, f"n_rejected_{motif}")
+        return decrit
 
 
 class RiskManager:
     """Se place entre la strategie et l'execution.
 
-    Trois responsabilites, dans cet ordre :
+    Quatre responsabilites, dans cet ordre :
 
       1. neutraliser les ordres `reduce_only` sans position a reduire ;
       2. dimensionner les entrees ;
-      3. refuser ce qui depasse la marge disponible ou le plafond de contrats.
+      3. refuser ce qui depasse le plafond de contrats de l'INSTRUMENT ;
+      4. refuser ce qui depasse un plafond du PORTEFEUILLE, ou la marge.
+
+    Les etapes 3 et 4 ne mesurent pas la meme chose, et leurs noms se
+    ressemblent assez pour qu'on les confonde. `max_gross_contracts` borne
+    `abs(position)` sur un instrument, en contrats. `limits` borne le
+    portefeuille entier, en argent rapporte a l'equity. Un plafond en contrats
+    n'a pas de sens d'un instrument a l'autre - voir `engine/limites.py`.
     """
 
-    __slots__ = ("_warnings", "margin_policy", "max_gross_contracts", "sizing", "stats")
+    __slots__ = (
+        "_reserved",
+        "_warnings",
+        "limits",
+        "margin_policy",
+        "max_gross_contracts",
+        "sizing",
+        "stats",
+    )
 
     def __init__(
         self,
@@ -335,6 +391,7 @@ class RiskManager:
         sizing: SizingRule | None = None,
         margin_policy: MarginPolicy = MarginPolicy.REJECT,
         max_gross_contracts: int | None = None,
+        limits: PortfolioLimits | None = None,
     ) -> None:
         if max_gross_contracts is not None and max_gross_contracts < 1:
             raise ConfigurationError(
@@ -343,12 +400,59 @@ class RiskManager:
         self.sizing = sizing
         self.margin_policy = margin_policy
         self.max_gross_contracts = max_gross_contracts
+        self.limits = AUCUNE_LIMITE if limits is None else limits
         self.stats = RiskStats()
         self._warnings: list[str] = []
+        self._reserved: dict[str, int] = {}
 
     def reset(self) -> None:
         self.stats = RiskStats()
         self._warnings = []
+        self._reserved = {}
+
+    def begin_submission(self) -> None:
+        """Ouvre une nouvelle FOURNEE d'ordres. A appeler par le runner.
+
+        Un plafond de portefeuille n'a de sens que si les ordres d'une meme
+        fournee se voient les uns les autres. Sans cela, un rebalancement
+        transversal qui emet dix ordres d'un coup les evalue tous contre le
+        portefeuille d'avant : chacun lit « aucune position detenue », chacun
+        passe, et un plafond de deux instruments en laisse ouvrir dix.
+
+        Mesure le 2026-09-12 sur `momentum_12_1_mensuel` : `max_positions=2`
+        laissait detenir jusqu'a SIX instruments. C'est precisement la ou un
+        plafond de portefeuille sert - une strategie de classement - qu'il ne
+        servait a rien.
+
+        La reservation dure une fournee, et pas davantage, parce que le runner
+        remplit les ordres dus AVANT de soumettre les suivants : au moment de
+        la fournee suivante, ce qui devait etre execute est deja dans le
+        portefeuille. L'exception est l'ordre a cours limite reste en attente -
+        il n'est ni rempli ni reserve, et le plafond l'ignore jusqu'a ce qu'il
+        touche. Meme famille d'approximation que le decalage des marques, et
+        documentee pour la meme raison dans `engine/limites.py`.
+        """
+        self._reserved = {}
+
+    def _reserver(self, order: Order) -> None:
+        """Inscrit un ordre accepte au portefeuille projete de la fournee.
+
+        Les REDUCTIONS y sont inscrites comme les entrees, et c'est necessaire,
+        pas genereux : `ranking@1` emet ses sorties avant ses entrees, et un
+        plafond qui ne crediterait pas les sorties refuserait toute rotation -
+        le portefeuille resterait fige sur ses premieres positions.
+        """
+        if not self.limits.actives:
+            return
+        symbole = order.symbol
+        self._reserved[symbole] = self._reserved.get(symbole, 0) + order.signed_quantity
+
+    def _quantites_projetees(self, portfolio: Portfolio) -> dict[str, int]:
+        """Positions detenues, plus ce que la fournee courante a deja accepte."""
+        quantites = {s: p.quantity for s, p in portfolio.positions.items()}
+        for symbole, reserve in self._reserved.items():
+            quantites[symbole] = quantites.get(symbole, 0) + reserve
+        return quantites
 
     @property
     def warmup_bars(self) -> int:
@@ -365,12 +469,20 @@ class RiskManager:
         spec = portfolio.spec_of(order.symbol)
 
         if order.reduce_only:
-            return self.revalidate_reduction(order, portfolio.quantity_of(order.symbol))
+            reduit = self.revalidate_reduction(
+                order, portfolio.quantity_of(order.symbol)
+            )
+            if reduit is not None:
+                self._reserver(reduit)
+            return reduit
 
         sized = self._size(order, ctx, spec, portfolio, marks)
         if sized is None:
             return None
-        return self._check_limits(sized, spec, portfolio, marks)
+        accepte = self._check_limits(sized, spec, portfolio, marks)
+        if accepte is not None:
+            self._reserver(accepte)
+        return accepte
 
     # -- etapes ------------------------------------------------------------
 
@@ -440,6 +552,11 @@ class RiskManager:
             self.stats.n_rejected_gross_cap += 1
             return None
 
+        if self.limits.actives and not self._portfolio_limits_ok(
+            order, spec, portfolio, marks
+        ):
+            return None
+
         added_margin = (projected - abs(held)) * spec.initial_margin
         if added_margin <= 0.0:
             return order
@@ -461,10 +578,45 @@ class RiskManager:
             )
         return order
 
+    def _portfolio_limits_ok(
+        self,
+        order: Order,
+        spec: InstrumentSpec,
+        portfolio: Portfolio,
+        marks: dict[str, float],
+    ) -> bool:
+        """Le portefeuille d'APRES respecte-t-il les plafonds declares ?
+
+        Les marques sont resolues par `Portfolio.mark_of` - la meme resolution
+        que celle de l'equity a laquelle les expositions sont rapportees. Les
+        prendre dans `marks` seul ferait tomber le numerateur des instruments
+        qui ne cotent pas a cette barre, alors qu'ils comptent dans le
+        denominateur : le ratio serait faux dans le sens PERMISSIF.
+        """
+        quantites = self._quantites_projetees(portfolio)
+        specs = {s: portfolio.spec_of(s) for s in quantites}
+        marques = {
+            s: mark
+            for s in quantites
+            if (mark := portfolio.mark_of(s, marks)) is not None
+        }
+        avant = mesurer(quantites, specs, marques)
+        apres = mesurer(
+            projeter(quantites, order.symbol, order.signed_quantity), specs, marques
+        )
+        motif = self.limits.refus(
+            avant, apres, portfolio.equity(marks), classe_de(spec)
+        )
+        if motif == AUCUN:
+            return True
+        self.stats.compter_refus(motif)
+        return False
+
     def describe(self) -> SpecDict:
         return {
             "sizing": None if self.sizing is None else self.sizing.describe(),
             "margin_policy": self.margin_policy.value,
             "max_gross_contracts": self.max_gross_contracts,
+            "limits": self.limits.describe(),
             "stats": self.stats.describe(),
         }

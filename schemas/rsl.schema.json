@@ -346,6 +346,89 @@
         "title": "Period",
         "type": "string"
       },
+      "PortfolioLimitsSpec": {
+        "additionalProperties": false,
+        "description": "Plafonds portant sur le PORTEFEUILLE entier.\n\nA ne pas confondre avec `max_gross_contracts`, juste au-dessus, qui borne\nun INSTRUMENT en contrats. Les deux coexistent et repondent a deux\nquestions differentes ; `engine/limites.py` explique pourquoi un plafond en\ncontrats ne peut pas repondre a celle-ci.\n\nTout est facultatif et `None` par defaut : une specification ecrite avant\nce jour rend exactement les memes chiffres qu'avant.",
+        "properties": {
+          "max_gross_exposure": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Somme des |notionnels| / equity. Borne le risque de base total, y compris celui d'un portefeuille neutre en directionnel.",
+            "title": "Max Gross Exposure"
+          },
+          "max_net_exposure": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "|Somme des notionnels signes| / equity. Borne la seule exposition directionnelle ; un long/short couvert y compte pour peu.",
+            "title": "Max Net Exposure"
+          },
+          "max_per_category": {
+            "anyOf": [
+              {
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Nombre d'instruments detenus par classe d'actif (indices, metaux, energie, forex). Un instrument sans classe declaree est compte avec les autres sans classe, jamais exempte.",
+            "title": "Max Per Category"
+          },
+          "max_positions": {
+            "anyOf": [
+              {
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Nombre d'instruments detenus a la fois.",
+            "title": "Max Positions"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Commentaire libre. Ignore par le moteur, EXCLU du config_hash. Une liste de chaines vaut plusieurs lignes.",
+            "title": "Note"
+          }
+        },
+        "title": "PortfolioLimitsSpec",
+        "type": "object"
+      },
       "RebalanceSpec": {
         "additionalProperties": false,
         "properties": {
@@ -396,6 +479,15 @@
       "RiskSpec": {
         "additionalProperties": false,
         "properties": {
+          "limits": {
+            "$ref": "#/$defs/PortfolioLimitsSpec",
+            "default": {
+              "max_gross_exposure": null,
+              "max_net_exposure": null,
+              "max_per_category": null,
+              "max_positions": null
+            }
+          },
           "max_gross_contracts": {
             "anyOf": [
               {
@@ -407,6 +499,7 @@
               }
             ],
             "default": null,
+            "description": "Borne |position| POUR UN INSTRUMENT, en contrats. Son nom dit 'gross' mais il ne regarde pas le portefeuille : pour cela, voir `limits`.",
             "title": "Max Gross Contracts"
           },
           "note": {
@@ -810,6 +903,12 @@
       "risk": {
         "$ref": "#/$defs/RiskSpec",
         "default": {
+          "limits": {
+            "max_gross_exposure": null,
+            "max_net_exposure": null,
+            "max_per_category": null,
+            "max_positions": null
+          },
           "max_gross_contracts": null,
           "sizing": {
             "atr_multiple": 2.0,

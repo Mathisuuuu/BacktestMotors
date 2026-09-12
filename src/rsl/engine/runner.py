@@ -240,6 +240,17 @@ class RunResult:
     non la decision."""
 
 
+    risk_stats: SpecDict = field(default_factory=dict)
+    """Compteurs de la couche risque : ordres perdus au dimensionnement,
+    refuses par la marge, par le plafond de contrats de l'instrument, ou par un
+    plafond de PORTEFEUILLE.
+
+    Meme raison d'etre que `execution_stats`, et meme raison d'etre a part :
+    sans eux, un plafond qui refuse tout donne une strategie qui ne trade pas,
+    sans rien dire de pourquoi. Hors de l'empreinte pour ne pas invalider les
+    runs archives - ils decrivent ce que le moteur a EMPECHE, pas ce que la
+    strategie a decide."""
+
     @property
     def final_equity(self) -> float:
         return self.equity.equity[-1] if self.equity.equity else self.config.initial_cash
@@ -257,6 +268,7 @@ class RunResult:
             "n_fills": len(self.fills),
             "counters": self.counters.describe(),
             "execution_stats": dict(self.execution_stats),
+            "risk_stats": dict(self.risk_stats),
             "portfolio": self.portfolio.describe(),
             "config": self.config.describe(),
             "strategy": self.strategy_spec,
@@ -381,6 +393,7 @@ class SingleAssetRunner:
             config=self.config,
             strategy_spec=strategy.describe(),
             warnings=self.risk.warnings,
+            risk_stats=self.risk.stats.describe(),
             execution_stats=self._execution.stats.describe(),
         )
 
@@ -545,6 +558,11 @@ class SingleAssetRunner:
         marks: dict[str, float],
     ) -> None:
         assert isinstance(orders, (list, tuple))
+        # Voir `RiskManager.begin_submission` : sans effet ici tant qu'aucun
+        # plafond de portefeuille n'est declare, et necessaire des qu'il y en
+        # a un - une strategie mono-instrument peut aussi emettre plusieurs
+        # ordres sur la meme barre.
+        self.risk.begin_submission()
         for order in orders:
             assert isinstance(order, Order)
             counters.n_orders_submitted += 1

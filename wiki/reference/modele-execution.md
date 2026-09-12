@@ -1,6 +1,6 @@
 ---
 type: reference
-updated: 2026-09-11
+updated: 2026-09-12
 autorite: docs/execution-model.md
 ---
 
@@ -19,6 +19,7 @@ autorite: docs/execution-model.md
 | Quel modele de couts ? | section couts |
 | Comment sont comptabilises les futures ? | section comptabilite futures |
 | Que se passe-t-il sur un trou de session ? | section trous de session |
+| Comment borner un PORTEFEUILLE, pas un instrument ? | §6.3 — quatre plafonds sous `risk.limits`, regle de non-aggravation, et ce qu'ils ne garantissent pas |
 
 ## Cote code
 
@@ -27,7 +28,8 @@ autorite: docs/execution-model.md
 | Ordres | [src/rsl/orders.py](../../src/rsl/orders.py) — **hors de `engine/`**, voir ci-dessous |
 | Execution et fills | [src/rsl/engine/execution.py](../../src/rsl/engine/execution.py) |
 | Portefeuille | [src/rsl/engine/portfolio.py](../../src/rsl/engine/portfolio.py) |
-| Risque | [src/rsl/engine/risk.py](../../src/rsl/engine/risk.py) |
+| Risque et dimensionnement | [src/rsl/engine/risk.py](../../src/rsl/engine/risk.py) |
+| Plafonds de portefeuille | [src/rsl/engine/limites.py](../../src/rsl/engine/limites.py) |
 | Runner mono-instrument | [src/rsl/engine/runner.py](../../src/rsl/engine/runner.py) |
 | Runner transversal | [src/rsl/engine/cross_sectional.py](../../src/rsl/engine/cross_sectional.py) |
 

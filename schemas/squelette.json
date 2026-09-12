@@ -3548,6 +3548,41 @@
     },
     "risk": {
       "champs": {
+        "limits": {
+          "champs": {
+            "max_gross_exposure": {
+              "accepte_null": true,
+              "defaut": null,
+              "min_exclu": 0.0,
+              "type": "nombre"
+            },
+            "max_net_exposure": {
+              "accepte_null": true,
+              "defaut": null,
+              "min_exclu": 0.0,
+              "type": "nombre"
+            },
+            "max_per_category": {
+              "accepte_null": true,
+              "defaut": null,
+              "min": 1,
+              "type": "entier"
+            },
+            "max_positions": {
+              "accepte_null": true,
+              "defaut": null,
+              "min": 1,
+              "type": "entier"
+            }
+          },
+          "defaut": {
+            "max_gross_exposure": null,
+            "max_net_exposure": null,
+            "max_per_category": null,
+            "max_positions": null
+          },
+          "type": "objet"
+        },
         "max_gross_contracts": {
           "accepte_null": true,
           "defaut": null,
@@ -3634,6 +3669,12 @@
         }
       },
       "defaut": {
+        "limits": {
+          "max_gross_exposure": null,
+          "max_net_exposure": null,
+          "max_per_category": null,
+          "max_positions": null
+        },
         "max_gross_contracts": null,
         "sizing": {
           "atr_multiple": 2.0,

@@ -220,3 +220,120 @@ class TestLeCatalogueDecritCeQuiTourne:
         epinglees = manifeste["primitives"]
         assert epinglees, "aucune primitive enregistree au manifeste"
         assert all("@" in str(ref) for ref in epinglees), epinglees
+
+
+PLAFONNE = "momentum_12_1_mensuel.json"
+"""Le seul exemple transversal : dix instruments, quatre classes d'actif.
+
+C'est le seul endroit du depot ou un plafond de PORTEFEUILLE veut dire quelque
+chose - sur un mono-instrument, brut et net coincident et le compte de
+positions ne depasse jamais un.
+"""
+
+
+def spec_plafonnee(**limites: object) -> BacktestSpec:
+    """Le montage de l'exemple, plus des plafonds.
+
+    L'exemple sur DISQUE n'est pas touche : sa verite terrain doit rester
+    comparable a ce qu'elle etait, et un exemple modifie pour porter une
+    contrainte serait une strategie differente presentee sous le meme nom.
+    """
+    from fixtures.exemples import montage, strategie
+    from rsl.composition import compose
+
+    reglages = montage(PLAFONNE)
+    risque = reglages["risk"]
+    assert isinstance(risque, dict)
+    return compose(
+        strategie(PLAFONNE),
+        {**reglages, "risk": {**risque, "limits": limites}},
+        symbol=None,
+    )
+
+
+@pytest.fixture(scope="module")
+def sous_plafond():
+    """Un seul run pour toute la classe : l'univers fait dix parquets."""
+    return run_backtest_detailed(spec_plafonnee(max_positions=2))
+
+
+class TestLesPlafondsDePortefeuilleSurDonneesReelles:
+    """Les plafonds de `engine/limites.py`, sur les dix instruments du momentum.
+
+    Ce n'est PAS un essai de strategie, et rien ici ne doit etre lu comme tel :
+    aucun Sharpe, aucun rendement, aucune conclusion sur `momentum_12_1`. La
+    strategie ne sert que de generateur d'ordres sur un univers reel a quatre
+    classes d'actif - le seul exemple du depot ou un plafond de portefeuille
+    veut dire quelque chose. Le compteur d'essais du Deflated Sharpe n'a donc
+    pas a s'incrementer (voir CLAUDE.md, « unite de travail : l'essai »).
+
+    Ce que ces tests etablissent, et que le synthetique ne peut pas montrer :
+    le plafond mord sur un vrai flux d'ordres, et il change le resultat.
+    """
+
+    NOM = PLAFONNE
+    PLAFOND = 2
+
+
+    def test_le_plafond_refuse_reellement_des_ordres(self, sous_plafond):
+        """Sans refus, tous les tests suivants passeraient pour rien : ils
+        verifieraient un plafond qui n'a jamais eu l'occasion de mordre."""
+        stats = sous_plafond.result.risk_stats
+        assert stats["n_rejected_positions"] > 0, stats
+
+    def test_et_il_le_dit_dans_le_rapport(self, sous_plafond):
+        """Un ordre disparu sans compteur donne « la strategie ne trade pas »
+        sans explication. Le compteur doit survivre jusqu'au rapport."""
+        run = sous_plafond.report.to_dict()["run"]
+        assert isinstance(run, dict)
+        stats = run["risk_stats"]
+        assert isinstance(stats, dict)
+        assert stats["n_rejected_positions"] > 0
+
+    def test_le_nombre_d_instruments_detenus_ne_depasse_jamais_le_plafond(
+        self, sous_plafond
+    ):
+        """La seule des quatre limites qui soit EXACTE, et c'est pourquoi
+        c'est elle qu'on rejoue ici.
+
+        Les plafonds en argent sont evalues sur les marques de la barre
+        courante alors que le fill a lieu a la suivante : l'exposition realisee
+        peut les depasser un peu, et le module le dit. Un COMPTE d'instruments,
+        lui, ne bouge qu'aux fills et la projection le predit exactement - il
+        n'y a donc aucune tolerance a accorder.
+
+        Rejoue les fills dans l'ordre plutot que de lire l'etat final : un
+        depassement transitoire, referme avant la fin, serait invisible
+        autrement.
+        """
+        quantites: dict[str, int] = {}
+        pire = 0
+        for fill in sous_plafond.result.fills:
+            signe = 1 if fill.side.value == "buy" else -1
+            quantites[fill.symbol] = (
+                quantites.get(fill.symbol, 0) + signe * fill.quantity
+            )
+            pire = max(pire, sum(1 for q in quantites.values() if q != 0))
+        assert 0 < pire <= self.PLAFOND, f"jusqu'a {pire} instruments detenus"
+
+    def test_un_plafond_qui_mord_change_le_resultat(self, sous_plafond):
+        """La verification qui rend les autres credibles : si l'empreinte etait
+        la meme qu'sans plafond, la contrainte serait decorative."""
+        assert (
+            sous_plafond.report.result_fingerprint
+            != ATTENDUES[self.NOM]["result_fingerprint"]
+        )
+
+    def test_un_plafond_declare_change_le_config_hash(self):
+        """Deux runs aux contraintes differentes ne doivent pas se confondre.
+        Le pendant du test unitaire qui verifie qu'un plafond ABSENT, lui, ne
+        change rien."""
+        obtenu = canonical_hash(spec_plafonnee(max_positions=self.PLAFOND).canonical())
+        assert obtenu != ATTENDUES[self.NOM]["config_hash"]
+
+    def test_un_plafond_par_classe_d_actif_mord_aussi(self):
+        """L'univers couvre quatre classes - quatre forex, quatre indices, un
+        metal, une energie. Un seul instrument par classe doit refuser des
+        ordres que `max_positions=4` aurait laisse passer."""
+        artefacts = run_backtest_detailed(spec_plafonnee(max_per_category=1))
+        assert artefacts.result.risk_stats["n_rejected_per_category"] > 0

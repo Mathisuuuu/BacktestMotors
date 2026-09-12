@@ -47,6 +47,7 @@ from rsl.engine.execution import (
     ZeroFee,
     ZeroSlippage,
 )
+from rsl.engine.limites import PortfolioLimits
 from rsl.engine.risk import (
     EquityFraction,
     FixedContracts,
@@ -82,6 +83,34 @@ def _sans_notes(valeur: object) -> Any:
     if isinstance(valeur, list):
         return [_sans_notes(v) for v in valeur]
     return valeur
+
+
+def _sans_plafonds_muets(payload: SpecDict) -> None:
+    """Retire `risk.limits` de la charge quand aucun plafond n'y est declare.
+
+    Meme regle que pour `note`, et pour la meme raison : ce qui ne porte aucune
+    INSTRUCTION ne doit pas entrer dans le `config_hash`. Un bloc `limits`
+    entierement nul dit « aucun plafond », ce que disait deja l'absence du bloc
+    avant qu'il existe ; les deux runs ont recu les memes instructions, et deux
+    hachages differents pretendraient le contraire.
+
+    Sans ce retrait, ajouter le champ changeait le `config_hash` des SEPT
+    exemples - mesure le 2026-09-12 - et rendait incomparable tout run archive,
+    sans qu'aucune decision de strategie n'ait bouge.
+
+    La regle est deliberement ETROITE : elle ne retire pas les blocs nuls en
+    general, seulement celui-ci, et seulement s'il est entierement nul. Un
+    plafond declare, meme large, reste hache - c'est une instruction.
+
+    Modifie sur place : `canonical()` vient de construire la charge et en est
+    seul proprietaire.
+    """
+    risque = payload.get("risk")
+    if not isinstance(risque, dict):
+        return
+    plafonds = risque.get("limits")
+    if isinstance(plafonds, dict) and all(v is None for v in plafonds.values()):
+        del risque["limits"]
 
 
 class StrictModel(BaseModel):
@@ -354,15 +383,67 @@ class SizingSpec(StrictModel):
                 )
 
 
+class PortfolioLimitsSpec(StrictModel):
+    """Plafonds portant sur le PORTEFEUILLE entier.
+
+    A ne pas confondre avec `max_gross_contracts`, juste au-dessus, qui borne
+    un INSTRUMENT en contrats. Les deux coexistent et repondent a deux
+    questions differentes ; `engine/limites.py` explique pourquoi un plafond en
+    contrats ne peut pas repondre a celle-ci.
+
+    Tout est facultatif et `None` par defaut : une specification ecrite avant
+    ce jour rend exactement les memes chiffres qu'avant.
+    """
+
+    max_gross_exposure: float | None = Field(
+        default=None,
+        gt=0.0,
+        description="Somme des |notionnels| / equity. Borne le risque de base "
+        "total, y compris celui d'un portefeuille neutre en directionnel.",
+    )
+    max_net_exposure: float | None = Field(
+        default=None,
+        gt=0.0,
+        description="|Somme des notionnels signes| / equity. Borne la seule "
+        "exposition directionnelle ; un long/short couvert y compte pour peu.",
+    )
+    max_positions: int | None = Field(
+        default=None, ge=1, description="Nombre d'instruments detenus a la fois."
+    )
+    max_per_category: int | None = Field(
+        default=None,
+        ge=1,
+        description="Nombre d'instruments detenus par classe d'actif "
+        "(indices, metaux, energie, forex). Un instrument sans classe declaree "
+        "est compte avec les autres sans classe, jamais exempte.",
+    )
+
+    def build(self) -> PortfolioLimits:
+        return PortfolioLimits(
+            max_gross_exposure=self.max_gross_exposure,
+            max_net_exposure=self.max_net_exposure,
+            max_positions=self.max_positions,
+            max_per_category=self.max_per_category,
+        )
+
+
 class RiskSpec(StrictModel):
     sizing: SizingSpec = SizingSpec()
-    max_gross_contracts: int | None = Field(default=None, ge=1)
+    max_gross_contracts: int | None = Field(
+        default=None,
+        ge=1,
+        description="Borne |position| POUR UN INSTRUMENT, en contrats. Son nom "
+        "dit 'gross' mais il ne regarde pas le portefeuille : pour cela, voir "
+        "`limits`.",
+    )
+    limits: PortfolioLimitsSpec = PortfolioLimitsSpec()
 
     def build(self, margin_policy: MarginPolicy) -> RiskManager:
         return RiskManager(
             sizing=self.sizing.build(),
             margin_policy=margin_policy,
             max_gross_contracts=self.max_gross_contracts,
+            limits=self.limits.build(),
         )
 
 
@@ -446,6 +527,11 @@ class BacktestSpec(StrictModel):
         differents doivent donner la meme empreinte si elles designent les
         memes fichiers.
 
+        Un bloc `risk.limits` entierement nul est retire : voir
+        `_sans_plafonds_muets`. Il ne dit rien de plus que son absence, et
+        l'avoir hache aurait rendu incomparable tout run anterieur a son
+        existence.
+
         Les `note` sont retirees a TOUTE profondeur. Sur les blocs types,
         pydantic s'en charge deja (`exclude=True`) - mais les noeuds de
         signaux vivent dans une region LIBRE (`strategy.params.rules`, que
@@ -458,6 +544,7 @@ class BacktestSpec(StrictModel):
         payload = self.model_dump(mode="json")
         for entry, source in zip(payload["data"], self.data, strict=True):
             entry["path"] = source.canonical_path()
+        _sans_plafonds_muets(payload)
         propre = _sans_notes(payload)
         assert isinstance(propre, dict)
         return propre

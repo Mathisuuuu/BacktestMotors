@@ -1,6 +1,6 @@
 ---
 type: hub
-updated: 2026-09-11
+updated: 2026-09-12
 ---
 
 # Lecons
@@ -557,3 +557,39 @@ couverte sans qu'on y pense. Effet de bord assume : `note` devient un mot
 RESERVE dans une specification.
 
 Fonde sur [[Failed Ideas/ledger]] (2026-09-12) · [[log]] (2026-09-12)
+
+---
+
+## L20 -- Une contrainte de portefeuille verifiee ordre par ordre ne contraint rien
+
+Les quatre plafonds de `engine/limites.py` etaient justes, testes, et sans
+effet la ou ils servaient.
+
+Chaque ordre etait evalue contre le portefeuille **commite**. Or une strategie
+de classement emet TOUS ses ordres d'un coup, avant qu'aucun ne soit rempli :
+les dix ordres d'un rebalancement lisaient chacun « aucune position detenue »,
+chacun passait le controle, et `max_positions=2` laissait detenir jusqu'a SIX
+instruments sur `momentum_12_1_mensuel`.
+
+Le mecanisme est general et vaut au-dela de ce cas : **une contrainte qui porte
+sur un agregat ne peut pas se verifier sur les elements pris un par un**, si
+les elements arrivent par lots. Ni le type, ni le test unitaire, ni la relecture
+ne le montrent - chaque verification prise isolement est correcte.
+
+Ce qui l'a trouve : un test qui REJOUE les fills dans l'ordre et mesure le pire
+etat atteint, au lieu de lire l'etat final. L'etat final respectait le plafond ;
+c'est le transitoire qui ne le respectait pas. Un test de l'etat final aurait
+publie la contrainte comme fonctionnelle.
+
+Corollaire sur le choix de la mesure : `max_positions` COMPTE, il ne valorise
+pas, donc sa projection est exacte et l'assertion peut etre stricte. Les deux
+plafonds en argent dependent de marques prises une barre avant le fill : ils
+admettent un depassement, et un test strict sur eux aurait ete faux pour une
+raison sans rapport. C'est en choisissant la limite EXACTE comme sonde que le
+defaut est devenu visible sans tolerance a negocier.
+
+Le remede est une reservation valable le temps d'une fournee
+(`RiskManager.begin_submission`), les reductions reservees comme les entrees -
+sans quoi le plafond interdirait la rotation qu'il est cense encadrer.
+
+Fonde sur [docs/execution-model.md](../docs/execution-model.md) §6.3 · [[log]] (2026-09-12)

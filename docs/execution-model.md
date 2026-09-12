@@ -288,6 +288,93 @@ donne `0` contrat, l'ordre n'est **pas** émis, et le compteur
 Conséquence : sur un capital modeste, une stratégie sur ES (multiplicateur 50)
 est grumeleuse. C'est la réalité de l'instrument, pas un artefact.
 
+### 6.3 Contraintes de portefeuille
+
+Le dimensionnement (§6.2) regarde **un instrument**. Une contrainte de
+portefeuille regarde **toutes les positions à la fois**. Les deux peuvent être
+justes séparément et donner ensemble un portefeuille inacceptable : dix règles
+qui prennent chacune une position raisonnable font une exposition qui ne l'est
+pas.
+
+Quatre plafonds, tous facultatifs et `null` par défaut, déclarés sous
+`risk.limits` :
+
+| Plafond | Mesure |
+|---|---|
+| `max_gross_exposure` | `Σ abs(quantité × multiplicateur × marque) / equity` |
+| `max_net_exposure` | `abs(Σ quantité × multiplicateur × marque) / equity` |
+| `max_positions` | nombre d'instruments détenus |
+| `max_per_category` | nombre d'instruments détenus par classe d'actif |
+
+Les deux premiers se mesurent **en argent**, pas en contrats : dix ES et dix CL
+ne représentent pas le même risque, donc un plafond en contrats ne peut pas
+répondre à cette question. `max_gross_contracts`, qui existe par ailleurs,
+borne `abs(position)` **pour un instrument** — son nom dit « gross » mais il ne
+regarde pas le portefeuille.
+
+Brut et net ne disent pas la même chose : un portefeuille long 5 ES / court
+5 ES a un net de zéro et un brut de dix. Borner l'un sans l'autre laisse passer
+exactement l'un des deux risques.
+
+#### Règle de non-aggravation
+
+Un ordre est refusé s'il dépasse le plafond **et** aggrave la mesure qu'il
+dépasse. Un ordre qui la laisse égale ou la diminue passe toujours.
+
+Cette règle n'est pas une commodité : les plafonds en argent se comparent à une
+equity qui bouge seule. Un portefeuille conforme à 1,9 le matin est à 2,1 le
+soir sans qu'aucun ordre ne soit passé. Un contrôle portant sur le **niveau**
+enfermerait alors le portefeuille au-dessus de son plafond — il ne pourrait
+plus se réduire. Un plafond qui peut piéger un portefeuille n'est pas une
+contrainte, c'est une panne.
+
+Conséquence à connaître : sous une equity nulle ou négative, les quatre mesures
+valent l'infini, `inf > inf` est faux, et les plafonds deviennent **inertes**
+dans les deux sens. C'est voulu pour la liquidation ; sous `margin_policy:
+"reject"`, la marge refuse déjà tout ordre qui ajoute du risque dans cet état.
+
+#### Portée d'un contrôle : la fournée
+
+Les ordres d'une même soumission sont évalués **les uns contre les autres**.
+Sans cela, un rebalancement transversal qui émet dix ordres d'un coup les
+évaluerait tous contre le portefeuille d'avant : chacun lirait « aucune
+position détenue », chacun passerait, et un plafond de deux instruments en
+laisserait ouvrir dix. Une réservation vaut le temps d'une fournée, pas
+davantage — le runner remplit les ordres dus **avant** de soumettre les
+suivants.
+
+Les réductions sont réservées comme les entrées. `ranking@1` émet ses sorties
+avant ses entrées ; un plafond qui ne créditerait pas les sorties refuserait
+toute rotation.
+
+#### Ce que ces plafonds ne garantissent pas
+
+- Ils sont évalués **à la soumission**, sur les marques de la barre courante,
+  alors que le fill a lieu à `t+lag`, à un autre prix. L'exposition réalisée
+  peut donc dépasser légèrement un plafond **en argent**. C'est structurel : le
+  plafond exact demanderait de connaître le prix de fill avant de le connaître,
+  ce que §2 interdit. `max_positions` et `max_per_category`, qui comptent et ne
+  valorisent pas, sont en revanche **exacts**.
+- Un ordre à cours limité resté en attente n'est ni rempli ni réservé : le
+  plafond l'ignore jusqu'à ce qu'il touche.
+- Un ordre `reduce_only` — y compris un stop ou un objectif — n'est pas soumis
+  à ces plafonds. Il ne peut que réduire.
+- Un instrument sans marque à cet instant compte dans `max_positions` mais pas
+  dans les expositions en argent : il est détenu, il n'est pas valorisable, et
+  lui inventer une valeur serait la seule façon de se tromper en silence.
+
+Chaque refus est compté sous son propre motif, publié dans `run.risk_stats` du
+rapport : `n_rejected_gross_exposure`, `n_rejected_net_exposure`,
+`n_rejected_positions`, `n_rejected_per_category`. Un ordre disparu sans
+compteur donnerait « la stratégie ne trade pas » sans explication.
+
+#### Hachage
+
+Un bloc `risk.limits` entièrement `null` est **retiré de la forme canonique**,
+donc du `config_hash` : il ne dit rien de plus que son absence, et deux runs
+qui n'ont déclaré aucun plafond ont reçu les mêmes instructions. Un plafond
+réellement déclaré, lui, est haché — c'est une instruction.
+
 ---
 
 ## 7. Deux modes de runner

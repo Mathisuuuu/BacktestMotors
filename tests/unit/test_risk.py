@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+from typing import ClassVar
+
 import pytest
 
 from rsl.data.feed import BarContext
 from rsl.data.schema import BarStore
 from rsl.engine.execution import MarginPolicy
+from rsl.engine.limites import MOTIFS, PortfolioLimits
 from rsl.engine.portfolio import Portfolio
 from rsl.engine.risk import (
     EquityFraction,
@@ -236,3 +239,200 @@ class TestManagerLifecycle:
 
         described = RiskManager(sizing=FixedContracts(2)).describe()
         assert json.loads(json.dumps(described)) == described
+
+
+class TestPlafondsDePortefeuille:
+    """Les plafonds de `engine/limites.py`, vus depuis le `RiskManager`.
+
+    Les regles elles-memes sont eprouvees dans
+    `tests/unit/test_limites_portefeuille.py`, sur des photographies. Ici on
+    verifie le CABLAGE : que le gestionnaire mesure bien le portefeuille reel,
+    qu'il projette l'ordre avant de trancher, et qu'il compte le refus sous le
+    bon motif.
+
+    Arithmetique du montage : multiplicateur 50, marque 100, donc 5 000 le
+    contrat sur une equity de 100 000 - un contrat vaut 0,05 d'exposition.
+    """
+
+    MARQUE = 100.0
+    MARQUES: ClassVar[dict[str, float]] = {SYMBOL: MARQUE}
+
+    def gestionnaire(self, **plafonds: object) -> RiskManager:
+        return RiskManager(limits=PortfolioLimits(**plafonds))
+
+    def test_sans_plafond_declare_rien_ne_change(self, ctx, portfolio):
+        """Le defaut doit etre strictement inerte : toutes les empreintes
+        archivees en dependent.
+
+        Cinq contrats et non cinquante : la MARGE reste active, et 50 x 10 000
+        la depasserait. Un `None` viendrait alors d'elle, pas du defaut teste
+        ici - le test aurait passe pour la mauvaise raison."""
+        risk = RiskManager()
+        assert risk.prepare(entry(5), ctx, portfolio, self.MARQUES) is not None
+        assert risk.stats.n_rejected_portfolio == 0
+
+    def test_un_ordre_qui_ferait_franchir_le_brut_est_refuse(self, ctx, portfolio):
+        risk = self.gestionnaire(max_gross_exposure=0.1)  # 2 contrats
+        assert risk.prepare(entry(3), ctx, portfolio, self.MARQUES) is None
+        assert risk.stats.n_rejected_gross_exposure == 1
+
+    def test_un_ordre_qui_reste_sous_le_brut_passe(self, ctx, portfolio):
+        risk = self.gestionnaire(max_gross_exposure=0.1)
+        assert risk.prepare(entry(2), ctx, portfolio, self.MARQUES) is not None
+        assert risk.stats.n_rejected_portfolio == 0
+
+    def test_le_plafond_porte_sur_le_portefeuille_d_apres(self, ctx, portfolio):
+        """Deja 2 contrats en portefeuille, plafond a 2 : un troisieme doit
+        etre refuse. Mesurer l'etat AVANT le laisserait passer, et le plafond
+        ne mordrait qu'une fois deja depasse."""
+        hold(portfolio, 2, price=self.MARQUE)
+        risk = self.gestionnaire(max_gross_exposure=0.1)
+        assert risk.prepare(entry(1), ctx, portfolio, self.MARQUES) is None
+        assert risk.stats.n_rejected_gross_exposure == 1
+
+    def test_une_sortie_reduce_only_n_est_jamais_soumise_aux_plafonds(
+        self, ctx, portfolio
+    ):
+        """Un `reduce_only` sort par un autre chemin, avant tout controle. S'il
+        y passait, un portefeuille au-dessus du plafond ne pourrait plus se
+        fermer - et les stops empruntent ce meme chemin."""
+        hold(portfolio, 5, price=self.MARQUE)
+        risk = self.gestionnaire(max_gross_exposure=0.01)
+        sortie = Order(symbol=SYMBOL, side=Side.SELL, quantity=5, reduce_only=True)
+        assert risk.prepare(sortie, ctx, portfolio, self.MARQUES) is not None
+        assert risk.stats.n_rejected_portfolio == 0
+
+    def test_le_plafond_par_classe_compte_les_instruments_sans_classe(
+        self, ctx, portfolio
+    ):
+        """L'instrument de test n'en declare pas. Il est compte avec les autres
+        sans classe, jamais exempte : sinon omettre un champ facultatif
+        contournerait le plafond."""
+        risk = self.gestionnaire(max_per_category=1)
+        assert risk.prepare(entry(1), ctx, portfolio, self.MARQUES) is not None
+        hold(portfolio, 1, price=self.MARQUE)
+        # Renforcer ne cree pas une seconde position dans la classe.
+        assert risk.prepare(entry(1), ctx, portfolio, self.MARQUES) is not None
+        assert risk.stats.n_rejected_per_category == 0
+
+    def test_le_refus_de_portefeuille_est_distinct_du_plafond_de_contrats(
+        self, ctx, portfolio
+    ):
+        """Deux compteurs, parce que deux limites differentes : l'une borne un
+        instrument en contrats, l'autre le portefeuille en argent."""
+        risk = RiskManager(
+            max_gross_contracts=10, limits=PortfolioLimits(max_gross_exposure=0.1)
+        )
+        assert risk.prepare(entry(5), ctx, portfolio, self.MARQUES) is None
+        assert risk.stats.n_rejected_gross_cap == 0
+        assert risk.stats.n_rejected_gross_exposure == 1
+
+    def test_le_plafond_de_contrats_tranche_en_premier(self, ctx, portfolio):
+        """L'ordre des controles est observable : quand les deux mordent, c'est
+        le plafond d'instrument qui compte le refus."""
+        risk = RiskManager(
+            max_gross_contracts=2, limits=PortfolioLimits(max_gross_exposure=0.1)
+        )
+        assert risk.prepare(entry(5), ctx, portfolio, self.MARQUES) is None
+        assert risk.stats.n_rejected_gross_cap == 1
+        assert risk.stats.n_rejected_portfolio == 0
+
+    def test_un_motif_inconnu_est_refuse_plutot_qu_ecrit(self):
+        """Le compteur est indexe par nom : sans garde, une faute de frappe
+        creerait un compteur fantome au lieu d'echouer."""
+        risk = RiskManager()
+        with pytest.raises(ValueError, match="motif de refus inconnu"):
+            risk.stats.compter_refus("gross_exposition")
+
+    def test_reset_remet_les_compteurs_de_plafond_a_zero(self, ctx, portfolio):
+        risk = self.gestionnaire(max_gross_exposure=0.01)
+        risk.prepare(entry(1), ctx, portfolio, self.MARQUES)
+        assert risk.stats.n_rejected_portfolio == 1
+        risk.reset()
+        assert risk.stats.n_rejected_portfolio == 0
+
+    def test_describe_publie_les_plafonds_et_leurs_compteurs(self, ctx, portfolio):
+        """Un run qui refuse des ordres doit dire lesquels, et pourquoi -
+        sinon « la strategie ne trade pas » reste sans explication."""
+        risk = self.gestionnaire(max_positions=1, max_gross_exposure=2.0)
+        decrit = risk.describe()
+        assert decrit["limits"] == {
+            "max_gross_exposure": 2.0,
+            "max_net_exposure": None,
+            "max_positions": 1,
+            "max_per_category": None,
+        }
+        stats = decrit["stats"]
+        assert isinstance(stats, dict)
+        for motif in MOTIFS:
+            assert f"n_rejected_{motif}" in stats
+
+
+class TestUneFourneeDOrdresSeVoitElleMeme:
+    """Le defaut trouve le 2026-09-12, isole ici pour qu'il ne revienne pas.
+
+    Un plafond de portefeuille etait evalue contre le portefeuille COMMITE.
+    Or un rebalancement transversal emet tous ses ordres d'un coup, avant
+    qu'aucun ne soit rempli : chacun lisait « aucune position detenue »,
+    chacun passait, et `max_positions=2` laissait detenir jusqu'a SIX
+    instruments sur `momentum_12_1_mensuel`.
+
+    La correction est une RESERVATION valable le temps d'une fournee. Ces
+    tests l'exercent sur un seul instrument, la ou tout est verifiable de
+    tete ; l'effet sur les dix instruments reels est verifie dans
+    `tests/test_integration_reelle.py`.
+    """
+
+    MARQUES: ClassVar[dict[str, float]] = {SYMBOL: 100.0}
+
+    def test_deux_ordres_de_la_meme_fournee_se_cumulent(self, ctx, portfolio):
+        """Plafond a 2 contrats. Deux ordres d'un contrat passent ; le
+        troisieme est refuse, alors que le portefeuille est encore vide."""
+        risk = RiskManager(limits=PortfolioLimits(max_gross_exposure=0.1))
+        risk.begin_submission()
+        assert risk.prepare(entry(1), ctx, portfolio, self.MARQUES) is not None
+        assert risk.prepare(entry(1), ctx, portfolio, self.MARQUES) is not None
+        assert risk.prepare(entry(1), ctx, portfolio, self.MARQUES) is None
+        assert risk.stats.n_rejected_gross_exposure == 1
+
+    def test_une_nouvelle_fournee_repart_des_positions_reelles(self, ctx, portfolio):
+        """La reservation ne dure QU'une fournee : le runner remplit les ordres
+        dus avant de soumettre les suivants, donc a la fournee d'apres, ce qui
+        devait s'executer est deja dans le portefeuille. La garder plus
+        longtemps compterait deux fois la meme position."""
+        risk = RiskManager(limits=PortfolioLimits(max_gross_exposure=0.1))
+        risk.begin_submission()
+        assert risk.prepare(entry(2), ctx, portfolio, self.MARQUES) is not None
+        risk.begin_submission()
+        assert risk.prepare(entry(2), ctx, portfolio, self.MARQUES) is not None
+
+    def test_une_sortie_libere_la_place_pour_une_entree(self, ctx, portfolio):
+        """La raison pour laquelle les REDUCTIONS sont reservees elles aussi.
+
+        `ranking@1` emet ses sorties avant ses entrees. Un plafond qui ne
+        crediterait pas les sorties refuserait toute rotation : le portefeuille
+        resterait fige sur ses premieres positions - la meme facon de pieger un
+        portefeuille que celle contre laquelle la regle de non-aggravation
+        protege."""
+        hold(portfolio, 2, price=100.0)
+        risk = RiskManager(limits=PortfolioLimits(max_gross_exposure=0.1))
+        risk.begin_submission()
+        sortie = Order(symbol=SYMBOL, side=Side.SELL, quantity=2, reduce_only=True)
+        assert risk.prepare(sortie, ctx, portfolio, self.MARQUES) is not None
+        assert risk.prepare(entry(2), ctx, portfolio, self.MARQUES) is not None
+        assert risk.stats.n_rejected_portfolio == 0
+
+    def test_sans_plafond_aucune_reservation_n_est_tenue(self, ctx, portfolio):
+        """Le chemin par defaut ne doit rien payer, ni rien retenir."""
+        risk = RiskManager()
+        risk.begin_submission()
+        risk.prepare(entry(1), ctx, portfolio, self.MARQUES)
+        assert risk._reserved == {}
+
+    def test_reset_efface_les_reservations(self, ctx, portfolio):
+        risk = RiskManager(limits=PortfolioLimits(max_gross_exposure=0.5))
+        risk.begin_submission()
+        risk.prepare(entry(1), ctx, portfolio, self.MARQUES)
+        assert risk._reserved
+        risk.reset()
+        assert risk._reserved == {}
