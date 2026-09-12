@@ -10,10 +10,12 @@ capture pas la famille qu'il pretend capturer.
 from __future__ import annotations
 
 import json
+import re
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
+from pydantic import ValidationError
 
 from fixtures import synthetic
 from rsl.config import BacktestSpec
@@ -25,7 +27,7 @@ from rsl.engine.execution import ExecutionConfig, ZeroFee, ZeroSlippage
 from rsl.engine.runner import RunConfig
 from rsl.errors import ConfigurationError
 from rsl.orders import Fill, Order, Side
-from rsl.report import run_backtest
+from rsl.report import run_backtest, run_backtest_detailed
 from rsl.strategies.base import build_strategy, get_strategy
 from rsl.strategies.handwritten import CrossSectionalMomentum
 from rsl.strategies.ranking import RankingStrategy, momentum_score
@@ -380,3 +382,145 @@ class TestFromAConfigurationFile:
             )
         )
         assert momentum.result_fingerprint != low_vol.result_fingerprint
+
+
+class TestLAllocationDansUnRunComplet:
+    """L'allocation depuis un fichier, sur quatre instruments synthetiques.
+
+    Les regles elles-memes sont eprouvees dans `tests/unit/test_allocation.py`.
+    Ici on verifie le CABLAGE : que la strategie transmette la coupe a
+    l'allocateur, que les tailles emises soient celles qu'il rend, et que le
+    manifeste porte la repartition.
+
+    Quatre instruments de prix tres differents - ES a 2000, CL a 70 - donc un
+    montage ou « un contrat chacun » et « meme argent chacun » ne peuvent pas
+    se confondre.
+    """
+
+    def _files(self, tmp_path: Path) -> dict[str, Path]:
+        return TestFromAConfigurationFile()._files(tmp_path)
+
+    def _spec(self, tmp_path: Path, allocation: dict[str, object], **risque: object):
+        charge: dict[str, object] = {
+            "name": "allocation",
+            "initial_cash": CASH,
+            "data": [
+                {"root": r, "path": str(p)}
+                for r, p in sorted(self._files(tmp_path).items())
+            ],
+            "execution": {"fees": {"kind": "zero"}, "slippage": {"kind": "zero"}},
+            "strategy": {
+                "ref": "ranking@1",
+                "params": {
+                    "score": momentum_score(lookback=20, skip=1),
+                    "n_long": 1,
+                    "n_short": 1,
+                    "allocation": allocation,
+                },
+            },
+        }
+        if risque:
+            charge["risk"] = risque
+        return BacktestSpec.model_validate(charge)
+
+    def test_le_defaut_reproduit_le_comportement_historique(self, tmp_path: Path):
+        """La garde qui protege tout run existant : `fixed` avec `quantity`
+        doit donner exactement ce que donnait l'absence d'allocation."""
+        avec = run_backtest(self._spec(tmp_path, {"kind": "fixed"}))
+        sans = run_backtest(
+            TestFromAConfigurationFile()._spec(
+                tmp_path, momentum_score(lookback=20, skip=1)
+            )
+        )
+        assert avec.result_fingerprint == sans.result_fingerprint
+
+    def test_les_poids_egaux_donnent_des_tailles_differentes_par_nom(
+        self, tmp_path: Path
+    ):
+        """La verification qui compte : un contrat CL valant bien moins qu'un
+        contrat ES, egaliser l'argent ne peut pas egaliser les nombres."""
+        artefacts = run_backtest_detailed(
+            self._spec(tmp_path, {"kind": "equal_weight", "gross_target": 1.0})
+        )
+        entrees = [f for f in artefacts.result.fills if f.tag.startswith("ranking_")]
+        tailles = {f.quantity for f in entrees}
+        assert len(tailles) > 1, sorted(tailles)
+
+    def test_et_changent_le_resultat(self, tmp_path: Path):
+        """Une allocation qui ne changerait rien serait decorative."""
+        egaux = run_backtest(
+            self._spec(tmp_path, {"kind": "equal_weight", "gross_target": 1.0})
+        )
+        fixes = run_backtest(self._spec(tmp_path, {"kind": "fixed"}))
+        assert egaux.result_fingerprint != fixes.result_fingerprint
+
+    def test_la_volatilite_inverse_tourne_de_bout_en_bout(self, tmp_path: Path):
+        rapport = run_backtest(
+            self._spec(
+                tmp_path,
+                {"kind": "inverse_volatility", "window": 20, "gross_target": 0.5},
+            )
+        )
+        assert rapport.metrics.n_trades > 0
+
+    def test_le_manifeste_porte_la_repartition(self, tmp_path: Path):
+        """Un run archive doit rester interpretable : sans la regle publiee,
+        on ne saurait pas relire pourquoi les tailles etaient celles-la."""
+        rapport = run_backtest(
+            self._spec(tmp_path, {"kind": "equal_weight", "gross_target": 0.5})
+        )
+        strategie = rapport.to_dict()["run"]["strategy"]  # type: ignore[index]
+        assert strategie["allocation"]["rule"] == "equal_weight"
+        assert strategie["allocation"]["gross_target"] == 0.5
+        assert "stats" in strategie["allocation"]
+
+    def test_un_signal_sans_expression_est_refuse(self, tmp_path: Path):
+        with pytest.raises(ConfigurationError, match="`signal` est requis"):
+            run_backtest(self._spec(tmp_path, {"kind": "signal"}))
+
+
+class TestUneAllocationEcraseeEstRefusee:
+    """`RiskManager._size` REMPLACE la quantite de l'ordre.
+
+    Une allocation qui repartit un budget entre plusieurs noms verrait donc ses
+    tailles ecrasees par la meme valeur, sans erreur et sans compteur : elle
+    serait declaree, calculee, et jetee. Le refus tombe a la VALIDATION - un
+    backtest de plusieurs minutes qui rend des chiffres ininterpretables est
+    pire qu'un refus immediat.
+
+    Donc un `ValidationError`, comme toute autre erreur de specification, et
+    non un `ConfigurationError` - celui-ci se documente comme « detectee hors
+    du champ de pydantic ».
+    """
+
+    def spec(self, tmp_path: Path, allocation: dict[str, object], **risque: object):
+        return TestLAllocationDansUnRunComplet()._spec(tmp_path, allocation, **risque)
+
+    @pytest.mark.parametrize(
+        "kind", ["equal_weight", "inverse_volatility"]
+    )
+    def test_la_combinaison_est_refusee(self, tmp_path: Path, kind: str):
+        with pytest.raises(ValidationError, match="ne peuvent pas coexister"):
+            self.spec(
+                tmp_path, {"kind": kind}, sizing={"kind": "fixed", "contracts": 2}
+            )
+
+    def test_le_message_dit_comment_en_sortir(self, tmp_path: Path):
+        with pytest.raises(ValidationError, match=re.escape('sizing.kind = "none"')):
+            self.spec(
+                tmp_path,
+                {"kind": "equal_weight"},
+                sizing={"kind": "fixed", "contracts": 2},
+            )
+
+    def test_une_allocation_fixe_reste_compatible(self, tmp_path: Path):
+        """Elle ne repartit rien : il n'y a rien a ecraser. Interdire cette
+        combinaison casserait des specifications valides."""
+        assert self.spec(
+            tmp_path, {"kind": "fixed"}, sizing={"kind": "fixed", "contracts": 2}
+        ) is not None
+
+    def test_et_une_allocation_en_argent_sans_dimensionnement_aussi(
+        self, tmp_path: Path
+    ):
+        assert self.spec(tmp_path, {"kind": "equal_weight"}) is not None

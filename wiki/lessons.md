@@ -593,3 +593,47 @@ Le remede est une reservation valable le temps d'une fournee
 sans quoi le plafond interdirait la rotation qu'il est cense encadrer.
 
 Fonde sur [docs/execution-model.md](../docs/execution-model.md) §6.3 · [[log]] (2026-09-12)
+
+---
+
+## L21 -- Une conversion en entiers peut changer la question sans changer la reponse
+
+Trois regles d'allocation comparees sur `momentum_12_1` : `fixed` rendait un
+Sharpe de 0,92, `equal_weight` 0,02, `inverse_volatility` 0,15. Le tableau
+etait net, et il etait faux.
+
+A 1 M$ reparti sur six noms, chaque nom recoit 166 666 $. Un contrat ES en vaut
+250 000. `trunc` le met a zero. Ce ne sont donc pas « l'equiponderation » et
+« la ponderation inverse a la volatilite » qui ont ete mesurees, mais ces
+regles **amputees de leurs plus gros instruments** : 190 et 294 noms tronques
+sur ~690 emplacements, 28 % et 43 %.
+
+Le mecanisme merite d'etre retenu au-dela du cas. La troncature est une regle
+connue, documentee, et deja consignee comme piege pour `VolatilityTarget`. Ce
+qui est nouveau, c'est qu'elle ne frappe pas au hasard : elle **elimine
+preferentiellement les gros contrats**. Une conversion en entiers qui perd
+uniformement fait du bruit ; une qui perd selon la taille fait un BIAIS, et le
+resultat reste plausible.
+
+Rien dans les metriques ne pouvait le signaler. Le run tournait, les 107 trades
+etaient la, les Sharpe etaient dans les ordres de grandeur habituels. Les trois
+lignes se comparaient entre elles, ce qui donnait au tableau son air de
+resultat.
+
+Ce qui l'a trouve : avoir ecrit le compteur `n_noms_tronques` AVANT de lire le
+moindre chiffre de performance, et l'avoir regarde en premier. Il n'y avait
+aucune raison de le consulter - c'est l'habitude prise sur `n_dropped_sizing`
+qui a joue.
+
+Regle pratique : quand une grandeur continue devient un entier, verifier que
+**la perte ne depend pas de l'unite**. Ici, doubler puis decupler le capital
+(20 M$) ramene la troncature a zero et rend la comparaison licite - les trois
+regles selectionnent alors exactement les memes noms, seules les tailles
+different.
+
+Corollaire sur la publication : un compteur qui n'apparait pas dans le rapport
+n'est pas lu. `n_noms_tronques` est publie dans
+`run.strategy.allocation.stats`, et [docs/execution-model.md](../docs/execution-model.md)
+§6.4 dit qu'il se lit AVANT les performances.
+
+Fonde sur [[experiments/allocation-momentum-12-1-trois-regles]] · [[log]] (2026-09-12)

@@ -11,7 +11,7 @@ Voir `docs/no-lookahead.md` §2 et §3.
 from __future__ import annotations
 
 from collections import deque
-from collections.abc import Iterator
+from collections.abc import Iterator, Mapping
 from datetime import datetime
 from typing import Final, Protocol, runtime_checkable
 
@@ -694,11 +694,12 @@ class MultiContext:
     (`docs/no-lookahead.md` §4.1).
     """
 
-    __slots__ = ("_account", "_contexts", "_panel", "_row")
+    __slots__ = ("_account", "_contexts", "_multipliers", "_panel", "_row")
 
     def __init__(self, panel: Panel) -> None:
         self._panel = panel
         self._row = -1
+        self._multipliers: dict[str, float] = {}
         self._contexts = {s: BarContext(panel.stores[s]) for s in panel.symbols}
         # UN compte pour tout le panneau : deux instruments d'un meme
         # portefeuille n'ont pas deux equities. Les positions, elles, restent
@@ -740,6 +741,36 @@ class MultiContext:
             )
         return self._contexts[symbol]
 
+    def _set_multipliers(self, multipliers: Mapping[str, float]) -> None:
+        """Declare la taille des contrats. Reserve au runner, une seule fois.
+
+        Le runner detient deja les `InstrumentSpec` du run ; il les transmet
+        plutot que de laisser la couche `strategies` aller les rechercher dans
+        la table globale. Deux chemins vers la meme donnee en feraient deux
+        sources, dont l'une finirait par mentir.
+        """
+        self._multipliers = dict(multipliers)
+
+    def contract_value(self, symbol: str) -> float:
+        """Valeur d'UN contrat de `symbol`, en devise, a cet instant.
+
+        C'est la seule grandeur dont une allocation ait besoin pour convertir
+        de l'argent en contrats, et la seule que l'on expose : une strategie
+        n'a pas a connaitre la marge, le tick ni les frais - ce sont des
+        affaires du moteur.
+
+        Leve si l'instrument ne cote pas a cet instant (par `__getitem__`), ou
+        si aucun multiplicateur n'a ete declare - c'est-a-dire hors runner.
+        Rendre une valeur plausible ferait une allocation silencieusement
+        fausse, ce qui est pire qu'un refus.
+        """
+        multiplicateur = self._multipliers.get(symbol)
+        if multiplicateur is None:
+            raise ConfigurationError(
+                f"aucun multiplicateur declare pour {symbol} : `contract_value` "
+                f"n'est utilisable que dans un run."
+            )
+        return self[symbol].bar.close * multiplicateur
     def _set_account(self, state: AccountState) -> None:
         """Enregistre l'etat de compte de la ligne courante. Reserve au runner.
 

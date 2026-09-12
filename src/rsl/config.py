@@ -18,7 +18,7 @@ from datetime import timedelta
 from pathlib import Path
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from rsl.data.instruments import get_instrument
 from rsl.data.loader import build_panel, load_bar_store
@@ -519,6 +519,47 @@ class BacktestSpec(StrictModel):
             "exploration mais rend le manifeste incomplet, et le rapport le signale."
         ),
     )
+
+    @model_validator(mode="after")
+    def _refuse_allocation_ecrasee(self) -> BacktestSpec:
+        """Une allocation en argent et une regle de dimensionnement s'excluent.
+
+        `RiskManager._size` REMPLACE la quantite de l'ordre par celle que rend
+        la regle de dimensionnement. Une strategie de classement qui a reparti
+        son budget entre six noms verrait donc ses six tailles ecrasees par la
+        meme valeur, sans erreur et sans compteur : l'allocation serait
+        declaree, calculee, et jetee.
+
+        Les deux repondent d'ailleurs a la meme question - combien de contrats
+        - depuis deux endroits. Une seule doit le faire.
+
+        Refuse a la VALIDATION, pas au run : le fichier est faux, et un backtest
+        de plusieurs minutes qui produit des chiffres ininterpretables est pire
+        qu'un refus immediat. `kind: "fixed"` reste autorise avec un
+        dimensionnement, puisqu'il ne repartit rien.
+
+        Leve un `ValueError` nu et non un `ConfigurationError` : ce dernier se
+        documente comme « detectee HORS du champ de pydantic ». Ici on est
+        dedans, et pydantic l'enveloppe dans le `ValidationError` qui porte deja
+        toutes les autres erreurs de specification - `extra="forbid"`, `ge=1`,
+        type invalide. Une seule forme d'echec a lire pour un fichier faux.
+        """
+        if self.risk.sizing.kind == "none":
+            return self
+        allocation = self.strategy.params.get("allocation")
+        if not isinstance(allocation, dict):
+            return self
+        genre = allocation.get("kind", "fixed")
+        if genre == "fixed":
+            return self
+        raise ValueError(
+            f"allocation '{genre}' et sizing '{self.risk.sizing.kind}' ne peuvent "
+            f"pas coexister : les deux decident du nombre de contrats, et le "
+            f"dimensionnement passe en dernier - il ecraserait la repartition. "
+            f"Choisir l'un des deux : `risk.sizing.kind = \"none\"` pour laisser "
+            f"l'allocation repartir, ou une allocation 'fixed' pour laisser le "
+            f"dimensionnement decider."
+        )
 
     def canonical(self) -> SpecDict:
         """Forme canonique hachee dans le manifeste.

@@ -38,12 +38,22 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass, field
+from typing import Literal
 
 from pydantic import Field as PydField
 
 from rsl.data.feed import Context, MultiContext
 from rsl.errors import ConfigurationError
 from rsl.orders import Fill, Order, Side
+from rsl.strategies.allocation import (
+    DEFAUT_GROSS_TARGET,
+    Allocateur,
+    AllocationRule,
+    ContratsFixes,
+    PoidsEgaux,
+    PoidsParSignal,
+    VolatiliteInverse,
+)
 from rsl.strategies.base import CrossSectionalStrategy, StrategyParams, strategy
 from rsl.strategies.signals import Signal, SpecDict, build_signal
 
@@ -58,9 +68,14 @@ class RankingStrategy(CrossSectionalStrategy):
     quantity: int = 1
     long_short: bool = True
     extra_warmup: int = 0
+    allocation: AllocationRule | None = None
+    """Comment repartir entre les noms retenus. `None` = `quantity` contrats
+    chacun, le comportement historique - voir `strategies/allocation.py` pour
+    ce que ce defaut implique reellement."""
     _positions: dict[str, int] = field(default_factory=dict, init=False, repr=False)
     _rebalances: int = field(default=0, init=False, repr=False)
     _skipped: int = field(default=0, init=False, repr=False)
+    _allocateur: Allocateur = field(init=False, repr=False)
 
     def __post_init__(self) -> None:
         if self.n_long < 1:
@@ -73,12 +88,22 @@ class RankingStrategy(CrossSectionalStrategy):
             raise ConfigurationError(f"quantity doit etre >= 1, recu {self.quantity}")
         if self.extra_warmup < 0:
             raise ConfigurationError(f"extra_warmup doit etre >= 0, recu {self.extra_warmup}")
+        regle = ContratsFixes(self.quantity) if self.allocation is None else self.allocation
+        self._allocateur = Allocateur(regle)
 
     # -- contrat -----------------------------------------------------------
 
     @property
     def warmup_bars(self) -> int:
-        return self.score.warmup_bars + self.extra_warmup
+        """Le MAXIMUM des deux besoins, pas leur somme.
+
+        Le score et l'allocation lisent la meme histoire en parallele : chacun
+        doit disposer de sa profondeur, aucun n'attend l'autre. Les additionner
+        rognerait l'echantillon sans raison ; prendre seulement celle du score
+        ferait qu'une allocation a fenetre longue ecarterait tous les noms aux
+        premiers rebalancements, sans que rien ne dise pourquoi.
+        """
+        return max(self.score.warmup_bars, self._allocateur.warmup_bars) + self.extra_warmup
 
     @property
     def required_universe(self) -> int:
@@ -88,6 +113,7 @@ class RankingStrategy(CrossSectionalStrategy):
         self._positions = {}
         self._rebalances = 0
         self._skipped = 0
+        self._allocateur.reset()
 
     def on_fill(self, fill: Fill) -> None:
         current = self._positions.get(fill.symbol, 0) + fill.signed_quantity
@@ -105,7 +131,8 @@ class RankingStrategy(CrossSectionalStrategy):
             # vente, et vendre ici fabriquerait des frais que rien ne justifie.
             self._skipped += 1
             return ()
-        return self._orders_towards(self._targets(scores))
+        cibles = self._targets(scores)
+        return self._orders_towards(cibles, self._allocateur.contrats(sorted(cibles), ctx))
 
     def describe(self) -> SpecDict:
         return {
@@ -116,6 +143,7 @@ class RankingStrategy(CrossSectionalStrategy):
             "quantity": self.quantity,
             "long_short": self.long_short,
             "extra_warmup": self.extra_warmup,
+            "allocation": self._allocateur.describe(),
             "n_rebalances": self._rebalances,
             "n_skipped_rebalances": self._skipped,
         }
@@ -155,8 +183,18 @@ class RankingStrategy(CrossSectionalStrategy):
                 targets[symbol] = -1
         return targets
 
-    def _orders_towards(self, targets: dict[str, int]) -> list[Order]:
-        """Sorties d'abord, entrees ensuite, chaque groupe dans l'ordre trie."""
+    def _orders_towards(
+        self, targets: dict[str, int], quantites: dict[str, int]
+    ) -> list[Order]:
+        """Sorties d'abord, entrees ensuite, chaque groupe dans l'ordre trie.
+
+        `quantites` vient de l'allocation et ne porte que des MAGNITUDES : le
+        sens est dans `targets`. Un nom absent de `quantites` a ete ecarte par
+        l'allocation - taille tronquee a zero, poids incalculable - et n'est
+        donc pas ouvert. Les SORTIES, elles, ne consultent jamais l'allocation :
+        fermer une position n'est pas la dimensionner, et un nom dont le poids
+        devient incalculable doit pouvoir etre ferme.
+        """
         orders: list[Order] = []
 
         for symbol in sorted(self._positions):
@@ -178,16 +216,90 @@ class RankingStrategy(CrossSectionalStrategy):
             held = self._positions.get(symbol, 0)
             if held != 0 and (1 if held > 0 else -1) == wanted:
                 continue
+            taille = quantites.get(symbol, 0)
+            if taille < 1:
+                continue
             orders.append(
                 Order(
                     symbol=symbol,
                     side=Side.BUY if wanted > 0 else Side.SELL,
-                    quantity=self.quantity,
+                    quantity=taille,
                     tag="ranking_long" if wanted > 0 else "ranking_short",
                 )
             )
 
         return orders
+
+
+class AllocationSpec(StrategyParams):
+    """Comment repartir le budget entre les noms retenus.
+
+    Meme forme que `SizingSpec` dans `config.py` - un `kind` discriminant, des
+    champs facultatifs - et pour la meme raison : un JSON se lit mieux avec un
+    mot qu'avec la presence ou l'absence d'une cle.
+
+    `fixed` est le defaut et reproduit exactement le comportement d'avant le
+    2026-09-12. Ce n'est pas une allocation neutre pour autant : voir
+    `strategies/allocation.py`, qui explique pourquoi « un contrat chacun »
+    met trois fois plus d'argent sur ES que sur 6J.
+    """
+
+    kind: Literal["fixed", "equal_weight", "inverse_volatility", "signal"] = "fixed"
+    contracts: int | None = PydField(
+        default=None,
+        ge=1,
+        description="Contrats par nom, pour kind='fixed'. Par defaut, "
+        "`quantity` de la strategie.",
+    )
+    gross_target: float = PydField(
+        default=DEFAUT_GROSS_TARGET,
+        gt=0.0,
+        description="Notionnel brut vise, en fraction de l'equity. Sur des "
+        "futures, 1.0 n'est PAS 'sans levier' : c'est environ seize fois la "
+        "marge initiale d'ES.",
+    )
+    window: int = PydField(
+        default=20,
+        ge=2,
+        description="Fenetre de volatilite, pour kind='inverse_volatility'.",
+    )
+    signal: dict[str, object] | None = PydField(
+        default=None,
+        description="Noeud de signal donnant le poids brut. Requis pour "
+        "kind='signal'. Normalise, donc son echelle est indifferente.",
+    )
+
+    def build(self, quantity: int) -> AllocationRule:
+        match self.kind:
+            case "fixed":
+                return ContratsFixes(
+                    quantity if self.contracts is None else self.contracts
+                )
+            case "equal_weight":
+                return PoidsEgaux(gross_target=self.gross_target)
+            case "inverse_volatility":
+                return VolatiliteInverse(
+                    window=self.window, gross_target=self.gross_target
+                )
+            case "signal":
+                if self.signal is None:
+                    raise ConfigurationError(
+                        "allocation 'signal' : `signal` est requis - sans "
+                        "expression, il n'y a aucun poids a calculer"
+                    )
+                return PoidsParSignal(
+                    signal=build_signal(self.signal), gross_target=self.gross_target
+                )
+
+    @property
+    def est_le_defaut(self) -> bool:
+        """Vrai si cette allocation reproduit le comportement historique.
+
+        Sert a `BacktestSpec`, qui refuse une allocation en argent combinee a
+        une regle de dimensionnement : la combinaison n'a de sens a interdire
+        que si l'allocation demande VRAIMENT quelque chose.
+        """
+        return self.kind == "fixed"
 
 
 class RankingParams(StrategyParams):
@@ -204,6 +316,7 @@ class RankingParams(StrategyParams):
     quantity: int = 1
     long_short: bool = True
     extra_warmup: int = 0
+    allocation: AllocationSpec = AllocationSpec()
 
 
 @strategy(
@@ -228,6 +341,7 @@ def _build_ranking(params: StrategyParams) -> CrossSectionalStrategy:
         n_short=params.n_short,
         quantity=params.quantity,
         long_short=params.long_short,
+        allocation=params.allocation.build(params.quantity),
         extra_warmup=params.extra_warmup,
     )
 

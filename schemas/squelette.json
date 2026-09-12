@@ -3819,6 +3819,49 @@
     },
     "ranking@1": {
       "params": {
+        "allocation": {
+          "champs": {
+            "contracts": {
+              "accepte_null": true,
+              "defaut": null,
+              "min": 1,
+              "type": "entier"
+            },
+            "gross_target": {
+              "defaut": 1.0,
+              "min_exclu": 0.0,
+              "type": "nombre"
+            },
+            "kind": {
+              "choix": [
+                "fixed",
+                "equal_weight",
+                "inverse_volatility",
+                "signal"
+              ],
+              "defaut": "fixed",
+              "type": "choix"
+            },
+            "signal": {
+              "accepte_null": true,
+              "defaut": null,
+              "type": "objet"
+            },
+            "window": {
+              "defaut": 20,
+              "min": 2,
+              "type": "entier"
+            }
+          },
+          "defaut": {
+            "contracts": null,
+            "gross_target": 1.0,
+            "kind": "fixed",
+            "signal": null,
+            "window": 20
+          },
+          "type": "objet"
+        },
         "extra_warmup": {
           "defaut": 0,
           "type": "entier"

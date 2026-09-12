@@ -248,6 +248,13 @@ class CrossSectionalRunner:
                 for symbole in self.panel.symbols:
                     mctx._context_of(symbole)._set_position_depth(warmup)
                 mctx._account_history().set_initial(self.config.initial_cash)
+                # La taille des contrats, transmise depuis les specifications
+                # du run : c'est ce qui permet a une ALLOCATION de convertir
+                # de l'argent en contrats sans aller rechercher la table des
+                # instruments par un second chemin.
+                mctx._set_multipliers(
+                    {s: spec.multiplier for s, spec in self.specs.items()}
+                )
                 profondeur_dite = True
             row = mctx._row
             bars = {symbol: mctx[symbol].bar for symbol in mctx.symbols}

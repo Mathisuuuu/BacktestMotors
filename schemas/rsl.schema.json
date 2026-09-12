@@ -2208,9 +2208,101 @@
       "type": "object"
     },
     "ranking@1": {
+      "$defs": {
+        "AllocationSpec": {
+          "additionalProperties": false,
+          "description": "Comment repartir le budget entre les noms retenus.\n\nMeme forme que `SizingSpec` dans `config.py` - un `kind` discriminant, des\nchamps facultatifs - et pour la meme raison : un JSON se lit mieux avec un\nmot qu'avec la presence ou l'absence d'une cle.\n\n`fixed` est le defaut et reproduit exactement le comportement d'avant le\n2026-09-12. Ce n'est pas une allocation neutre pour autant : voir\n`strategies/allocation.py`, qui explique pourquoi « un contrat chacun »\nmet trois fois plus d'argent sur ES que sur 6J.",
+          "properties": {
+            "contracts": {
+              "anyOf": [
+                {
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Contrats par nom, pour kind='fixed'. Par defaut, `quantity` de la strategie.",
+              "title": "Contracts"
+            },
+            "gross_target": {
+              "default": 1.0,
+              "description": "Notionnel brut vise, en fraction de l'equity. Sur des futures, 1.0 n'est PAS 'sans levier' : c'est environ seize fois la marge initiale d'ES.",
+              "exclusiveMinimum": 0.0,
+              "title": "Gross Target",
+              "type": "number"
+            },
+            "kind": {
+              "default": "fixed",
+              "enum": [
+                "fixed",
+                "equal_weight",
+                "inverse_volatility",
+                "signal"
+              ],
+              "title": "Kind",
+              "type": "string"
+            },
+            "note": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Commentaire libre. Ignore par le moteur, EXCLU du config_hash. Une liste de chaines vaut plusieurs lignes.",
+              "title": "Note"
+            },
+            "signal": {
+              "anyOf": [
+                {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Noeud de signal donnant le poids brut. Requis pour kind='signal'. Normalise, donc son echelle est indifferente.",
+              "title": "Signal"
+            },
+            "window": {
+              "default": 20,
+              "description": "Fenetre de volatilite, pour kind='inverse_volatility'.",
+              "minimum": 2,
+              "title": "Window",
+              "type": "integer"
+            }
+          },
+          "title": "AllocationSpec",
+          "type": "object"
+        }
+      },
       "additionalProperties": false,
       "description": "Parametres d'une strategie de classement.\n\n`score` est une specification de noeud - c'est la que reside toute\nl'expressivite. Sa validation est faite par `build_signal`, qui connait le\nregistre des noeuds ; le schema publie par `rsl schema` en donne le contrat.",
       "properties": {
+        "allocation": {
+          "$ref": "#/$defs/AllocationSpec",
+          "default": {
+            "contracts": null,
+            "gross_target": 1.0,
+            "kind": "fixed",
+            "signal": null,
+            "window": 20
+          }
+        },
         "extra_warmup": {
           "default": 0,
           "title": "Extra Warmup",

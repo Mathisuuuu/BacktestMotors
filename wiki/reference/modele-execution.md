@@ -20,6 +20,7 @@ autorite: docs/execution-model.md
 | Comment sont comptabilises les futures ? | section comptabilite futures |
 | Que se passe-t-il sur un trou de session ? | section trous de session |
 | Comment borner un PORTEFEUILLE, pas un instrument ? | §6.3 — quatre plafonds sous `risk.limits`, regle de non-aggravation, et ce qu'ils ne garantissent pas |
+| Comment REPARTIR entre plusieurs noms ? | §6.4 — allocation de `ranking@1`. **Lire d'abord `n_noms_tronques`** : la troncature elimine les gros contrats d'abord |
 
 ## Cote code
 
@@ -30,6 +31,7 @@ autorite: docs/execution-model.md
 | Portefeuille | [src/rsl/engine/portfolio.py](../../src/rsl/engine/portfolio.py) |
 | Risque et dimensionnement | [src/rsl/engine/risk.py](../../src/rsl/engine/risk.py) |
 | Plafonds de portefeuille | [src/rsl/engine/limites.py](../../src/rsl/engine/limites.py) |
+| Allocation transversale | [src/rsl/strategies/allocation.py](../../src/rsl/strategies/allocation.py) |
 | Runner mono-instrument | [src/rsl/engine/runner.py](../../src/rsl/engine/runner.py) |
 | Runner transversal | [src/rsl/engine/cross_sectional.py](../../src/rsl/engine/cross_sectional.py) |
 

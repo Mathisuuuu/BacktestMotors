@@ -375,6 +375,80 @@ donc du `config_hash` : il ne dit rien de plus que son absence, et deux runs
 qui n'ont déclaré aucun plafond ont reçu les mêmes instructions. Un plafond
 réellement déclaré, lui, est haché — c'est une instruction.
 
+### 6.4 Allocation transversale
+
+§6.2 dit combien de contrats sur **un** instrument ; §6.3 dit ce que le
+portefeuille s'**interdit**. Ni l'un ni l'autre ne dit comment **répartir** un
+budget entre plusieurs noms retenus. C'est ce que fait l'allocation de
+`ranking@1`, déclarée sous `strategy.params.allocation`.
+
+#### « Un contrat chacun » est une répartition, pas son absence
+
+Le défaut historique donne `quantity` contrats à chaque nom. Un contrat ES vaut
+environ 50 × 5 000 = 250 000 $ ; un contrat 6J environ 81 000 $. « Un contrat
+chacun » met donc trois fois plus d'argent sur ES, et le résultat du
+portefeuille est dominé par l'instrument dont le contrat est gros — pour une
+raison sans rapport avec la stratégie. La règle porte désormais un nom
+(`fixed`) : un défaut invisible ne se discute pas.
+
+| `kind` | Poids |
+|---|---|
+| `fixed` | `contracts` contrats par nom. Défaut, identique au comportement antérieur |
+| `equal_weight` | `1/N` du budget à chaque nom |
+| `inverse_volatility` | proportionnel à `1/volatilité`, puis normalisé |
+| `signal` | une expression du vocabulaire, puis normalisée |
+
+    budget     = equity × gross_target
+    contrats_i = trunc(budget × poids_i / (prix_i × multiplicateur_i))
+
+#### Ce qui exige de voir la coupe
+
+Beaucoup de besoins sont déjà couverts par une règle de dimensionnement (§6.2),
+qui ne voit qu'un instrument — s'ils suffisent, les préférer. Une allocation ne
+se justifie que pour ce qu'une règle par instrument ne peut pas faire :
+**normaliser**. `vol_target` appliqué à six noms déploie six fois son budget ;
+`inverse_volatility` en déploie un, quel que soit le nombre de noms retenus et
+quelles que soient leurs volatilités.
+
+#### Exclusion mutuelle avec le dimensionnement
+
+`RiskManager._size` **remplace** la quantité de l'ordre. Une allocation qui
+répartit un budget verrait donc ses tailles écrasées par une valeur unique,
+sans erreur et sans compteur. La combinaison d'une allocation en argent et d'un
+`risk.sizing.kind` autre que `"none"` est donc **refusée à la validation**, pas
+au run. `fixed` reste autorisé : il ne répartit rien.
+
+#### Troncature : la première cause de « la stratégie ne trade pas »
+
+Le nombre de contrats est tronqué vers zéro (§6.2). Avec un budget modeste
+réparti sur plusieurs noms, `trunc` peut rendre zéro — et ce sont les
+**gros contrats qui disparaissent en premier**, ce qui transforme silencieusement
+la répartition demandée en une autre.
+
+Mesuré le 2026-09-12 sur `momentum_12_1` (dix instruments, six noms retenus) :
+à 1 M$ de capital et `gross_target: 1.0`, `equal_weight` tronque **190** noms à
+zéro et `inverse_volatility` **294**, sur ~690 emplacements. Les Sharpe obtenus
+ne décrivaient alors pas les règles déclarées. À 20 M$, la troncature tombe à
+zéro pour les trois règles.
+
+Le compteur `n_noms_tronques`, publié dans `run.strategy.allocation.stats`, est
+donc à **lire avant** tout chiffre de performance issu d'une allocation.
+
+#### Ce que l'allocation ne garantit pas
+
+- Les poids sont calculés sur les barres closes de la coupe ; l'ordre est
+  rempli à `t+lag`, à un autre prix. La répartition réalisée s'écarte un peu de
+  la répartition voulue — même approximation structurelle qu'en §6.3.
+- Un nom dont le poids n'est pas calculable (volatilité indéfinie ou nulle,
+  signal `None` ou négatif) est **écarté**, jamais doté d'un poids par défaut,
+  et compté sous `n_noms_sans_poids`. La normalisation porte alors sur les noms
+  restants : la cible brute est tenue, au prix d'une concentration.
+- Les **sorties** ne consultent jamais l'allocation. Fermer une position n'est
+  pas la dimensionner, et un nom dont le poids devient incalculable doit
+  pouvoir être fermé.
+- `gross_target: 1.0` n'est pas « sans levier » sur des futures : la marge
+  initiale d'ES avoisine 6 % du notionnel, donc environ seize fois la marge.
+
 ---
 
 ## 7. Deux modes de runner

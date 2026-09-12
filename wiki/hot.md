@@ -16,23 +16,24 @@ generated: true
 
 | Indicateur | Valeur |
 |---|---|
-| Pages de wiki | 23 |
-| Entrees de log | 127 |
+| Pages de wiki | 24 |
+| Entrees de log | 129 |
 | Derniere activite | 2026-09-12 |
 | Idees ecartees (ledger) | 18 |
 | Idees en attente (ledger) | 4 |
 | Pages `Failed Ideas/` | 1 |
 | Pages `concepts/` | 6 |
-| Pages `experiments/` | 4 |
+| Pages `experiments/` | 5 |
 | Pages `reference/` | 7 |
 | Pages `research/` | 1 |
 
-**Activite par type :** note × 61, fix × 26, feat × 17, decision × 17, experiment × 2, setup × 1, lint × 1, audit × 1, refactor × 1
+**Activite par type :** note × 61, fix × 26, feat × 18, decision × 17, experiment × 2, setup × 1, lint × 1, audit × 1, refactor × 1, essai × 1
 
 ## Experiences
 
 | Experience | Statut | Verdict | Essais | Maj |
 |---|---|---|---|---|
+| [[experiments/allocation-momentum-12-1-trois-regles]] | `termine` | `non-conclusif` | 6 | 2026-09-12 |
 | [[experiments/dsr-grille-sma-8-essais]] | `termine` | `non-conclusif` | 8 | 2026-09-10 |
 | [[experiments/paire-es-nq-retour-a-la-moyenne]] | `termine` | `non-conclusif` | 1 | 2026-09-11 |
 | [[experiments/rsi-survendu-hors-lundi]] | `termine` | `non-conclusif` | 1 | 2026-09-11 |
@@ -42,14 +43,14 @@ Le total des essais alimente le Deflated Sharpe : un essai non enregistre gonfle
 
 ## Derniere activite — 8 entree(s)
 
+- **2026-09-12** — essai | Momentum 12-1, trois regles d'allocation, deux niveaux de capital -- SIX essais comptes | les trois premiers etaient inexploitables : la troncature en contrats entiers eliminait 28 a 43 % des noms, les GROS contrats d'abord. A 20 M$ : Sharpe 0,84 / 0,45 / 0,71. Verdict non-conclusif, lecon [[lessons]] L21
+- **2026-09-12** — feat | Allocation transversale : `ranking@1` sait repartir (`equal_weight`, `inverse_volatility`, `signal`), `MultiContext.contract_value` donne la taille d'un contrat | livre ; 3923 tests ; 7 empreintes et 7 config_hash inchanges ; la combinaison allocation-en-argent + sizing est refusee a la validation
 - **2026-09-12** — fix | Les plafonds etaient evalues ordre par ordre contre le portefeuille commite : un rebalancement transversal de dix ordres les franchissait tous ensemble | `max_positions=2` laissait detenir SIX instruments sur momentum_12_1 ; corrige par reservation de fournee, verifie en rejouant les fills. Lecon [[lessons]] L20
 - **2026-09-12** — feat | Contraintes de portefeuille : quatre plafonds sous `risk.limits`, regle de non-aggravation, reservation par fournee | livre ; 3869 tests ; 7 empreintes ET 7 config_hash inchanges
 - **2026-09-12** — note | verification decisive : les dix chemins derives designent des fichiers qui EXISTENT | et les dix-huit entrees `data` des reglages versionnes s'accordent avec la table, sans une divergence. Les 7 empreintes et les contrats engendres sont inchanges -- `InstrumentSpec` n'entre dans aucun hachage, ce qui a ete verifie AVANT de la modifier
 - **2026-09-12** — decision | `category` vaut `None` par defaut, et un instrument sans classe n'a PAS de chemin | les instruments construits dans les tests n'existent sur aucun disque. Leur inventer une classe laisserait croire qu'ils ont un fichier ; `data_path` leve donc plutot que de rendre un chemin plausible -- meme regle que `session` sans calendrier declare, et que `account` hors runner. Les dix contrats de la table en ont tous une, ce qu'un test verifie
 - **2026-09-12** — decision | une classe d'actif plutot qu'un chemin brut | `InstrumentSpec` se decrit comme une specification ECONOMIQUE : y coller un chemin de fichier melangerait le contrat et le disque. La classe d'actif, elle, est une propriete durable -- ES est un future d'indice, ou que soient ses donnees. Le fait que l'arborescence la reproduise est une commodite, portee par `data_path` seul et nommee comme telle
 - **2026-09-12** — fix | le chemin des donnees rejoint `InstrumentSpec`, et la copie disparait | `gui/montage.py` portait une table `DOSSIERS` recopiant l'arborescence (`ES` -> `indices`, `GC` -> `metaux`) : un instrument range ailleurs, ou simplement oublie, l'aurait fait mentir sans prevenir. `InstrumentSpec` gagne une `category` -- la CLASSE D'ACTIF, propriete du contrat et non du disque -- dont `data_path` derive le chemin relatif. Une seule convention, ecrite une seule fois
-- **2026-09-12** — fix | `walkforward` et `verify` appelaient le meme chargeur sans en avoir les options | les commandes documentees dans les pages d'experience etaient donc devenues impossibles. Verifie en les EXECUTANT toutes, extraites du README et du wiki par expression reguliere : quatre commandes, quatre succes. Une commande documentee qu'on n'execute pas est une commande qu'on suppose
-- **2026-09-12** — note | un seul chemin pour charger un exemple : `tests/fixtures/exemples.py` | cinq fichiers de tests chargeaient un exemple, chacun a sa maniere. Avec DEUX morceaux a recoller et un symbole a injecter, cinq manieres seraient devenues cinq occasions de le faire differemment. Le symbole vient de `empreintes_attendues.json`, deja verite terrain : le stocker ailleurs ferait une seconde source
 
 ## Next Actions
 
@@ -175,11 +176,23 @@ suivante, qui viennent de l'audit fonctionnel du 2026-09-10.
       pour un champ qui ne dit rien. Defaut trouve au passage et corrige :
       la contrainte ne contraignait rien sur un rebalancement transversal
       ([[lessons]] L20).
-- [ ] **Le pendant qui manque encore : l'ALLOCATION.** Les contraintes disent ce
-      qu'on s'interdit ; elles ne disent pas comment repartir. `ranking@1` prend
-      toujours `quantity` contrats par nom, egalement - pas de poids, pas de
-      budget de risque, pas d'inverse-volatilite. C'est une tache distincte, pas
-      un reste de celle-ci.
+- [x] **Allocation : FAITE (2026-09-12).** `ranking@1` sait repartir -
+      `equal_weight`, `inverse_volatility`, `signal`, plus `fixed` qui NOMME
+      enfin le defaut historique ([allocation.py](../src/rsl/strategies/allocation.py),
+      `docs/execution-model.md` §6.4). Deux points a retenir : la combinaison
+      d'une allocation en argent et d'un `risk.sizing` est **refusee a la
+      validation** - le dimensionnement passe en dernier et ecraserait la
+      repartition en silence ; et la troncature en contrats entiers elimine les
+      GROS contrats d'abord, ce qui a rendu trois essais sur six inexploitables
+      avant qu'un compteur ne le dise ([[lessons]] L21).
+- [ ] **Granularites intra-journalieres absentes.** `Period` n'offre que
+      `day/week/month/quarter/year` : pas de 5 min, 1 h, 4 h. Les donnees sont a
+      la MINUTE, donc rien ne manque en amont - c'est `resample.bucket_ids` et
+      `period_end_ns` qu'il faut etendre, plus `RESAMPLES` du montage. Question
+      a trancher avant d'ecrire : une barre de 4 h s'ancre-t-elle sur l'epoque
+      UTC (simple, mais coupe les seances n'importe ou) ou sur une seance
+      declaree (juste, mais `data[].session` devient obligatoire pour agreger) ?
+      Le ledger a deja tranche contre tout ce qui DEVINE une frontiere.
 - [ ] Obtenir et ingerer la source du Deflated Sharpe (independance des essais).
 <!-- NEXT-ACTIONS:END -->
 
