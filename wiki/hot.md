@@ -17,7 +17,7 @@ generated: true
 | Indicateur | Valeur |
 |---|---|
 | Pages de wiki | 24 |
-| Entrees de log | 136 |
+| Entrees de log | 137 |
 | Derniere activite | 2026-09-12 |
 | Idees ecartees (ledger) | 18 |
 | Idees en attente (ledger) | 4 |
@@ -27,7 +27,7 @@ generated: true
 | Pages `reference/` | 7 |
 | Pages `research/` | 1 |
 
-**Activite par type :** note × 62, fix × 28, feat × 21, decision × 17, experiment × 2, essai × 2, setup × 1, lint × 1, audit × 1, refactor × 1
+**Activite par type :** note × 63, fix × 28, feat × 21, decision × 17, experiment × 2, essai × 2, setup × 1, lint × 1, audit × 1, refactor × 1
 
 ## Experiences
 
@@ -43,6 +43,7 @@ Le total des essais alimente le Deflated Sharpe : un essai non enregistre gonfle
 
 ## Derniere activite — 8 entree(s)
 
+- **2026-09-12** — note | A-P2 mesure enfin, apres avoir ete annonce « urgent » deux sessions de suite | la memoisation apporte 8x au segment memoisable et 1,07x au segment a pair - c'est-a-dire rien. Il ne reste donc qu'un seul cas, et il ne mord qu'a la granularite MINUTE : en quotidien, un signal a pair sur tout l'echantillon coute 3,7 secondes. L'entree hot.md decrivait un probleme deja resolu aux trois quarts
 - **2026-09-12** — feat | `rsl walkforward --archive` : un walk-forward compte pour UN essai, avec le Sharpe de la serie GROUPEE | la regle « un pli n'est pas un essai » etait un commentaire depuis la premiere version de `walkforward.py` ; elle devient executable. L'agregat groupe est publie au passage : 0,62 annualise contre 0,32 en moyenne des plis sur `sma_es_daily` - une moyenne par pli donne le meme poids a un pli qui a negocie une fois et a un pli qui a negocie tout du long
 - **2026-09-12** — feat | Registre des ESSAIS : `essais/registre.jsonl` versionne, `rsl run --archive`, `rsl essais` | le compteur du Deflated Sharpe survit enfin aux sessions. 14 essais archives avec leur rapport complet, dont les 7 exemples du depot et les 7 essais de la journee. Les DSR publies AVANT cette date sont des PSR deguises
 - **2026-09-12** — fix | P7 : `rsl <commande> > fichier` ecrivait dans l'encodage de la LOCALE (cp1252 sous Windows), pas en UTF-8 | corrige a l'entree de la CLI et non dans `schema` : trois commandes sur neuf saignaient (`schema --what all|spec|strategies`), les six autres passaient parce que leur sortie etait ASCII par hasard. 28 tests, valides en neutralisant le correctif
@@ -50,7 +51,6 @@ Le total des essais alimente le Deflated Sharpe : un essai non enregistre gonfle
 - **2026-09-12** — essai | Verification de bout en bout : `sma_crossover@1` sur ES en tranches de 1 h ancrees sur la seance CME | 62 785 barres, Sharpe 0,42, empreinte `f2f0e7e5`. Essai TECHNIQUE - la machinerie etait l'objet, pas la strategie - mais il compte au compteur du Deflated Sharpe, et aucun chiffre n'en a ete exploite pour choisir quoi que ce soit
 - **2026-09-12** — note | Le garde-fou « jamais avant la derniere cloture observee » n'est pas theorique : il mord 74 fois sur 16 417 tranches de 4 h d'ES | des barres 1 min horodatees 16:00 cloturent a 16:01, apres la fermeture declaree. Sans lui, 74 barres agregees auraient ete disponibles avant une de leurs composantes. Lecon [[lessons]] L22
 - **2026-09-12** — feat | Granularites intra-journalieres : `5min` a `4h`, ancrees sur la SEANCE declaree (`Period`, `tranches_de_seance`, champ SEANCE du montage) | livre ; 3992 tests ; 7 empreintes et 7 config_hash inchanges ; `docs/execution-model.md` §1.3
-- **2026-09-12** — essai | Momentum 12-1, trois regles d'allocation, deux niveaux de capital -- SIX essais comptes | les trois premiers etaient inexploitables : la troncature en contrats entiers eliminait 28 a 43 % des noms, les GROS contrats d'abord. A 20 M$ : Sharpe 0,84 / 0,45 / 0,71. Verdict non-conclusif, lecon [[lessons]] L21
 
 ## Next Actions
 
@@ -78,17 +78,27 @@ suivante, qui viennent de l'audit fonctionnel du 2026-09-10.
       couches redevient verifiable ([[lessons]] L14). Et les neuf cles de
       `rules` cessent d'etre recopiees quatre fois, ce qui permet enfin de
       **refuser une cle inconnue** ([[lessons]] L15).
-- [ ] **A-P2 devient PLUS urgent avec 136 primitives.** La bibliotheque ne
-      change rien au cout unitaire d'un `rolling`, mais elle multiplie les
-      occasions d'en ecrire un. Arbitrage a rendre, pas tache a executer : `rolling(zscore,120)`
-      sur un `arith` de deux primitives coute **1549 us/barre**, soit 1,6 h pour
-      un signal sur les 3,7 M de barres minute d'ES et 14,4 h sur l'univers de
-      dix. Trois voies, aucune gratuite : elimination des sous-expressions
-      communes DANS une barre (~2x, sans toucher a une garantie) ;
-      memoisation ENTRE barres (rapide, mais se heurte au rejet des noeuds a
-      etat, [[Failed Ideas/ledger]]) ; primitives dediees (deja « en attente »
-      au ledger). Recommandation : la troisieme, apres avoir mesure quels cas
-      la justifient.
+- [ ] **A-P2 : MESURE le 2026-09-12, et il reste beaucoup moins qu'annonce.**
+      L'entree precedente decrivait un probleme deja resolu aux trois quarts
+      par la memoisation du 2026-09-11. Mesure sur ES quotidien, panneau ES+NQ,
+      400 barres, avec et sans `RSL_NO_MEMO` :
+
+      | Sous-arbre sous `rolling(zscore,120)` | sans memo | avec memo | gain |
+      |---|---|---|---|
+      | `arith(sma/sma)` — memoisable | 2864 us | 352 us | **8x** |
+      | `arith(close/peer)` — NON memoisable | 1461 us | 1358 us | **1,07x** |
+
+      Les deux lignes ne comparent pas la meme expression - le sous-arbre a
+      pair est plus simple - donc le rapport 4x entre 1358 et 352 mesure ce
+      qu'on paie aujourd'hui, pas le cout du `peer` lui-meme. Le chiffre qui
+      tranche est le **1,07x** : la memoisation n'apporte RIEN au segment a
+      pair, et c'est le seul qui reste.
+      Ordre de grandeur restant : 1,41 h pour un signal a pair sur les 3,7 M de
+      barres minute d'ES, contre 0,37 h pour son equivalent memoisable.
+      Ce qu'il faut trancher n'est donc plus « comment accelerer `rolling` »
+      mais « un z-score de ratio ES/NQ a la minute est-il un cas qu'on veut
+      vraiment traiter ». A l'echelle QUOTIDIENNE, ou vivent tous les exemples,
+      le sujet n'existe pas : 2753 barres a 1358 us font 3,7 secondes.
 - [x] **A-P3 fait (2026-09-11)**, ses trois points :
       - `signals.py` (1 949 lignes) devient une FACADE de 168 lignes ; le code
         vit dans `rsl/strategies/noeuds/`, range par famille (`contrat`,
