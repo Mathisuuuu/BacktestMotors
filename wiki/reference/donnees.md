@@ -1,6 +1,6 @@
 ---
 type: reference
-updated: 2026-09-11
+updated: 2026-09-12
 autorite: docs/no-lookahead.md §4 + src/rsl/data/
 ---
 
@@ -116,6 +116,7 @@ machines produisent le meme hash pour le meme run. Voir [[lessons]] L7.
 | Valider des fichiers en ligne de commande | `rsl validate FICHIER...` — la racine est deduite du nom (`ES_v0_1m` → `ES`) |
 | Table des contrats | `rsl instruments` — multiplicateur, tick, valeur du tick, frais, marge |
 | Reechantillonnage causal | couche donnees + `rsl run` (champ `resample` de la config) |
+| Granularites disponibles | [docs/execution-model.md](../../docs/execution-model.md) §1.3 — 1 min brut, `5min` a `4h` **ancrees sur la seance declaree**, puis `day` a `year` |
 
 ## Liens wiki
 

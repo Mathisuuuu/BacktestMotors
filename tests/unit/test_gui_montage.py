@@ -24,9 +24,12 @@ from rsl.errors import ConfigurationError
 from rsl.gui.montage import (
     FRAIS,
     GLISSEMENTS,
+    MIN_BARRES_AGREGEES,
     RESAMPLES,
     Montage,
+    min_barres_pour,
     racine_initiale,
+    seance_proposee,
 )
 
 
@@ -123,9 +126,92 @@ class TestLesListesProposees:
         for genre in GLISSEMENTS:
             assert Montage(root="ES", glissement=genre) is not None
 
-    def test_chaque_agregation_est_acceptee(self):
+    def test_chaque_agregation_est_acceptee_avec_ce_que_le_formulaire_propose(self):
+        """La propriete qui compte pour l'utilisateur : tout ce que le menu
+        offre doit etre constructible SANS rien retaper.
+
+        Les agregations intra-journalieres exigent une seance ; le formulaire
+        la pre-remplit. Si la proposition manquait pour un instrument offert,
+        le menu contiendrait un choix menant a une erreur - ce test l'interdit.
+        """
+        propose = seance_proposee("ES")
         for genre in RESAMPLES:
-            assert Montage(root="ES", resample=genre) is not None
+            assert Montage(root="ES", resample=genre, seance=propose) is not None
+
+
+class TestUneAgregationIntraJournaliereExigeUneSeance:
+    """Le socle ne devine aucune frontiere ; le formulaire non plus."""
+
+    SEANCE = "17:00-16:00@America/Chicago"
+
+    @pytest.mark.parametrize(
+        "genre", ["5min", "10min", "15min", "30min", "1h", "2h", "4h"]
+    )
+    def test_sans_seance_elle_est_refusee(self, genre):
+        with pytest.raises(ConfigurationError, match="exige une SEANCE"):
+            Montage(root="ES", resample=genre)
+
+    @pytest.mark.parametrize("genre", ["brut", "day", "week", "month"])
+    def test_une_agregation_calendaire_n_en_demande_aucune(self, genre):
+        assert Montage(root="ES", resample=genre) is not None
+
+    def test_avec_une_seance_elle_passe_et_la_transmet(self):
+        reglages = Montage(root="ES", resample="4h", seance=self.SEANCE).reglages()
+        source = reglages["data"][0]
+        assert source["resample"] == "4h"
+        assert source["session"] == {
+            "start": "17:00", "end": "16:00", "timezone": "America/Chicago"
+        }
+
+    def test_un_format_de_seance_faux_est_refuse_des_la_saisie(self):
+        """Et non au chargement des donnees : l'erreur porte sur le
+        formulaire, pas sur des centaines de Mo de parquet."""
+        with pytest.raises(ConfigurationError, match="format attendu"):
+            Montage(root="ES", resample="1h", seance="17h-16h")
+
+    def test_un_fuseau_inconnu_est_refuse_par_le_socle(self):
+        """La validation des trois champs reste faite par le socle : ce module
+        ne redeclare aucune regle."""
+        with pytest.raises(ConfigurationError, match="fuseau inconnu"):
+            Montage(root="ES", resample="1h", seance="17:00-16:00@Mars/Olympus")
+
+    def test_une_seance_declaree_sur_une_agregation_calendaire_est_transmise(self):
+        """Elle ne sert pas au decoupage - `resample` la refuserait - mais elle
+        reste utile aux noeuds `session` et `cumulative`. Le montage la passe
+        donc, et c'est `config.py` qui decide de ne pas l'utiliser pour
+        agreger."""
+        reglages = Montage(root="ES", resample="day", seance=self.SEANCE).reglages()
+        assert reglages["data"][0]["session"]["start"] == "17:00"
+
+    def test_le_resume_dit_la_seance_retenue(self):
+        """Le bandeau doit montrer ce qui a SERVI : deux seances differentes
+        font deux decoupages differents, donc deux runs differents."""
+        resume = Montage(root="ES", resample="4h", seance=self.SEANCE).resume()
+        assert self.SEANCE in resume
+
+
+class TestLeSeuilDeRemplissageSuitLaFamille:
+    """200 barres sur une tranche de 5 min les ecarterait TOUTES."""
+
+    def test_une_agregation_calendaire_garde_le_seuil_historique(self):
+        source = Montage(root="ES", resample="day").reglages()["data"][0]
+        assert source["resample_min_bars"] == MIN_BARRES_AGREGEES
+
+    @pytest.mark.parametrize(
+        ("genre", "attendu"), [("5min", 2), ("1h", 30), ("4h", 120)]
+    )
+    def test_une_tranche_exige_la_moitie_de_sa_duree(self, genre, attendu):
+        assert min_barres_pour(genre) == attendu
+
+    def test_le_seuil_laisse_passer_la_derniere_tranche_d_une_seance_es(self):
+        """Une seance de 23 h decoupee en 4 h finit sur une tranche de 3 h.
+        Un seuil qui l'ecarterait supprimerait la cloture de chaque seance -
+        la partie la plus liquide."""
+        assert min_barres_pour("4h") <= 3 * 60
+
+    def test_brut_n_a_pas_de_seuil_puisqu_il_n_agrege_pas(self):
+        source = Montage(root="ES", resample="brut").reglages()["data"][0]
+        assert "resample_min_bars" not in source
 
     def test_chaque_instrument_connu_est_acceptable(self):
         for racine in known_roots():

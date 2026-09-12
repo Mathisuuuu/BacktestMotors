@@ -16,11 +16,19 @@ from rsl.data.resample import (
     granularity_of,
     period_end_ns,
     resample,
+    tranches_de_seance,
 )
 from rsl.data.schema import BarStore, Granularity, ns_to_datetime
+from rsl.data.session import SessionCalendar
 from rsl.errors import ConfigurationError
 
 DAY = Granularity(timedelta(days=1), name="1d")
+
+SEANCE_DE_TEST = SessionCalendar(start="00:00", end="23:00", timezone="UTC")
+"""Seance quelconque, pour les balayages qui couvrent les deux familles de
+periodes. Une periode intra-journaliere ne se decoupe pas sans calendrier ; ce
+fichier teste les CALENDAIRES, les tranches de seance ont le leur
+(`test_resample_intraday.py`)."""
 
 
 def daily_store(n: int, start: datetime, closes=None, symbol: str = "D.v.0") -> BarStore:
@@ -61,9 +69,18 @@ class TestBucketIds:
         assert got == [base, base, base + 1]
 
     def test_ids_are_monotonic(self):
+        """Balayage de TOUTES les periodes, les deux familles comprises.
+
+        Les intra-journalieres passent par `tranches_de_seance`, qui exige un
+        calendrier : `bucket_ids` les refuse par construction. Le balayage les
+        couvre quand meme - le restreindre aux calendaires laisserait une
+        famille entiere hors garde ([[lessons]] L16)."""
         store = daily_store(400, datetime(2020, 1, 1, tzinfo=UTC))
         for period in Period:
-            ids = bucket_ids(store.ts_event, period)
+            if period.intra_journaliere:
+                ids, _ = tranches_de_seance(store.ts_event, SEANCE_DE_TEST, period)
+            else:
+                ids = bucket_ids(store.ts_event, period)
             assert bool((np.diff(ids) >= 0).all()), period
 
 
@@ -89,11 +106,18 @@ class TestPeriodEnd:
         assert ns_to_datetime(int(period_end_ns(ids, period)[0])) == expected
 
     def test_boundary_is_never_before_the_last_bar(self):
-        """La propriete qui rend le choix sur : jamais anticipe."""
+        """La propriete qui rend le choix sur : jamais anticipe.
+
+        Vaut pour les DEUX familles. Pour les intra-journalieres, la borne est
+        prise sur la fermeture de seance, ce qui la rapproche - d'ou un
+        garde-fou explicite dans `_fin_de_tranche`, que ce balayage exerce."""
         store = daily_store(400, datetime(2020, 1, 1, tzinfo=UTC))
         for period in Period:
-            aggregated, _ = resample(store, period)
-            last_bar, _ = resample(store, period, close_stamp=CloseStamp.LAST_BAR)
+            calendrier = SEANCE_DE_TEST if period.intra_journaliere else None
+            aggregated, _ = resample(store, period, calendar=calendrier)
+            last_bar, _ = resample(
+                store, period, calendar=calendrier, close_stamp=CloseStamp.LAST_BAR
+            )
             assert bool((aggregated.ts_close >= last_bar.ts_close).all()), period
 
 

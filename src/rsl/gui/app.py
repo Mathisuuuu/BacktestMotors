@@ -47,6 +47,7 @@ from rsl.gui.montage import (
     RESAMPLES,
     Montage,
     racine_initiale,
+    seance_proposee,
 )
 from rsl.report import run_backtest_detailed
 
@@ -173,6 +174,7 @@ class DashboardApp(tk.Tk):
         self.var_glissement = tk.StringVar(value="tick")
         self.var_glissement_valeur = tk.StringVar(value="1")
         self.var_contrats = tk.StringVar(value="1")
+        self.var_seance = tk.StringVar(value=seance_proposee(racine_initiale()))
         self._chemin_strategie: Path | None = None
 
         self._styler()
@@ -337,6 +339,17 @@ class DashboardApp(tk.Tk):
         self._champ_liste(grille, 1, 0, "FRAIS", self.var_frais, FRAIS)
         self._champ_liste(grille, 1, 1, "GLISSEMENT", self.var_glissement, GLISSEMENTS)
         self._champ_saisie(grille, 1, 2, "TICKS / BPS", self.var_glissement_valeur)
+        self._champ_saisie(grille, 1, 3, "SEANCE", self.var_seance)
+        tk.Label(
+            corps,
+            text=("La SEANCE n'est lue que pour une agregation intra-journaliere "
+                  "(5min a 4h) : c'est elle qui dit ou commence une barre de 4 h. "
+                  "Le socle ne devine aucune frontiere. Format "
+                  "'HH:MM-HH:MM@Fuseau' ; la valeur proposee est a relire, pas a "
+                  "croire."),
+            font=UI_PETIT, bg=BLANC, fg=GRIS_CLAIR, anchor="w", justify="left",
+            wraplength=760,
+        ).pack(fill="x", pady=(2, 0))
 
         bas = tk.Frame(corps, bg=BLANC)
         bas.pack(fill="x", pady=(26, 0))
@@ -394,6 +407,7 @@ class DashboardApp(tk.Tk):
         return Montage(
             root=self.var_actif.get(),
             resample=self.var_agregation.get(),
+            seance=self.var_seance.get(),
             capital=nombre(self.var_capital, "Capital initial"),
             frais=self.var_frais.get(),
             glissement=self.var_glissement.get(),

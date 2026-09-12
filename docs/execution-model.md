@@ -40,6 +40,71 @@ trous de session). Les deux ne doivent jamais être confondus.
 résultat dépend de cet ordre est traitée par la règle du §4.4 (priorité
 intra-barre pessimiste).
 
+### 1.3 Rééchantillonnage : deux familles de périodes
+
+Les données sont à la **minute**. Toute autre granularité est produite par
+agrégation causale en amont du run (`rsl.data.resample`) : une période
+partielle n'est jamais visible comme si elle était complète.
+
+Les périodes se répartissent en deux familles qui ne s'ancrent pas de la même
+façon.
+
+| Famille | Périodes | Ancrage |
+|---|---|---|
+| Calendaire | `day` `week` `month` `quarter` `year` | l'horodatage seul |
+| Intra-journalière | `5min` `10min` `15min` `30min` `1h` `2h` `4h` | l'**ouverture de séance déclarée** |
+
+Le mois d'une barre se lit dans sa date. « Une barre de 4 h » ne dit pas où
+elle commence : c'est une convention, et le socle n'en invente aucune. La
+réponse est prise dans `data[].session`, **déclarée** — la même décision que
+celle qui a tenu le nœud `session` écarté jusqu'à ce qu'un calendrier existe.
+
+Une période intra-journalière sans `session` est donc **refusée à la
+validation**, et une `session` fournie pour une période calendaire l'est aussi :
+elle n'y changerait rien, et l'accepter laisserait croire le contraire.
+
+#### La dernière tranche d'une séance est plus courte
+
+Dès que la durée de séance n'est pas un multiple de la période. Une séance ES
+de 23 h découpée en 4 h donne cinq tranches pleines et une de 3 h. Cette
+tranche est **conservée** : c'est la clôture, la partie la plus liquide de la
+séance. `granularity_of` reste donc une durée *nominale*, exactement comme pour
+`month` — c'est `ts_close` qui fait foi.
+
+#### Instant de disponibilité
+
+Trois termes, dans cet ordre :
+
+1. la fin nominale, `début + durée` ;
+2. bornée par la **fermeture de séance** — dater la tranche courte une heure
+   après la clôture retarderait le signal sans rien y gagner ;
+3. **jamais avant la dernière clôture réellement observée**.
+
+Le troisième terme n'est pas une précaution théorique. Sur les données ES avec
+la déclaration usuelle `17:00-16:00@America/Chicago`, il mord **74 fois sur
+16 417** tranches de 4 h : des barres d'une minute horodatées 16:00 clôturent à
+16:01, après la fermeture déclarée. Sans lui, ces 74 barres agrégées seraient
+réputées disponibles avant la clôture d'une de leurs composantes — une fuite.
+
+#### Conséquence sur les panneaux
+
+Deux instruments dont les séances diffèrent n'ont **plus aucune frontière
+commune** en intra-journalier. Le calendrier d'union du panneau (§7.2) produit
+alors une ligne par instrument et par tranche, avec un univers amputé à chaque
+fois. Mesuré sur ES (CME) + FDAX (Eurex) en tranches de 4 h : **18 653 lignes
+sur 18 654 ne portaient qu'un seul instrument**, soit 100 %. Une stratégie
+transversale n'y aurait rien à comparer, et n'aurait levé aucune erreur — elle
+aurait sauté tous ses rééquilibrages en silence.
+
+La combinaison est donc **refusée à la validation** : tous les instruments d'un
+panneau agrégé en intra-journalier doivent déclarer la **même** séance.
+`allow_mixed_granularity` ne voit pas ce cas — les deux séries sont bien en
+`4h`, c'est leur ancrage qui diffère.
+
+Le découpage intra-journalier est ainsi un outil **mono-instrument**, ou réservé
+à des instruments partageant le même calendrier. Pour un panneau hétérogène,
+`day` et au-delà restent les seules périodes qui alignent.
+
 ---
 
 ## 2. Chaîne de décision

@@ -195,6 +195,30 @@ class DataSpec(StrictModel):
         "le MEME instrument a deux granularites, chacune sous son nom.",
     )
 
+    @model_validator(mode="after")
+    def _une_periode_intraday_exige_une_seance(self) -> DataSpec:
+        """Une barre de 4 h ne dit pas ou elle commence.
+
+        Les periodes calendaires se lisent dans l'horodatage seul. Les
+        intra-journalieres n'ont aucun ancrage naturel, et le socle refuse d'en
+        deviner un - c'est la meme decision que celle qui a fait ecarter le
+        noeud `session` jusqu'a ce qu'un calendrier soit DECLARE (voir le
+        ledger, 2026-09-11).
+
+        Refuse ici plutot qu'au chargement : l'erreur porte sur le fichier, et
+        `resample` la leverait apres avoir lu des centaines de Mo de parquet.
+        """
+        if self.resample is None or not self.resample.intra_journaliere:
+            return self
+        if self.session is None:
+            raise ValueError(
+                f"resample '{self.resample.value}' sur '{self.root}' exige une "
+                f"`session` : une barre de {self.resample.minutes} min ne dit pas "
+                f"ou elle commence, et le socle ne devine aucune frontiere. "
+                f"Ajouter session: {{start, end, timezone}} a cette entree."
+            )
+        return self
+
     @property
     def key(self) -> str:
         """Nom sous lequel la serie est publiee au panneau.
@@ -521,6 +545,56 @@ class BacktestSpec(StrictModel):
     )
 
     @model_validator(mode="after")
+    def _refuse_un_panneau_intraday_a_seances_differentes(self) -> BacktestSpec:
+        """Deux seances differentes n'ont aucune frontiere de tranche commune.
+
+        Une periode calendaire aligne les instruments parce que la frontiere de
+        mois est la meme pour tous. Une tranche intra-journaliere est ancree sur
+        l'OUVERTURE, donc deux instruments qui n'ouvrent pas a la meme heure
+        n'ont plus une seule frontiere en commun.
+
+        Le panneau prend l'UNION des horodatages de cloture : chaque tranche de
+        chaque instrument y devient sa propre ligne, avec un univers d'un seul
+        nom. Mesure le 2026-09-12 sur ES (CME) + FDAX (Eurex) en tranches de
+        4 h : **18 653 lignes sur 18 654 ne portaient qu'un instrument**, soit
+        100 %. Une strategie transversale n'y aurait jamais rien a comparer, et
+        n'aurait leve aucune erreur - elle aurait simplement saute tous ses
+        rebalancements.
+
+        C'est le meme defaut que celui qui a fait choisir `CloseStamp.
+        PERIOD_END` pour les periodes calendaires (`rsl.data.resample`), mais
+        `allow_mixed_granularity` ne le voit pas : les deux series sont bien en
+        `4h`, c'est leur ANCRAGE qui differe.
+
+        Un seul instrument agrege en intra-journalier reste evidemment permis -
+        c'est l'usage prevu.
+        """
+        # Un TUPLE trie plutot que le dictionnaire de `describe()` : il faut
+        # pouvoir mettre ces declarations dans un ensemble pour les compter.
+        seances = {
+            (
+                (entry.session.start, entry.session.end, entry.session.timezone)
+                if entry.session is not None
+                else None
+            )
+            for entry in self.data
+            if entry.resample is not None and entry.resample.intra_journaliere
+        }
+        if len(seances) <= 1:
+            return self
+        lisibles = sorted(
+            "aucune" if s is None else f"{s[0]}-{s[1]}@{s[2]}" for s in seances
+        )
+        raise ValueError(
+            f"panneau intra-journalier a seances differentes ({', '.join(lisibles)}) : "
+            f"deux seances distinctes n'ont aucune frontiere de tranche commune, et "
+            f"le panneau produirait une ligne par instrument et par tranche - mesure "
+            f"a 100 % de lignes a un seul instrument sur ES + FDAX en 4 h. Declarer "
+            f"la MEME seance pour tous les instruments agreges en intra-journalier, "
+            f"ou agreger en `day` ou au-dela, qui alignent."
+        )
+
+    @model_validator(mode="after")
     def _refuse_allocation_ecrasee(self) -> BacktestSpec:
         """Une allocation en argent et une regle de dimensionnement s'excluent.
 
@@ -633,11 +707,20 @@ def load_stores(
         )
         transformations: list[str] = []
         if entry.resample is not None:
+            # Le calendrier n'est transmis que pour une periode
+            # intra-journaliere : `resample` REFUSE d'en recevoir un sur une
+            # periode calendaire, ou il ne changerait rien - le passer quand
+            # meme laisserait croire le contraire.
             store, resample_report = resample(
                 store,
                 entry.resample,
                 min_bars=entry.resample_min_bars,
                 close_stamp=entry.close_stamp,
+                calendar=(
+                    entry.session.build()
+                    if entry.session is not None and entry.resample.intra_journaliere
+                    else None
+                ),
             )
             transformations.append(
                 f"resample:{entry.resample.value}"

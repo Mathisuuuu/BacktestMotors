@@ -60,9 +60,9 @@ Ces pages ne font autorite sur rien : elles disent ou est l'autorite.
 - [[reference/contrat-anti-lookahead]] — vers [docs/no-lookahead.md](../docs/no-lookahead.md), normatif. Y compris ce que le socle **ne** garantit **pas**.
 - [[reference/modele-execution]] — vers [docs/execution-model.md](../docs/execution-model.md), normatif. Points `[A ARBITRER]` encore ouverts. **Inclut §6.3, les plafonds de portefeuille et ce qu'ils ne garantissent pas.**
 - [[reference/vocabulaire-signaux]] — schemas engendres, `rsl catalogue`, moules `rules@1` / `panel_rules@1` / `ranking@1`.
-- [[reference/donnees]] — 33,4 M barres, series non ajustees au roulement, trous par defaut. **Contient un avertissement bloquant sur `rsl.data`.**
+- [[reference/donnees]] — 33,4 M barres a la MINUTE, agregeables de `5min` a `year`, series non ajustees au roulement, trous par defaut. **Contient un avertissement bloquant sur `rsl.data`.**
 - [[reference/cli]] — commandes, codes de sortie `0/1/2`, boucle de developpement.
-- [[reference/seances]] — calendrier de seance **declare** (`data[].session`), noeuds `session` et `cumulative`. Le socle ne devine toujours aucune frontiere.
+- [[reference/seances]] — calendrier de seance **declare** (`data[].session`), noeuds `session` et `cumulative`, et depuis le 2026-09-12 l'ANCRAGE des granularites intra-journalieres. Le socle ne devine toujours aucune frontiere.
 - [[reference/tableau-de-bord]] — fenetre de resultats (`rsl gui`). **Contient la distinction MESUREE / RECONSTRUITE, a lire avant d'interpreter un chiffre filtre.**
 
 ## Sources — `research/`

@@ -1,6 +1,6 @@
 ---
 type: reference
-updated: 2026-09-11
+updated: 2026-09-12
 autorite: src/rsl/data/session.py
 ---
 
@@ -14,6 +14,22 @@ Le socle a longtemps refuse toute notion de seance, et il avait raison : les
 series continues `.v.0` sont trouees, et inferer une frontiere d'un trou est une
 supposition. Ce qui a change au 2026-09-11 n'est pas ce refus — c'est qu'une
 seance peut desormais etre **declaree**. Une declaration ne devine rien.
+
+
+## Depuis le 2026-09-12 : la seance ancre aussi le DECOUPAGE
+
+Le calendrier declare ne sert plus seulement aux noeuds `session` et
+`cumulative`. C'est lui qui dit ou commence une barre de 4 h :
+[docs/execution-model.md](../../docs/execution-model.md) §1.3. Une periode
+intra-journaliere sans `session` est refusee a la validation.
+
+Consequence a connaitre avant de s'en servir : deux instruments dont les
+seances different n'ont plus aucune frontiere commune en intra-journalier. Le
+decoupage ancre sur la seance est un outil **mono-instrument**.
+
+Et une lecon : une declaration exacte ne decrit pas forcement le fichier. Voir
+[[lessons]] L22, ou 74 tranches d'ES sur 16 417 auraient fuit malgre une seance
+correctement declaree.
 
 ## Declarer
 

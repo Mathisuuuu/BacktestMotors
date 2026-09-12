@@ -1,6 +1,6 @@
 ---
 type: reference
-updated: 2026-09-11
+updated: 2026-09-12
 autorite: src/rsl/gui/
 ---
 
@@ -11,16 +11,24 @@ autorite: src/rsl/gui/
 > [charts.py](../../src/rsl/gui/charts.py) pour les courbes,
 > [app.py](../../src/rsl/gui/app.py) pour la fenetre.
 
-Fenetre de resultats d'un backtest, en **quatre onglets**. Fond blanc, mise en
-page plate ; **vert et rouge portent le sens** (gain / perte, hausse / baisse)
-et ne decorent jamais.
+Fenetre d'un backtest, en **cinq onglets**. Fond blanc, mise en page plate ;
+**vert et rouge portent le sens** (gain / perte, hausse / baisse) et ne
+decorent jamais.
 
 | Onglet | Contenu |
 |---|---|
+| `MONTAGE` | ce qu'un fichier de strategie ne porte pas : l'actif, l'agregation, le capital, les couts |
 | `SYNTHESE` | les indicateurs, groupes en Performance / Risque / Activite |
 | `COURBES` | capital et drawdown, abscisse partagee |
 | `PRIX & ORDRES` | bougies de l'instrument, avec les ordres poses dessus |
 | `CARNET D'ORDRES` | une ligne par aller-retour, teintee gain ou perte |
+
+Le champ **SEANCE** du montage n'est lu que pour une agregation
+intra-journaliere (`5min` a `4h`) : c'est lui qui dit ou commence une barre de
+4 h, et sans lui le montage est refuse. La valeur pre-remplie par place est une
+PROPOSITION, pas une autorite - c'est ce que l'utilisateur valide qui entre
+dans le `config_hash`. Voir
+[docs/execution-model.md](../../docs/execution-model.md) §1.3.
 
 Les filtres (annee, sens) sont au-dessus des onglets : ils s'appliquent aux
 quatre a la fois.

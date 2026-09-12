@@ -637,3 +637,39 @@ n'est pas lu. `n_noms_tronques` est publie dans
 §6.4 dit qu'il se lit AVANT les performances.
 
 Fonde sur [[experiments/allocation-momentum-12-1-trois-regles]] · [[log]] (2026-09-12)
+
+---
+
+## L22 -- Une frontiere DECLAREE reste une hypothese sur les donnees
+
+Le decoupage intra-journalier est ancre sur la seance declaree, ce qui etait la
+condition pour l'ecrire du tout : le socle n'invente aucune frontiere. La
+declaration lui donne la sienne, le probleme semblait clos.
+
+Il ne l'etait pas. Une seance ES declaree `17:00-16:00@America/Chicago` est
+juste ; les DONNEES, elles, contiennent des barres d'une minute horodatees
+16:00, qui cloturent donc a 16:01 - une minute apres la fermeture declaree.
+Borner la disponibilite d'une tranche a la fermeture declaree aurait rendu 74
+barres agregees sur 16 417 disponibles AVANT la cloture d'une de leurs propres
+composantes. Une fuite, produite par une declaration correcte.
+
+Le point a retenir : une declaration dit ce que le marche est CENSE faire. Elle
+ne dit pas ce que le fichier contient. Les deux coincident presque toujours, et
+« presque » suffit a fabriquer un biais - 74 occurrences reparties sur dix ans,
+invisibles a l'oeil, chacune un signal lisible avant son heure.
+
+Le remede est structurel plutot que defensif : la disponibilite d'une tranche
+est un MAXIMUM entre la borne theorique et la derniere cloture reellement
+observee. La propriete ne depend alors plus de la qualite de la declaration ni
+de celle des donnees - elle tient par construction, y compris sur une seance
+mal declaree.
+
+Ce qui l'a trouve : avoir mesure sur les vraies series avant d'ecrire les
+tests, en cherchant explicitement si le troisieme terme du maximum etait du
+code mort. Il ne l'etait pas. Une suite synthetique ne l'aurait jamais montre -
+les seances y finissent a l'heure.
+
+A rapprocher de L18 : la ou un defaut de symetrie rendait une erreur invisible,
+c'est ici une declaration exacte qui rendait une hypothese invisible.
+
+Fonde sur [docs/execution-model.md](../docs/execution-model.md) §1.3 · [[log]] (2026-09-12)

@@ -159,8 +159,14 @@ class SessionIndex:
         )
 
 
-def _ouvertures(ts_ns: IntArray, calendar: SessionCalendar) -> tuple[IntArray, IntArray]:
+def bornes_de_seances(
+    ts_ns: IntArray, calendar: SessionCalendar
+) -> tuple[IntArray, IntArray]:
     """Instants UTC d'ouverture et de fermeture de chaque seance couvrant la serie.
+
+    PUBLIQUE, et c'est delibere : `resample` s'en sert pour ancrer ses tranches
+    intra-journalieres. Deux definitions de « a quelle seance appartient cette
+    barre » finiraient par diverger ; il n'y en a qu'une, et elle est ici.
 
     Une conversion de fuseau par jour local, pas par barre : c'est ce qui rend
     la construction utilisable sur des series de plusieurs millions de barres.
@@ -214,7 +220,7 @@ def build_session_index(
         return SessionIndex(calendar, vide_i, vide_i, vide_f, vide_b, vide_b,
                             vide_f, vide_f, vide_f, vide_f, vide_f)
 
-    ouverts, fermes = _ouvertures(ts_ns, calendar)
+    ouverts, fermes = bornes_de_seances(ts_ns, calendar)
     rang = np.searchsorted(ouverts, ts_ns, side="right") - 1
     if bool(np.any(rang < 0)):  # pragma: no cover - la marge de deux jours l'evite
         raise ConfigurationError(

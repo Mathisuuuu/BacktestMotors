@@ -335,8 +335,15 @@
         "type": "object"
       },
       "Period": {
-        "description": "Periodes calendaires supportees.",
+        "description": "Periodes supportees : intra-journalieres, puis calendaires.\n\nLes deux familles ne s'ancrent PAS de la meme facon, et c'est la seule\nchose a retenir de cette liste. Une periode calendaire se lit dans\nl'horodatage : le mois d'une barre ne depend que de sa date. Une periode\nintra-journaliere n'a aucun ancrage naturel - « une barre de 4 h » ne dit\npas ou elle commence - et la reponse est prise dans le calendrier de\nSEANCE declare : elles commencent a l'ouverture.",
         "enum": [
+          "5min",
+          "10min",
+          "15min",
+          "30min",
+          "1h",
+          "2h",
+          "4h",
           "day",
           "week",
           "month",

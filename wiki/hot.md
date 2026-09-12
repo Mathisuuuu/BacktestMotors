@@ -17,7 +17,7 @@ generated: true
 | Indicateur | Valeur |
 |---|---|
 | Pages de wiki | 24 |
-| Entrees de log | 129 |
+| Entrees de log | 133 |
 | Derniere activite | 2026-09-12 |
 | Idees ecartees (ledger) | 18 |
 | Idees en attente (ledger) | 4 |
@@ -27,7 +27,7 @@ generated: true
 | Pages `reference/` | 7 |
 | Pages `research/` | 1 |
 
-**Activite par type :** note × 61, fix × 26, feat × 18, decision × 17, experiment × 2, setup × 1, lint × 1, audit × 1, refactor × 1, essai × 1
+**Activite par type :** note × 62, fix × 27, feat × 19, decision × 17, experiment × 2, essai × 2, setup × 1, lint × 1, audit × 1, refactor × 1
 
 ## Experiences
 
@@ -43,14 +43,14 @@ Le total des essais alimente le Deflated Sharpe : un essai non enregistre gonfle
 
 ## Derniere activite — 8 entree(s)
 
+- **2026-09-12** — fix | Trou ouvert et referme le meme jour : un panneau agrege en intra-journalier avec des seances differentes | ES + FDAX en 4 h donnaient 100 % de lignes a un seul instrument, en silence. `allow_mixed_granularity` est aveugle au cas (meme granularite, ancrage different). Refuse a la validation
+- **2026-09-12** — essai | Verification de bout en bout : `sma_crossover@1` sur ES en tranches de 1 h ancrees sur la seance CME | 62 785 barres, Sharpe 0,42, empreinte `f2f0e7e5`. Essai TECHNIQUE - la machinerie etait l'objet, pas la strategie - mais il compte au compteur du Deflated Sharpe, et aucun chiffre n'en a ete exploite pour choisir quoi que ce soit
+- **2026-09-12** — note | Le garde-fou « jamais avant la derniere cloture observee » n'est pas theorique : il mord 74 fois sur 16 417 tranches de 4 h d'ES | des barres 1 min horodatees 16:00 cloturent a 16:01, apres la fermeture declaree. Sans lui, 74 barres agregees auraient ete disponibles avant une de leurs composantes. Lecon [[lessons]] L22
+- **2026-09-12** — feat | Granularites intra-journalieres : `5min` a `4h`, ancrees sur la SEANCE declaree (`Period`, `tranches_de_seance`, champ SEANCE du montage) | livre ; 3992 tests ; 7 empreintes et 7 config_hash inchanges ; `docs/execution-model.md` §1.3
 - **2026-09-12** — essai | Momentum 12-1, trois regles d'allocation, deux niveaux de capital -- SIX essais comptes | les trois premiers etaient inexploitables : la troncature en contrats entiers eliminait 28 a 43 % des noms, les GROS contrats d'abord. A 20 M$ : Sharpe 0,84 / 0,45 / 0,71. Verdict non-conclusif, lecon [[lessons]] L21
 - **2026-09-12** — feat | Allocation transversale : `ranking@1` sait repartir (`equal_weight`, `inverse_volatility`, `signal`), `MultiContext.contract_value` donne la taille d'un contrat | livre ; 3923 tests ; 7 empreintes et 7 config_hash inchanges ; la combinaison allocation-en-argent + sizing est refusee a la validation
 - **2026-09-12** — fix | Les plafonds etaient evalues ordre par ordre contre le portefeuille commite : un rebalancement transversal de dix ordres les franchissait tous ensemble | `max_positions=2` laissait detenir SIX instruments sur momentum_12_1 ; corrige par reservation de fournee, verifie en rejouant les fills. Lecon [[lessons]] L20
 - **2026-09-12** — feat | Contraintes de portefeuille : quatre plafonds sous `risk.limits`, regle de non-aggravation, reservation par fournee | livre ; 3869 tests ; 7 empreintes ET 7 config_hash inchanges
-- **2026-09-12** — note | verification decisive : les dix chemins derives designent des fichiers qui EXISTENT | et les dix-huit entrees `data` des reglages versionnes s'accordent avec la table, sans une divergence. Les 7 empreintes et les contrats engendres sont inchanges -- `InstrumentSpec` n'entre dans aucun hachage, ce qui a ete verifie AVANT de la modifier
-- **2026-09-12** — decision | `category` vaut `None` par defaut, et un instrument sans classe n'a PAS de chemin | les instruments construits dans les tests n'existent sur aucun disque. Leur inventer une classe laisserait croire qu'ils ont un fichier ; `data_path` leve donc plutot que de rendre un chemin plausible -- meme regle que `session` sans calendrier declare, et que `account` hors runner. Les dix contrats de la table en ont tous une, ce qu'un test verifie
-- **2026-09-12** — decision | une classe d'actif plutot qu'un chemin brut | `InstrumentSpec` se decrit comme une specification ECONOMIQUE : y coller un chemin de fichier melangerait le contrat et le disque. La classe d'actif, elle, est une propriete durable -- ES est un future d'indice, ou que soient ses donnees. Le fait que l'arborescence la reproduise est une commodite, portee par `data_path` seul et nommee comme telle
-- **2026-09-12** — fix | le chemin des donnees rejoint `InstrumentSpec`, et la copie disparait | `gui/montage.py` portait une table `DOSSIERS` recopiant l'arborescence (`ES` -> `indices`, `GC` -> `metaux`) : un instrument range ailleurs, ou simplement oublie, l'aurait fait mentir sans prevenir. `InstrumentSpec` gagne une `category` -- la CLASSE D'ACTIF, propriete du contrat et non du disque -- dont `data_path` derive le chemin relatif. Une seule convention, ecrite une seule fois
 
 ## Next Actions
 
@@ -185,14 +185,23 @@ suivante, qui viennent de l'audit fonctionnel du 2026-09-10.
       repartition en silence ; et la troncature en contrats entiers elimine les
       GROS contrats d'abord, ce qui a rendu trois essais sur six inexploitables
       avant qu'un compteur ne le dise ([[lessons]] L21).
-- [ ] **Granularites intra-journalieres absentes.** `Period` n'offre que
-      `day/week/month/quarter/year` : pas de 5 min, 1 h, 4 h. Les donnees sont a
-      la MINUTE, donc rien ne manque en amont - c'est `resample.bucket_ids` et
-      `period_end_ns` qu'il faut etendre, plus `RESAMPLES` du montage. Question
-      a trancher avant d'ecrire : une barre de 4 h s'ancre-t-elle sur l'epoque
-      UTC (simple, mais coupe les seances n'importe ou) ou sur une seance
-      declaree (juste, mais `data[].session` devient obligatoire pour agreger) ?
-      Le ledger a deja tranche contre tout ce qui DEVINE une frontiere.
+- [x] **Granularites intra-journalieres : FAITES (2026-09-12), ancrees sur la
+      SEANCE.** `5min` `10min` `15min` `30min` `1h` `2h` `4h`, refusees sans
+      `data[].session` - `docs/execution-model.md` §1.3. L'arbitrage a ete rendu
+      en faveur de la seance declaree contre l'epoque UTC ; le montage a gagne
+      un champ SEANCE, pre-rempli par place mais a relire.
+      Trois points a connaitre avant de s'en servir : la derniere tranche de
+      chaque seance est plus COURTE (23 h en 4 h = cinq pleines et une de 3 h,
+      conservee car c'est la cloture) ; le decoupage est MONO-INSTRUMENT, deux
+      seances differentes n'ayant plus de frontiere commune ; et une
+      declaration exacte ne decrit pas le fichier - 74 tranches d'ES sur 16 417
+      auraient fuit sans le garde-fou ([[lessons]] L22).
+- [x] **Panneau intra-journalier : GARDE POSE le meme jour.** Mesure avant de
+      reporter : ES (CME) + FDAX (Eurex) en 4 h donnaient **18 653 lignes sur
+      18 654 a un seul instrument**, soit 100 % - une strategie transversale
+      n'y aurait rien a comparer et n'aurait leve aucune erreur. La combinaison
+      est refusee a la validation ; tous les instruments d'un panneau agrege en
+      intra-journalier doivent declarer la MEME seance.
 - [ ] Obtenir et ingerer la source du Deflated Sharpe (independance des essais).
 <!-- NEXT-ACTIONS:END -->
 
