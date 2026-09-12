@@ -22,6 +22,7 @@ autorite: src/rsl/cli.py + README.md
 | `rsl verify CONFIG` | execute DEUX fois et compare les empreintes |
 | `rsl squelette [--out F]` | squelette a trous : tout ce qu'on peut ecrire, engendre depuis les registres |
 | `rsl run CONFIG --archive [--note T]` | execute ET enregistre l'essai dans `essais/`. Le Deflated Sharpe est alors calcule contre TOUS les essais du depot, pas contre celui-la seul |
+| `rsl walkforward CONFIG --archive [--note T]` | evalue par fenetres ET enregistre **UN** essai. Un pli n'est pas un essai : c'est la meme configuration sur d'autres donnees. Le Sharpe retenu est celui de la serie GROUPEE, pas la moyenne des plis |
 | `rsl essais [--json]` | ce que le compteur du DSR contient : lignes, configurations distinctes, variance, divergences et doublons |
 
 > **Redirection et `--out` sont equivalents depuis le 2026-09-12.** Ils ne l'etaient pas : `> fichier` ecrivait dans l'encodage de la LOCALE, donc du cp1252 sous Windows, et trois commandes sur neuf produisaient un fichier qu'aucun lecteur JSON n'ouvrait en UTF-8. Corrige a l'entree de la CLI ([cli.py](../../src/rsl/cli.py), `sortie_en_utf8`). Seul ecart restant : `print` ajoute un saut de ligne final.

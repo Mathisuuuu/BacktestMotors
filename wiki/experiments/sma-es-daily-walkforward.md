@@ -1,6 +1,6 @@
 ---
 type: experiment
-updated: 2026-09-10
+updated: 2026-09-12
 statut: termine
 verdict: fragile
 strategie: sma_crossover@1
@@ -10,10 +10,30 @@ essais: 1
 
 # SMA croisement sur ES quotidien — walk-forward 9 plis
 
-> Page seminale : les chiffres sont repris du run documente dans
+> Page seminale : les chiffres etaient repris du run documente dans
 > [README.md](../../README.md) au moment de la mise en place du wiki
-> (2026-09-10), pas d'une execution faite depuis ce wiki. Ils n'ont pas ete
-> reproduits ici — voir `Lecture`.
+> (2026-09-10), pas d'une execution faite depuis ce wiki.
+>
+> **Reproduits et ARCHIVES le 2026-09-12** : les neuf plis sortent identiques,
+> et l'essai figure desormais dans
+> [essais/registre.jsonl](../../essais/registre.jsonl) sous la cle
+> `95a3e8d456d0`, avec son rapport complet. Il compte pour **UN** essai au
+> Deflated Sharpe, pas neuf — un pli est la meme configuration sur d'autres
+> donnees, pas une configuration de plus.
+
+## Le Sharpe agrege, et ce qu'il n'etait pas
+
+Cette page parlait d'un « Sharpe 0,60 agrege » sans dire de quoi il etait
+l'agregat. Depuis le 2026-09-12, le rapport publie la serie **groupee** - les
+rendements hors echantillon des neuf plis mis bout a bout - et c'est elle qui
+porte le chiffre : **0,0391 par periode**, soit environ 0,62 annualise sur
+2241 observations.
+
+L'ecart avec la moyenne des Sharpe par pli n'est pas anecdotique : **0,32**.
+Une moyenne par pli donne le meme poids a un pli qui a negocie une fois et a un
+pli qui a negocie tout du long ; la serie groupee, non. C'est la seconde qui
+repond a « qu'aurait obtenu quelqu'un qui aurait applique la strategie a chaque
+epoque ».
 
 ## Hypothese
 

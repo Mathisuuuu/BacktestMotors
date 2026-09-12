@@ -330,3 +330,96 @@ class TestLeRegistreDuDepot:
             f"{sorted(k[:12] for k in divergences)}. Le moteur a change ; les "
             f"chiffres d'avant et d'apres ne se comparent pas."
         )
+
+
+class TestUnWalkForwardEstUnSeulEssai:
+    """La decision que `rsl walkforward --archive` encode.
+
+    Un essai est une CONFIGURATION differente sur les memes donnees ; un pli
+    est la MEME configuration sur d'autres donnees. Verser neuf plis au
+    compteur du Deflated Sharpe le rendrait pessimiste pour une raison qui n'a
+    rien a voir avec la selection - c'est la regle que `walkforward.py` posait
+    deja en commentaire depuis sa premiere version.
+    """
+
+    def rapport(self, tmp_path: Path):
+        from datetime import UTC, datetime, timedelta
+
+        from fixtures import synthetic
+        from rsl.config import BacktestSpec
+        from rsl.data.schema import Granularity
+        from rsl.metrics.statistics import RollingWalkForward
+        from rsl.walkforward import run_walk_forward
+
+        jour = Granularity(timedelta(days=1), name="1d")
+        chemin = tmp_path / "ES_v0_1m.parquet"
+        synthetic.make_frame(
+            synthetic.sine(900, 2000.0, 200.0, 90),
+            granularity=jour,
+            start=datetime(2016, 1, 4, tzinfo=UTC),
+        ).write_parquet(chemin)
+        spec = BacktestSpec.model_validate({
+            "name": "wf", "initial_cash": 500_000.0,
+            "data": [{"root": "ES", "path": str(chemin)}],
+            "execution": {"fees": {"kind": "zero"}, "slippage": {"kind": "zero"}},
+            "risk": {"sizing": {"kind": "fixed", "contracts": 1}},
+            "strategy": {
+                "ref": "sma_crossover@1",
+                "params": {"symbol": "ES.v.0", "fast_window": 5, "slow_window": 20},
+            },
+        })
+        return run_walk_forward(
+            spec, RollingWalkForward(train_bars=300, test_bars=150)
+        )
+
+    def test_plusieurs_plis_font_un_seul_essai(self, registre, tmp_path):
+        from rsl.cli import _essai_de_walkforward
+
+        rapport = self.rapport(tmp_path)
+        assert rapport.n_folds > 2, "il faut plusieurs plis pour que le test morde"
+        registre.archiver(_essai_de_walkforward(rapport))
+        assert registre.journal().n_trials == 1
+
+    def test_le_sharpe_enregistre_est_celui_de_la_serie_groupee(
+        self, registre, tmp_path
+    ):
+        """Et non la moyenne des Sharpe par pli, ou un pli court peserait
+        autant qu'un pli long."""
+        from rsl.cli import _essai_de_walkforward
+
+        rapport = self.rapport(tmp_path)
+        essai = registre.archiver(_essai_de_walkforward(rapport))
+        assert essai.sharpe_per_period == rapport.pooled_sharpe_per_period
+
+    def test_le_nom_dit_que_c_est_un_walk_forward(self, registre, tmp_path):
+        """Le registre melange des runs simples et des walk-forwards : lire
+        « 0,04 » sans savoir lequel serait trompeur."""
+        from rsl.cli import _essai_de_walkforward
+
+        essai = registre.archiver(_essai_de_walkforward(self.rapport(tmp_path)))
+        assert "walk-forward" in essai.label
+
+    def test_l_empreinte_couvre_tous_les_plis(self, registre, tmp_path):
+        """Deux walk-forwards qui produisent les memes plis dans le meme ordre
+        sont le meme resultat ; un pli qui change doit changer l'empreinte."""
+        from rsl.cli import _essai_de_walkforward
+        from rsl.manifest import canonical_hash
+
+        rapport = self.rapport(tmp_path)
+        charge = _essai_de_walkforward(rapport)
+        attendu = canonical_hash([f.fingerprint for f in rapport.folds])
+        assert charge["result_fingerprint"] == attendu
+        assert attendu != canonical_hash([f.fingerprint for f in rapport.folds[:-1]])
+
+    def test_le_rapport_complet_des_plis_est_conserve(self, registre, tmp_path):
+        """Le detail par pli est ce qui distingue une performance repartie
+        d'une performance concentree. Le perdre laisserait un Sharpe sans son
+        avertissement."""
+        from rsl.cli import _essai_de_walkforward
+
+        essai = registre.archiver(_essai_de_walkforward(self.rapport(tmp_path)))
+        assert essai.rapport is not None
+        archive = json.loads(
+            (registre.racine / essai.rapport).read_text(encoding="utf-8")
+        )
+        assert archive["walkforward"]["folds"]

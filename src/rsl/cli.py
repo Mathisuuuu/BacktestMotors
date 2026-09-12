@@ -33,13 +33,16 @@ from rsl.data.instruments import INSTRUMENTS, get_instrument
 from rsl.data.loader import validate_file
 from rsl.errors import ConfigurationError, RslError
 from rsl.essais import EssaiDejaArchiveError, Registre, registre_par_defaut
+from rsl.manifest import canonical_hash
 from rsl.metrics.statistics import AnchoredWalkForward, RollingWalkForward
 from rsl.primitives.registry import describe_registry
 from rsl.report import BacktestReport, run_backtest
 from rsl.skeleton import build_skeleton
 from rsl.strategies.base import describe_strategies
 from rsl.strategies.signals import describe_node_types, signal_json_schema
-from rsl.walkforward import run_walk_forward
+from rsl.walkforward import WalkForwardReport, run_walk_forward
+
+SpecDict = dict[str, object]
 
 EXIT_OK = 0
 EXIT_ERROR = 1
@@ -296,6 +299,20 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     walk.add_argument("--out", type=Path, help="ecrit le rapport JSON dans ce fichier")
     walk.add_argument("--json", action="store_true")
+    walk.add_argument(
+        "--archive",
+        action="store_true",
+        help=(
+            "enregistre ce walk-forward comme UN essai dans essais/. Un pli "
+            "n'est pas un essai : c'est la meme configuration sur d'autres "
+            "donnees, pas une configuration de plus."
+        ),
+    )
+    walk.add_argument(
+        "--note",
+        default="",
+        help="pourquoi cet essai a ete fait. Archive avec lui ; ignore sans --archive.",
+    )
     walk.set_defaults(handler=_cmd_walkforward)
 
     verify = sub.add_parser("verify", help="execute deux fois et compare les empreintes")
@@ -460,7 +477,7 @@ def _cmd_run(args: argparse.Namespace) -> int:
     )
     _emit(report, as_json=args.json, out=args.out)
     if registre is not None:
-        _archiver(registre, report, note=args.note)
+        _archiver(registre, report.to_dict(), note=args.note)
     if args.gui:
         # Import tardif : tkinter peut manquer sur une machine sans interface,
         # et `rsl run` sans `--gui` doit continuer d'y fonctionner.
@@ -470,7 +487,7 @@ def _cmd_run(args: argparse.Namespace) -> int:
     return EXIT_OK
 
 
-def _archiver(registre: Registre, report: BacktestReport, *, note: str) -> None:
+def _archiver(registre: Registre, rapport: SpecDict, *, note: str) -> None:
     """Ajoute l'essai au registre, ou dit pourquoi il ne l'a pas ete.
 
     Un doublon n'est PAS une erreur de l'utilisateur : relancer un backtest
@@ -478,7 +495,7 @@ def _archiver(registre: Registre, report: BacktestReport, *, note: str) -> None:
     La commande le dit et rend `EXIT_OK`.
     """
     try:
-        essai = registre.archiver(report.to_dict(), note=note)
+        essai = registre.archiver(rapport, note=note)
     except EssaiDejaArchiveError as deja:
         print(f"\nessai deja enregistre : {deja}")
         return
@@ -571,6 +588,19 @@ def _cmd_gui(args: argparse.Namespace) -> int:
 
 
 def _cmd_walkforward(args: argparse.Namespace) -> int:
+    """Evalue par fenetres, et - avec `--archive` - compte UN essai.
+
+    Un pli n'est pas un essai, et c'est la seule decision que cette commande
+    encode. Un essai est une CONFIGURATION differente sur les memes donnees ;
+    un pli est la MEME configuration sur d'autres donnees. Verser neuf plis au
+    compteur du Deflated Sharpe le rendrait pessimiste pour une raison qui n'a
+    rien a voir avec la selection - c'est la regle que `walkforward.py` posait
+    deja en commentaire, et qui devient ici executable.
+
+    Le Sharpe enregistre est donc celui de la serie GROUPEE - les rendements
+    hors echantillon de tous les plis, bout a bout - et non une moyenne des
+    Sharpe par pli, ou un pli court pese autant qu'un pli long.
+    """
     spec = _load_spec(args.config, args.settings, args.symbol)
     splitter = (
         AnchoredWalkForward(initial_train_bars=args.train, test_bars=args.test)
@@ -593,7 +623,47 @@ def _cmd_walkforward(args: argparse.Namespace) -> int:
         )
         if not args.json:
             print(f"\nRapport JSON ecrit dans {args.out}")
+    if args.archive:
+        _archiver(registre_par_defaut(), _essai_de_walkforward(report), note=args.note)
     return EXIT_OK
+
+
+def _essai_de_walkforward(report: WalkForwardReport) -> SpecDict:
+    """Traduit un walk-forward dans la forme qu'attend le registre.
+
+    Le registre lit des rapports de BACKTEST : un `metrics.risk`, un
+    `metrics.sample`, un `manifest`. Un walk-forward n'a pas cette forme - il a
+    des plis. Plutot que d'apprendre deux formes au registre, on traduit ici :
+    le registre reste simple, et le point de traduction est visible.
+
+    Les quatre grandeurs statistiques viennent du bloc `pooled` du rapport,
+    calcule sur les rendements hors echantillon de TOUS les plis concatenes.
+    C'est la que se joue la decision « un pli n'est pas un essai ».
+
+    L'empreinte de resultat est celle des plis mis bout a bout : deux
+    walk-forwards qui produisent les memes plis sont le meme resultat, et
+    l'ordre des plis compte puisqu'il est chronologique.
+    """
+    groupe = report.pooled()
+    return {
+        "name": f"{report.name} [walk-forward, {report.n_folds} plis]",
+        "symbols": list(report.symbols),
+        "result_fingerprint": canonical_hash([f.fingerprint for f in report.folds]),
+        "manifest": report.manifest.describe(),
+        "metrics": {
+            "risk": {
+                "sharpe_per_period": groupe["sharpe_per_period"],
+                "n_returns": groupe["n_returns"],
+                "returns_skewness": groupe["skewness"],
+                "returns_kurtosis": groupe["kurtosis"],
+            },
+            "sample": {
+                "n_bars": sum(f.metrics.n_bars for f in report.folds),
+                "span_years": sum(f.metrics.span_years for f in report.folds),
+            },
+        },
+        "walkforward": report.describe(),
+    }
 
 
 def _cmd_verify(args: argparse.Namespace) -> int:

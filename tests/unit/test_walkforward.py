@@ -387,3 +387,64 @@ class TestCli:
         )
         assert code == EXIT_OK
         assert "laisses ouverts" in capsys.readouterr().out
+
+
+class TestLAgregatGroupe:
+    """Les rendements hors echantillon de tous les plis, bout a bout.
+
+    C'est l'objet que le walk-forward mesure vraiment : ce qu'aurait obtenu
+    quelqu'un qui aurait applique la strategie a chaque epoque sans jamais la
+    reajuster. Une moyenne des Sharpe par pli n'est pas cela - un pli court y
+    pese autant qu'un pli long - et l'ecart n'est pas anecdotique : mesure le
+    2026-09-12 sur `sma_es_daily`, 0,32 en moyenne des plis contre 0,62
+    annualise sur la serie groupee.
+    """
+
+    def rapport(self, es_file: Path) -> WalkForwardReport:
+        return run_walk_forward(
+            single_spec(es_file), RollingWalkForward(train_bars=300, test_bars=200)
+        )
+
+    def test_la_serie_groupee_est_la_concatenation_des_plis(self, es_file):
+        rapport = self.rapport(es_file)
+        attendu = sum(f.returns.size for f in rapport.folds)
+        assert rapport.pooled_returns.size == attendu
+        assert attendu > 0
+
+    def test_le_sharpe_groupe_n_est_pas_la_moyenne_des_plis(self, es_file):
+        """La verification qui justifie tout ce bloc. Si les deux coincidaient,
+        la moyenne aurait suffi."""
+        rapport = self.rapport(es_file)
+        groupe = rapport.pooled_sharpe_per_period
+        assert groupe is not None
+        assert rapport.sharpe_mean is not None
+        assert groupe != pytest.approx(rapport.sharpe_mean)
+
+    def test_les_quatre_grandeurs_du_dsr_sont_publiees(self, es_file):
+        """Un chiffre qui gouverne l'interpretation ne doit pas n'exister que
+        dans le chemin qui l'enregistre."""
+        groupe = self.rapport(es_file).pooled()
+        assert set(groupe) == {
+            "n_returns", "sharpe_per_period", "skewness", "kurtosis"
+        }
+        assert groupe["n_returns"] > 0
+
+    def test_elles_figurent_dans_le_rapport_json(self, es_file):
+        charge = self.rapport(es_file).describe()
+        assert "pooled" in charge["aggregate"]
+
+    def test_mais_les_rendements_bruts_n_y_figurent_pas(self, es_file):
+        """Plusieurs milliers de nombres qui ne se lisent pas feraient grossir
+        le rapport sans rien apprendre a personne."""
+        charge = json.dumps(self.rapport(es_file).describe())
+        assert "returns" not in json.loads(charge)["folds"][0]
+
+    def test_un_rapport_sans_pli_ne_leve_pas(self, es_file):
+        """Une serie vide doit rendre zero observation, pas exploser."""
+        vide = WalkForwardReport(
+            name="vide", symbols=("ES.v.0",), cross_sectional=False,
+            splitter={}, folds=(), manifest=RunManifest.capture(config={}, seed=0),
+            specification={},
+        )
+        assert vide.pooled()["n_returns"] == 0
+        assert vide.pooled_sharpe_per_period is None

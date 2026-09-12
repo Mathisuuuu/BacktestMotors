@@ -58,6 +58,23 @@ configuration differente sur les memes donnees ; un pli est la meme
 configuration sur des donnees differentes. Les confondre gonflerait le
 compteur du Deflated Sharpe avec des observations qui ne mesurent pas de la
 selection - et le DSR deviendrait pessimiste pour une mauvaise raison.
+
+Cette regle est EXECUTABLE depuis le 2026-09-12 : `rsl walkforward --archive`
+enregistre un walk-forward comme UN essai
+([src/rsl/essais.py](essais.py)), avec le Sharpe de la serie groupee.
+
+L'agregat GROUPE
+-----------------
+`pooled_returns` concatene les rendements hors echantillon de tous les plis.
+C'est l'objet que le walk-forward mesure vraiment : ce qu'aurait obtenu
+quelqu'un qui aurait applique la strategie a chaque epoque sans jamais la
+reajuster.
+
+Une moyenne des Sharpe par pli ne repond pas a cette question - elle donne le
+meme poids a un pli qui a negocie une fois et a un pli qui a negocie tout du
+long. Mesure sur `sma_es_daily` en neuf plis : 0,32 en moyenne des plis contre
+0,62 annualise sur la serie groupee. Les deux sont publies ; c'est le second
+qui entre au registre.
 """
 
 from __future__ import annotations
@@ -66,11 +83,21 @@ import math
 from dataclasses import dataclass, field
 from statistics import median
 
+import numpy as np
+
 from rsl.config import BacktestSpec, build_panel_from, load_stores
-from rsl.data.schema import BarStore
+from rsl.data.schema import BarStore, FloatArray
 from rsl.errors import ConfigurationError
 from rsl.manifest import RunManifest
-from rsl.metrics.performance import PerformanceMetrics, compute_performance
+from rsl.metrics.performance import (
+    PerformanceMetrics,
+    compute_performance,
+    kurtosis,
+    sharpe_per_period,
+    simple_returns,
+    skewness,
+    to_daily,
+)
 from rsl.metrics.statistics import Split, WalkForwardSplitter
 from rsl.primitives.registry import RegistrySnapshot
 from rsl.report import execute_run, result_fingerprint
@@ -87,6 +114,14 @@ class Fold:
     split: Split
     metrics: PerformanceMetrics
     fingerprint: str
+    returns: FloatArray = field(default_factory=lambda: np.zeros(0))
+    """Rendements quotidiens HORS ECHANTILLON de ce pli.
+
+    Portes ici, et exclus de `describe`, pour une raison precise : la
+    concatenation de ces series est le seul objet dont un Sharpe de
+    walk-forward ait un sens. Les republier dans le JSON du rapport le
+    ferait grossir de plusieurs milliers de nombres qui ne se lisent pas.
+    """
 
     @property
     def total_return(self) -> float:
@@ -180,6 +215,51 @@ class WalkForwardReport:
         return math.sqrt(sum((v - mean) ** 2 for v in values) / (len(values) - 1))
 
     @property
+    def pooled_returns(self) -> FloatArray:
+        """Les rendements hors echantillon de TOUS les plis, bout a bout.
+
+        C'est l'objet que le walk-forward mesure vraiment : ce qu'aurait
+        obtenu quelqu'un qui aurait applique la strategie a chaque epoque sans
+        jamais la reajuster. Une moyenne de Sharpe par pli n'est pas cela - un
+        pli court et un pli long y pesent pareil.
+
+        Deux coutures a connaitre. Chaque pli repart de `initial_cash`, donc la
+        serie est une suite de rendements et non une courbe de capital ; c'est
+        exactement ce qu'il faut pour un Sharpe, et c'est pourquoi on
+        concatene des RENDEMENTS. Et les plis peuvent se chevaucher si le pas
+        est plus petit que la fenetre de test - le splitter le dit, et
+        `positive_share` comme cette serie en heritent.
+        """
+        series = [f.returns for f in self.folds if f.returns.size]
+        if not series:
+            return np.zeros(0, dtype=np.float64)
+        return np.concatenate(series)
+
+    @property
+    def pooled_sharpe_per_period(self) -> float | None:
+        """Le Sharpe du walk-forward, par periode et non annualise.
+
+        Par periode, parce que c'est cette forme qu'attend le Deflated Sharpe,
+        et que l'annualisation suppose un pas qui se mesure ailleurs.
+        """
+        return sharpe_per_period(self.pooled_returns)
+
+    def pooled(self) -> SpecDict:
+        """Les quatre grandeurs dont le Deflated Sharpe a besoin.
+
+        Publiees dans le rapport plutot que calculees au moment d'archiver :
+        un chiffre qui gouverne l'interpretation ne doit pas n'exister que
+        dans le chemin qui l'enregistre.
+        """
+        series = self.pooled_returns
+        return {
+            "n_returns": int(series.size),
+            "sharpe_per_period": self.pooled_sharpe_per_period,
+            "skewness": skewness(series) if series.size else 0.0,
+            "kurtosis": kurtosis(series) if series.size else 0.0,
+        }
+
+    @property
     def worst_fold(self) -> Fold | None:
         return min(self.folds, key=lambda f: f.total_return, default=None)
 
@@ -242,6 +322,7 @@ class WalkForwardReport:
                 "concentration": self.concentration,
                 "worst_fold": None if self.worst_fold is None else self.worst_fold.index,
                 "best_fold": None if self.best_fold is None else self.best_fold.index,
+                "pooled": self.pooled(),
             },
             "folds": [f.describe() for f in self.folds],
             "manifest": self.manifest.describe(),
@@ -351,6 +432,13 @@ def run_walk_forward(
             build_strategy(spec.strategy.as_dict()),
             entry.cross_sectional,
         )
+        # Les rendements du pli sont derives par LE MEME chemin que ceux de
+        # `compute_performance` - `to_daily` puis `simple_returns`. Une seconde
+        # definition de « un rendement » finirait par diverger de la premiere.
+        _, equity_quotidienne = to_daily(
+            np.asarray(result.equity.ts_ns, dtype=np.int64),
+            np.asarray(result.equity.equity, dtype=np.float64),
+        )
         folds.append(
             Fold(
                 index=index,
@@ -359,6 +447,7 @@ def run_walk_forward(
                     result, risk_free_annual=spec.risk_free_annual
                 ),
                 fingerprint=result_fingerprint(result),
+                returns=simple_returns(equity_quotidienne),
             )
         )
 

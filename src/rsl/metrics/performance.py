@@ -415,7 +415,7 @@ def compute_performance(
 
     volatility = _annual_volatility(returns, annualisation)
     downside = _annual_downside(excess, annualisation)
-    sharpe_period = _sharpe_per_period(excess)
+    sharpe_period = sharpe_per_period(excess)
     sharpe = None if sharpe_period is None else sharpe_period * annualisation
     sortino = _sortino(excess, downside, annualisation)
     if sharpe is None and returns.shape[0] >= 2:
@@ -493,8 +493,14 @@ def _annual_downside(excess: np.ndarray, annualisation: float) -> float | None:
     return float(math.sqrt(float(np.mean(below**2)))) * annualisation
 
 
-def _sharpe_per_period(excess: np.ndarray) -> float | None:
-    """Sharpe brut, sans annualisation. L'ecart-type est non biaise (ddof=1)."""
+def sharpe_per_period(excess: np.ndarray) -> float | None:
+    """Sharpe brut, sans annualisation. L'ecart-type est non biaise (ddof=1).
+
+    PUBLIQUE depuis le 2026-09-12 : le walk-forward en a besoin pour son
+    agregat GROUPE, et deux implementations de « le Sharpe par periode »
+    finiraient par diverger - sur le `ddof`, ou sur le seuil de dispersion
+    negligeable, qui sont precisement les deux endroits ou l'on se trompe.
+    """
     if excess.shape[0] < 2:
         return None
     deviation = float(np.std(excess, ddof=1))
