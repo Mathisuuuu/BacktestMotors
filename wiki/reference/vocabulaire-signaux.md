@@ -211,7 +211,7 @@ coupure.
 
 | Document | Sert a | Engendre ? |
 |---|---|---|
-| [schemas/squelette.json](../../schemas/squelette.json) | **ecrire** : chaque emplacement avec ses valeurs acceptees, les 10 instruments, les 136 primitives, les 22 noeuds, les 7 strategies | oui, `rsl squelette` |
+| [schemas/squelette.json](../../schemas/squelette.json) | **ecrire** : chaque emplacement avec ses valeurs acceptees, les 10 instruments, les 136 primitives, les 23 noeuds, les 7 strategies | oui, `rsl squelette` |
 | [schemas/signals.schema.json](../../schemas/signals.schema.json) | **valider** : JSON Schema exact | oui, `rsl schema` |
 | [examples/_moule_universel.json](../../examples/_moule_universel.json) | **imiter** : un fichier qui tourne et exerce les 20 noeuds | non, teste |
 
@@ -259,6 +259,37 @@ Le premier fichier est le seul qui passe a l'echelle : une primitive ajoutee
 demain y est couverte sans qu'une ligne soit ecrite. Il a trouve trois defauts
 reels le jour de sa mise en place, dont deux qu'aucune relecture n'aurait vus
 ([[lessons]] L16).
+
+## Reagir a sa propre performance : le noeud `account`
+
+Ajoute le 2026-09-12. C'etait le seul grand absent du vocabulaire, identifie
+en repondant a « peut-on tout ecrire en JSON ». La couche risque voyait
+l'equity - `RiskManager.contracts` la recoit - mais aucune REGLE ne pouvait y
+reagir : le dimensionnement composait avec le capital, la decision l'ignorait.
+
+```json
+{ "type": "compare", "op": "<",
+  "left":  { "type": "account", "field": "drawdown" },
+  "right": { "type": "constant", "value": -0.12 } }
+```
+
+Six champs : `equity`, `cash`, `peak_equity`, `initial_equity`, `drawdown`
+(fraction negative ou nulle) et `total_return`.
+
+**Trois differences avec `position`**, chacune pour un motif :
+
+| | `position` | `account` |
+|---|---|---|
+| Hors runner | plat, **par deduction** | **leve** : une equity est inconnue, pas nulle |
+| Forme | propriete | **methode**, comme `session_value` - une propriete qui leve rend `isinstance(ctx, Context)` impossible |
+| Portee | un par instrument | **un par portefeuille** |
+
+**Le piege a connaitre.** Une regle qui lit son propre drawdown se referme sur
+elle-meme : couper a -10 % change l'equity, donc le drawdown, donc les coupes
+suivantes. Le backtest reste juste - il simule exactement cela - mais la
+sensibilite au seuil est bien plus forte qu'elle n'en a l'air, et un seuil
+ajuste sur l'echantillon est du sur-ajustement particulierement difficile a
+voir.
 
 ## Dire POURQUOI : le champ `note`
 

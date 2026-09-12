@@ -67,6 +67,7 @@ from rsl.strategies.noeuds.fenetres import (
     rolling,
 )
 from rsl.strategies.noeuds.feuilles import (
+    Account,
     Constant,
     Peer,
     Position,
@@ -74,6 +75,7 @@ from rsl.strategies.noeuds.feuilles import (
     PrimitiveSignal,
     Session,
     Time,
+    account,
     peer,
     position,
     session,
@@ -108,6 +110,7 @@ __all__ = [
     "FALSE",
     "NODE_REF",
     "TRUE",
+    "Account",
     "AllOf",
     "AnyOf",
     "Arith",
@@ -142,6 +145,7 @@ __all__ = [
     "Signal",
     "SpecDict",
     "Time",
+    "account",
     "all_of",
     "any_of",
     "bars_since",

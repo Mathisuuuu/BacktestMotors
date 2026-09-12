@@ -17,7 +17,7 @@ generated: true
 | Indicateur | Valeur |
 |---|---|
 | Pages de wiki | 23 |
-| Entrees de log | 106 |
+| Entrees de log | 111 |
 | Derniere activite | 2026-09-12 |
 | Idees ecartees (ledger) | 18 |
 | Idees en attente (ledger) | 3 |
@@ -27,7 +27,7 @@ generated: true
 | Pages `reference/` | 7 |
 | Pages `research/` | 1 |
 
-**Activite par type :** note × 52, fix × 23, feat × 13, decision × 12, experiment × 2, setup × 1, lint × 1, audit × 1, refactor × 1
+**Activite par type :** note × 55, fix × 23, feat × 14, decision × 13, experiment × 2, setup × 1, lint × 1, audit × 1, refactor × 1
 
 ## Experiences
 
@@ -42,14 +42,14 @@ Le total des essais alimente le Deflated Sharpe : un essai non enregistre gonfle
 
 ## Derniere activite — 8 entree(s)
 
+- **2026-09-12** — note | seul le `config_hash` de `_moule_universel` change, pas son empreinte de resultat | `190584bb` -> `d990888c`. C'est la signature exacte d'un changement de SPECIFICATION sans changement de resultat, et c'est precisement ce que `test_integration_reelle.py` a ete ecrit pour rendre lisible. Les 7 empreintes de resultat sont inchangees
+- **2026-09-12** — note | le moule universel exerce le noeud, et j'ai verifie qu'il n'etait pas INERTE | coupe-circuit a -12 % de drawdown ajoute a `exit_long` et `exit_short`. L'empreinte ne bouge pas -- exactement le piege de [[lessons]] L18. Verifie plutot que suppose : le drawdown maximum du run est de -9,65 %, le seuil n'est donc jamais atteint, et abaisser le seuil a -5 %, -2 % puis -1 % CHANGE bien l'empreinte a chaque fois. Le noeud est vivant
+- **2026-09-12** — note | defaut attrape avant d'etre commis : le compte etait ecrit par LIGNE et relu par index de BARRE | sur un panneau, la ligne `r` ne vaut pas l'index `r` d'un symbole donne. Un symbole aurait lu ce qui a ete ecrit pour un autre. Corrige en indexant sur l'horodatage de cloture -- le calendrier d'un panneau etant l'UNION des clotures, la cloture d'une barre est toujours une ligne de ce calendrier
+- **2026-09-12** — decision | trois differences deliberees avec `position`, chacune pour un motif | (1) METHODE `account_value` et non propriete -- elle leve hors runner, et `isinstance` sur un `Protocol` evalue les proprietes : une propriete qui leve rend `isinstance(ctx, Context)` impossible, constate en cours de route ; (2) hors runner elle LEVE au lieu de rendre un defaut -- une position est plate par deduction, une equity est INCONNUE, et rendre zero ferait d'un `drawdown` une division par zero silencieuse ; (3) UN compte par portefeuille, la ou les positions sont par instrument -- d'ou un historique indexe par INSTANT et non par index de barre, seule coordonnee que tous les symboles partagent
+- **2026-09-12** — feat | noeud `account@1` : la gestion du risque pilotee par la PERFORMANCE devient exprimable | c'etait le seul grand absent, identifie en repondant a « peut-on tout ecrire en JSON ». La couche risque voyait l'equity (`RiskManager.contracts` la recoit) mais la DECISION non. Six champs : equity, cash, peak_equity, initial_equity, drawdown (fraction negative), total_return. Verifie contre la courbe du moteur barre pour barre, pas contre une seconde implementation. 23 types de noeuds desormais
 - **2026-09-12** — note | fausse alerte de duree, tranchee par une seconde mesure | la suite complete a rendu 4 747 s (79 min) une fois, contre ~100 s d'habitude. Verifie plutot que suppose : suite rapide 41,7 s, partie `slow` normale, suite complete 67 s au passage suivant. Contention externe, pas une regression
 - **2026-09-12** — note | trouve par un test sur un exemple REEL, pas sur une fixture | les objets construits dans un test n'ont pas de region libre a exercer : mon test « une note ne change pas le config_hash » passait sur une specification minimale et ratait le cas des noeuds. Celui qui a trouve le defaut lisait `examples/paire_es_nq.json` apres l'avoir annote
 - **2026-09-12** — fix | ma premiere version de `note` cassait le `config_hash` la ou elle comptait le plus | `Field(exclude=True)` protege les blocs TYPES, et ne peut rien pour les noeuds, qui vivent dans `strategy.params.rules` -- un `dict[str, object]` que pydantic recopie tel quel. Annoter un seuil faisait passer le `config_hash` de `c686c31f` a `bf0f2f3f`. Corrige : `canonical()` retire les notes a toute profondeur, recursivement, pour qu'une region libre apparue demain soit couverte. `note` devient un mot RESERVE dans une specification -> [[lessons]] L19
-- **2026-09-12** — feat | champ `note` : le seul manque reel de JSON, comble sans changer de format | accepte sur tout bloc de specification, tout jeu de parametres de strategie, et TOUT noeud de signal. Texte, ou liste de textes pour plusieurs lignes -- JSON n'ayant pas de chaine multiligne. Ignore par le moteur, absent de `describe()`, absent du rapport. Publie dans les trois contrats engendres, mais dit UNE FOIS dans `contraintes` plutot que repete sur chacun des 22 noeuds. `examples/paire_es_nq.json` est annote pour que la fonctionnalite soit exercee et pas seulement publiee
-- **2026-09-12** — decision | YAML envisage puis ecarte, sur trois mesures et non sur un gout | (1) cinq des dix operateurs du vocabulaire cassent ecrits a la main sans guillemets -- `>` devient la chaine VIDE sans erreur, `>=`, `!=`, `-` et `*` levent ; (2) le proces habituel fait a YAML ne tenait pas ici : `17:00` -> `1020` et `NO` -> `False` sont bien produits, mais les modeles stricts les REFUSENT, donc le danger etait ergonomique et non une faille ; (3) YAML gagne reellement en compacite (21 lignes contre 29, indentation 8 contre 10) mais les arbres descendent a la profondeur 12, ou l'absence de delimiteur de fermeture coute plus qu'elle ne rapporte. PyYAML installe dans le bac a sable seulement, pour mesurer plutot qu'affirmer -> [[Failed Ideas/ledger]]
-- **2026-09-11** — note | mes trois premiers tests par le runner echouaient, et ils avaient tort | le `Watcher` lisait cinq barres en arriere sans declarer de `warmup_bars` : la borne a refuse, exactement comme elle doit. Une strategie a REGLES, elle, derive son warmup de son arbre -- le cas reel etait donc sur, et c'est le montage a la main qui devait etre corrige. Un test de plus verifie desormais ce chemin declaratif
-- **2026-09-11** — fix | ma premiere purge de l'historique balayait tout le dictionnaire a chaque barre | O(portee) par barre, soit 740 millions d'operations sur les 3,7 M de barres minute d'ES pour une profondeur de 200. Remplacee par un retrait en O(1) -- le runner enregistre barre par barre, donc une seule cle sort de la fenetre a chaque appel. Le balayage reste en secours pour le cas non sequentiel. Verifie sans regression : 11,2-12,3 ms des deux cotes sur `_moule_universel`, soit du bruit
-- **2026-09-11** — fix | trou referme, que j'avais introduit deux heures plus tot avec `FrozenPeers` | le resolveur de pairs fige construisait un `BarContext` neuf, donc sans historique de position : `peer(NQ, position("quantity"))` rendait zero depuis une vue reculee alors qu'il rendait la bonne valeur depuis la vue courante. Aucun exemple ne l'exercait, donc aucune empreinte ne l'aurait signale. Trouve en enumerant ce que `FrozenPeers` ne transmettait pas
 
 ## Next Actions
 

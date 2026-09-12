@@ -16,7 +16,12 @@ from dataclasses import dataclass
 from typing import ClassVar
 
 from rsl.data.feed import Context
-from rsl.data.schema import POSITION_FIELDS, TIME_FIELDS, time_field
+from rsl.data.schema import (
+    ACCOUNT_FIELDS,
+    POSITION_FIELDS,
+    TIME_FIELDS,
+    time_field,
+)
 from rsl.data.session import SessionField
 from rsl.errors import (
     ConfigurationError,
@@ -270,6 +275,102 @@ class Position:
         if not isinstance(field_, str):
             raise ConfigurationError(f"'position' : 'field' doit etre textuel, recu {field_!r}")
         return cls(field_)
+
+
+@signal_node(
+    "account",
+    summary="Feuille : ce que la strategie sait de SON compte (equity, drawdown).",
+    fields=(
+        NodeField(
+            "field",
+            FieldKind.STRING,
+            required=False,
+            default="equity",
+            choices=ACCOUNT_FIELDS,
+            description=(
+                "equity (marquee au marche), cash, peak_equity, initial_equity, "
+                "drawdown (fraction negative ou nulle), total_return (fraction)."
+            ),
+        ),
+    ),
+)
+@dataclass(frozen=True, slots=True)
+class Account:
+    """Etat du COMPTE, lu depuis le `Context`.
+
+    Le pendant de `position` au niveau du portefeuille : la position dit ce
+    qu'on detient, le compte dit ce que ca a donne. C'est ce noeud qui rend
+    exprimable la gestion du risque pilotee par la PERFORMANCE :
+
+        exit_long = account("drawdown") < -0.10
+        entry_long = all_of(signal, account("drawdown") > -0.05)
+
+    Jusqu'au 2026-09-12, la couche risque voyait l'equity - `RiskManager`
+    la recoit - mais la DECISION non. Le dimensionnement pouvait composer avec
+    le capital ; aucune regle ne pouvait y reagir.
+
+    Pourquoi ce n'est pas du look-ahead
+    ------------------------------------
+    Meme argument que pour `position`, et le changement d'echelle ne
+    l'affaiblit pas : l'equity a la barre `t` vient des fills - donc de barres
+    closes - et des marques de la barre `t`, close elle aussi. La strategie
+    n'apprend rien qu'elle n'ait provoque : la boucle de retroaction est dans
+    le TEMPS, jamais a l'interieur d'une barre.
+
+    Le piege a connaitre
+    --------------------
+    Une regle qui lit son propre drawdown se referme sur elle-meme. Couper a
+    -10 % change l'equity, donc le drawdown, donc les coupes suivantes. Le
+    backtest reste juste - il simule exactement cela - mais la sensibilite au
+    seuil est BIEN plus forte qu'elle n'en a l'air, et un seuil ajuste sur
+    l'echantillon est du sur-ajustement particulierement difficile a voir.
+
+    Hors runner, ce noeud LEVE
+    ---------------------------
+    Contrairement a `position`, qui vaut `FLAT` par deduction. Hors runner une
+    equity n'est pas nulle, elle est inconnue, et repondre zero ferait d'un
+    `drawdown` une division par zero silencieuse. Meme regle que `session`
+    sans calendrier declare : le socle n'invente pas.
+    """
+
+    NODE_TYPE: ClassVar[str] = "account"
+    NODE_VERSION: ClassVar[int] = 1
+
+    field: str = "equity"
+
+    def __post_init__(self) -> None:
+        if self.field not in ACCOUNT_FIELDS:
+            raise ConfigurationError(
+                f"'account' : champ inconnu {self.field!r}. "
+                f"Attendus : {', '.join(ACCOUNT_FIELDS)}"
+            )
+
+    @property
+    def warmup_bars(self) -> int:
+        """Zero : ce noeud ne lit aucun historique de prix."""
+        return 0
+
+    def __call__(self, ctx: Context) -> float | None:
+        return ctx.account_value(self.field)
+
+    def describe(self) -> SpecDict:
+        return {
+            "type": self.NODE_TYPE,
+            "version": self.NODE_VERSION,
+            "field": self.field,
+        }
+
+    @classmethod
+    def from_spec(cls, spec: SpecDict, build: Builder) -> Signal:
+        field_ = spec.get("field", "equity")
+        if not isinstance(field_, str):
+            raise ConfigurationError(f"'account' : 'field' doit etre textuel, recu {field_!r}")
+        return cls(field_)
+
+
+def account(field: str = "equity") -> Account:
+    """Raccourci : `account("drawdown")`."""
+    return Account(field)
 
 
 def position(field: str = "quantity") -> Position:

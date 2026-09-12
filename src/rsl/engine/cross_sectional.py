@@ -36,7 +36,7 @@ from dataclasses import dataclass, field
 from typing import Protocol, runtime_checkable
 
 from rsl.data.feed import MultiContext, PanelFeed
-from rsl.data.schema import Bar, InstrumentSpec, Panel
+from rsl.data.schema import AccountState, Bar, InstrumentSpec, Panel
 from rsl.engine.execution import ExecutionEngine, IntrabarPriority, assert_within_bar
 from rsl.engine.portfolio import EquityRecorder, Portfolio
 from rsl.engine.risk import RiskManager
@@ -226,6 +226,7 @@ class CrossSectionalRunner:
         fills: list[Fill] = []
         tracking: dict[str, _SinceEntry] = {}
 
+        sommet = self.config.initial_cash
         profondeur_dite = False
         for mctx in PanelFeed(self.panel, warmup_rows=warmup, stop=self.config.stop):
             if not profondeur_dite:
@@ -234,6 +235,7 @@ class CrossSectionalRunner:
                 # fois sur chacun.
                 for symbole in self.panel.symbols:
                     mctx._context_of(symbole)._set_position_depth(warmup)
+                mctx._account_history().set_initial(self.config.initial_cash)
                 profondeur_dite = True
             row = mctx._row
             bars = {symbol: mctx[symbol].bar for symbol in mctx.symbols}
@@ -254,6 +256,15 @@ class CrossSectionalRunner:
                 mctx[symbol]._set_position(
                     position_state(tracking, portfolio, symbol, row)
                 )
+            sommet = max(sommet, equity)
+            mctx._set_account(
+                AccountState(
+                    equity=equity,
+                    cash=portfolio.cash,
+                    peak_equity=sommet,
+                    initial_equity=self.config.initial_cash,
+                )
+            )
 
             if self.schedule.is_rebalance(row):
                 counters.n_rebalances += 1

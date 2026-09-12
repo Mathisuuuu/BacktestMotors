@@ -168,6 +168,12 @@ class TestNoSampleLengthLeak:
             "bar", "bar_at", "granularity", "history", "n_bars_seen", "peer", "peers",
             "position", "session_value", "shifted", "symbol", "ts", "ts_event",
             "value", "values",
+            # `account_value` a rejoint la surface le 2026-09-12 : la gestion
+            # du risque pilotee par la PERFORMANCE etait le seul grand absent.
+            # METHODE et non propriete, comme `session_value` - elle leve quand
+            # aucun compte n'est tenu, et une propriete qui leve rendrait
+            # `isinstance(ctx, Context)` impossible.
+            "account_value",
             # `data_token` a rejoint la surface le 2026-09-11, pour la
             # memoisation (`rsl/strategies/memoire.py`). Il ne fuite rien :
             # c'est un `object()` NU, sans aucun attribut, dont le seul usage

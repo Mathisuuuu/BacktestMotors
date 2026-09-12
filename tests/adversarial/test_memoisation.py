@@ -117,15 +117,20 @@ class TestAucuneFuiteEntreSeries:
 class TestSousArbresNonMemoisables:
     """Attaque n° 2 : celle qui a REELLEMENT casse une empreinte."""
 
-    def test_peer_et_position_sont_les_deux_seuls(self):
+    def test_peer_position_et_account_sont_les_seuls(self):
         """La liste est complete par construction : un `BarContext` porte
-        `_store`, `_i`, `_position` et `_peers`. Les deux premiers sont dans
-        la cle, les deux autres ne s'atteignent que par ces noeuds."""
-        assert {"peer", "position"} == NOEUDS_NON_MEMOISABLES
+        `_store`, `_i`, `_position`, `_peers` et `_account`. Les deux premiers
+        sont dans la cle ; les trois autres ne s'atteignent que par ces noeuds.
+
+        `account` y a ete ajoute le 2026-09-12 - exactement le cas que la
+        docstring de `memoire.py` annoncait : « un noeud ajoute demain qui
+        lirait un attribut de plus devrait etre ajoute ici »."""
+        assert {"peer", "position", "account"} == NOEUDS_NON_MEMOISABLES
 
     @pytest.mark.parametrize("impur", [
         {"type": "peer", "symbol": "NQ.v.0", "inner": {"type": "price", "field": "close"}},
         {"type": "position", "field": "bars_held"},
+        {"type": "account", "field": "drawdown"},
     ])
     def test_un_sous_arbre_impur_est_refuse(self, impur):
         assert not memoisable(build_signal(impur))

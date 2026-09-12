@@ -5,7 +5,6 @@
   "risk_free_annual": 0.0,
   "min_warmup_bars": 0,
   "liquidate_at_end": false,
-
   "data": [
     {
       "root": "ES",
@@ -13,7 +12,11 @@
       "granularity_minutes": 1,
       "resample": "day",
       "resample_min_bars": 200,
-      "session": { "start": "17:00", "end": "16:00", "timezone": "America/Chicago" }
+      "session": {
+        "start": "17:00",
+        "end": "16:00",
+        "timezone": "America/Chicago"
+      }
     },
     {
       "root": "NQ",
@@ -23,22 +26,29 @@
       "resample_min_bars": 200
     }
   ],
-
-  "panel": { "align_policy": "drop", "max_ffill_bars": null },
-
+  "panel": {
+    "align_policy": "drop",
+    "max_ffill_bars": null
+  },
   "execution": {
-    "fees": { "kind": "per_contract" },
-    "slippage": { "kind": "tick", "ticks": 1.0 },
+    "fees": {
+      "kind": "per_contract"
+    },
+    "slippage": {
+      "kind": "tick",
+      "ticks": 1.0
+    },
     "lag_bars": 1,
     "intrabar_priority": "pessimistic",
     "margin_policy": "reject"
   },
-
   "risk": {
-    "sizing": { "kind": "fixed", "contracts": 1 },
+    "sizing": {
+      "kind": "fixed",
+      "contracts": 1
+    },
     "max_gross_contracts": null
   },
-
   "strategy": {
     "ref": "panel_rules@1",
     "params": {
@@ -46,190 +56,485 @@
       "quantity": 1,
       "allow_pyramiding": false,
       "extra_warmup": 0,
-
       "rules": {
         "entry_long": {
           "type": "all_of",
           "operands": [
             {
               "type": "crosses_above",
-              "fast": { "type": "primitive", "ref": "macd@1",
-                        "params": { "fast": 12, "slow": 26, "output": "line" } },
-              "slow": { "type": "primitive", "ref": "macd@1",
-                        "params": { "fast": 12, "slow": 26, "signal": 9, "output": "signal" } }
+              "fast": {
+                "type": "primitive",
+                "ref": "macd@1",
+                "params": {
+                  "fast": 12,
+                  "slow": 26,
+                  "output": "line"
+                }
+              },
+              "slow": {
+                "type": "primitive",
+                "ref": "macd@1",
+                "params": {
+                  "fast": 12,
+                  "slow": 26,
+                  "signal": 9,
+                  "output": "signal"
+                }
+              }
             },
             {
-              "type": "compare", "op": ">",
-              "left": { "type": "primitive", "ref": "adx@1",
-                        "params": { "window": 14, "output": "adx" } },
-              "right": { "type": "constant", "value": 18.0 }
-            },
-            {
-              "type": "compare", "op": "<",
+              "type": "compare",
+              "op": ">",
               "left": {
-                "type": "math", "op": "abs",
+                "type": "primitive",
+                "ref": "adx@1",
+                "params": {
+                  "window": 14,
+                  "output": "adx"
+                }
+              },
+              "right": {
+                "type": "constant",
+                "value": 18.0
+              }
+            },
+            {
+              "type": "compare",
+              "op": "<",
+              "left": {
+                "type": "math",
+                "op": "abs",
                 "inner": {
-                  "type": "rolling", "stat": "zscore", "window": 120,
+                  "type": "rolling",
+                  "stat": "zscore",
+                  "window": 120,
                   "inner": {
-                    "type": "arith", "op": "/",
-                    "left": { "type": "price", "field": "close" },
-                    "right": { "type": "peer", "symbol": "NQ.v.0",
-                               "inner": { "type": "price", "field": "close" } }
+                    "type": "arith",
+                    "op": "/",
+                    "left": {
+                      "type": "price",
+                      "field": "close"
+                    },
+                    "right": {
+                      "type": "peer",
+                      "symbol": "NQ.v.0",
+                      "inner": {
+                        "type": "price",
+                        "field": "close"
+                      }
+                    }
                   }
                 }
               },
-              "right": { "type": "constant", "value": 2.5 }
+              "right": {
+                "type": "constant",
+                "value": 2.5
+              }
             },
             {
               "type": "not",
               "inner": {
-                "type": "compare", "op": "==",
-                "left": { "type": "time", "field": "weekday" },
-                "right": { "type": "constant", "value": 0.0 }
+                "type": "compare",
+                "op": "==",
+                "left": {
+                  "type": "time",
+                  "field": "weekday"
+                },
+                "right": {
+                  "type": "constant",
+                  "value": 0.0
+                }
               }
             },
             {
-              "type": "compare", "op": ">",
-              "left": { "type": "rolling", "stat": "ema", "window": 10,
-                        "inner": { "type": "price", "field": "close" } },
-              "right": { "type": "lag", "bars": 5,
-                         "inner": { "type": "rolling", "stat": "ema", "window": 10,
-                                    "inner": { "type": "price", "field": "close" } } }
-            },
-            {
-              "type": "compare", "op": ">",
-              "left": { "type": "price", "field": "close" },
-              "right": { "type": "session", "field": "high", "lag": 1 }
-            },
-            {
-              "type": "compare", "op": ">",
-              "left": { "type": "price", "field": "close" },
+              "type": "compare",
+              "op": ">",
+              "left": {
+                "type": "rolling",
+                "stat": "ema",
+                "window": 10,
+                "inner": {
+                  "type": "price",
+                  "field": "close"
+                }
+              },
               "right": {
-                "type": "arith", "op": "/",
-                "left": { "type": "cumulative", "stat": "sum",
-                          "inner": { "type": "arith", "op": "*",
-                                     "left": { "type": "price", "field": "close" },
-                                     "right": { "type": "price", "field": "volume" } } },
-                "right": { "type": "cumulative", "stat": "sum",
-                           "inner": { "type": "price", "field": "volume" } }
+                "type": "lag",
+                "bars": 5,
+                "inner": {
+                  "type": "rolling",
+                  "stat": "ema",
+                  "window": 10,
+                  "inner": {
+                    "type": "price",
+                    "field": "close"
+                  }
+                }
+              }
+            },
+            {
+              "type": "compare",
+              "op": ">",
+              "left": {
+                "type": "price",
+                "field": "close"
+              },
+              "right": {
+                "type": "session",
+                "field": "high",
+                "lag": 1
+              }
+            },
+            {
+              "type": "compare",
+              "op": ">",
+              "left": {
+                "type": "price",
+                "field": "close"
+              },
+              "right": {
+                "type": "arith",
+                "op": "/",
+                "left": {
+                  "type": "cumulative",
+                  "stat": "sum",
+                  "inner": {
+                    "type": "arith",
+                    "op": "*",
+                    "left": {
+                      "type": "price",
+                      "field": "close"
+                    },
+                    "right": {
+                      "type": "price",
+                      "field": "volume"
+                    }
+                  }
+                },
+                "right": {
+                  "type": "cumulative",
+                  "stat": "sum",
+                  "inner": {
+                    "type": "price",
+                    "field": "volume"
+                  }
+                }
               }
             }
           ]
         },
-
         "entry_short": {
           "type": "all_of",
           "operands": [
             {
               "type": "crosses_below",
-              "fast": { "type": "primitive", "ref": "macd@1",
-                        "params": { "fast": 12, "slow": 26, "output": "line" } },
-              "slow": { "type": "primitive", "ref": "macd@1",
-                        "params": { "fast": 12, "slow": 26, "signal": 9, "output": "signal" } }
+              "fast": {
+                "type": "primitive",
+                "ref": "macd@1",
+                "params": {
+                  "fast": 12,
+                  "slow": 26,
+                  "output": "line"
+                }
+              },
+              "slow": {
+                "type": "primitive",
+                "ref": "macd@1",
+                "params": {
+                  "fast": 12,
+                  "slow": 26,
+                  "signal": 9,
+                  "output": "signal"
+                }
+              }
             },
             {
-              "type": "compare", "op": ">",
-              "left": { "type": "primitive", "ref": "adx@1",
-                        "params": { "window": 14, "output": "minus_di" } },
-              "right": { "type": "primitive", "ref": "adx@1",
-                         "params": { "window": 14, "output": "plus_di" } }
+              "type": "compare",
+              "op": ">",
+              "left": {
+                "type": "primitive",
+                "ref": "adx@1",
+                "params": {
+                  "window": 14,
+                  "output": "minus_di"
+                }
+              },
+              "right": {
+                "type": "primitive",
+                "ref": "adx@1",
+                "params": {
+                  "window": 14,
+                  "output": "plus_di"
+                }
+              }
             },
             {
-              "type": "compare", "op": "<",
-              "left": { "type": "primitive", "ref": "efficiency_ratio@1",
-                        "params": { "window": 20 } },
-              "right": { "type": "constant", "value": 0.9 }
+              "type": "compare",
+              "op": "<",
+              "left": {
+                "type": "primitive",
+                "ref": "efficiency_ratio@1",
+                "params": {
+                  "window": 20
+                }
+              },
+              "right": {
+                "type": "constant",
+                "value": 0.9
+              }
             }
           ]
         },
-
         "exit_long": {
           "type": "any_of",
           "operands": [
             {
-              "type": "compare", "op": ">",
-              "left": { "type": "primitive", "ref": "rsi_wilder@1", "params": { "window": 14 } },
-              "right": { "type": "constant", "value": 72.0 }
+              "type": "compare",
+              "op": ">",
+              "left": {
+                "type": "primitive",
+                "ref": "rsi_wilder@1",
+                "params": {
+                  "window": 14
+                }
+              },
+              "right": {
+                "type": "constant",
+                "value": 72.0
+              }
             },
             {
-              "type": "compare", "op": ">=",
-              "left": { "type": "position", "field": "bars_held" },
-              "right": { "type": "constant", "value": 45.0 }
+              "type": "compare",
+              "op": ">=",
+              "left": {
+                "type": "position",
+                "field": "bars_held"
+              },
+              "right": {
+                "type": "constant",
+                "value": 45.0
+              }
             },
             {
-              "type": "compare", "op": "<=",
-              "left": { "type": "bars_since", "lookback": 15,
-                        "inner": { "type": "compare", "op": "<",
-                                   "left": { "type": "primitive", "ref": "cci@1",
-                                             "params": { "window": 20 } },
-                                   "right": { "type": "constant", "value": -180.0 } } },
-              "right": { "type": "constant", "value": 1.0 }
+              "type": "compare",
+              "op": "<=",
+              "left": {
+                "type": "bars_since",
+                "lookback": 15,
+                "inner": {
+                  "type": "compare",
+                  "op": "<",
+                  "left": {
+                    "type": "primitive",
+                    "ref": "cci@1",
+                    "params": {
+                      "window": 20
+                    }
+                  },
+                  "right": {
+                    "type": "constant",
+                    "value": -180.0
+                  }
+                }
+              },
+              "right": {
+                "type": "constant",
+                "value": 1.0
+              }
+            },
+            {
+              "type": "compare",
+              "op": "<",
+              "note": [
+                "Coupe-circuit : sortir si le compte recule de plus de 12 % sous son",
+                "sommet. C'est le noeud `account`, ajoute le 2026-09-12 - jusque-la la",
+                "couche risque voyait l'equity mais aucune REGLE ne pouvait y reagir.",
+                "A manier avec prudence : une regle qui lit son propre drawdown se",
+                "referme sur elle-meme, et un seuil ajuste sur l'echantillon est du",
+                "sur-ajustement particulierement difficile a voir."
+              ],
+              "left": {
+                "type": "account",
+                "field": "drawdown"
+              },
+              "right": {
+                "type": "constant",
+                "value": -0.12
+              }
             }
           ]
         },
-
         "exit_short": {
           "type": "any_of",
           "operands": [
             {
-              "type": "compare", "op": "<",
-              "left": { "type": "primitive", "ref": "williams_r@1", "params": { "window": 14 } },
-              "right": { "type": "constant", "value": -88.0 }
+              "type": "compare",
+              "op": "<",
+              "left": {
+                "type": "primitive",
+                "ref": "williams_r@1",
+                "params": {
+                  "window": 14
+                }
+              },
+              "right": {
+                "type": "constant",
+                "value": -88.0
+              }
             },
             {
-              "type": "compare", "op": ">=",
-              "left": { "type": "position", "field": "bars_held" },
-              "right": { "type": "constant", "value": 30.0 }
+              "type": "compare",
+              "op": ">=",
+              "left": {
+                "type": "position",
+                "field": "bars_held"
+              },
+              "right": {
+                "type": "constant",
+                "value": 30.0
+              }
+            },
+            {
+              "type": "compare",
+              "op": "<",
+              "note": [
+                "Coupe-circuit : sortir si le compte recule de plus de 12 % sous son",
+                "sommet. C'est le noeud `account`, ajoute le 2026-09-12 - jusque-la la",
+                "couche risque voyait l'equity mais aucune REGLE ne pouvait y reagir.",
+                "A manier avec prudence : une regle qui lit son propre drawdown se",
+                "referme sur elle-meme, et un seuil ajuste sur l'echantillon est du",
+                "sur-ajustement particulierement difficile a voir."
+              ],
+              "left": {
+                "type": "account",
+                "field": "drawdown"
+              },
+              "right": {
+                "type": "constant",
+                "value": -0.12
+              }
             }
           ]
         },
-
         "stop_loss": {
           "type": "if_then_else",
           "condition": {
-            "type": "compare", "op": ">",
-            "left": { "type": "primitive", "ref": "efficiency_ratio@1",
-                      "params": { "window": 20 } },
-            "right": { "type": "constant", "value": 0.45 }
+            "type": "compare",
+            "op": ">",
+            "left": {
+              "type": "primitive",
+              "ref": "efficiency_ratio@1",
+              "params": {
+                "window": 20
+              }
+            },
+            "right": {
+              "type": "constant",
+              "value": 0.45
+            }
           },
           "then": {
-            "type": "arith", "op": "-",
-            "left": { "type": "position", "field": "high_since_entry" },
-            "right": { "type": "arith", "op": "*",
-                       "left": { "type": "constant", "value": 3.0 },
-                       "right": { "type": "primitive", "ref": "atr_wilder@1",
-                                  "params": { "window": 14 } } }
+            "type": "arith",
+            "op": "-",
+            "left": {
+              "type": "position",
+              "field": "high_since_entry"
+            },
+            "right": {
+              "type": "arith",
+              "op": "*",
+              "left": {
+                "type": "constant",
+                "value": 3.0
+              },
+              "right": {
+                "type": "primitive",
+                "ref": "atr_wilder@1",
+                "params": {
+                  "window": 14
+                }
+              }
+            }
           },
           "otherwise": {
-            "type": "arith", "op": "-",
-            "left": { "type": "price", "field": "close" },
-            "right": { "type": "arith", "op": "*",
-                       "left": { "type": "constant", "value": 1.5 },
-                       "right": { "type": "primitive", "ref": "atr_wilder@1",
-                                  "params": { "window": 14 } } }
+            "type": "arith",
+            "op": "-",
+            "left": {
+              "type": "price",
+              "field": "close"
+            },
+            "right": {
+              "type": "arith",
+              "op": "*",
+              "left": {
+                "type": "constant",
+                "value": 1.5
+              },
+              "right": {
+                "type": "primitive",
+                "ref": "atr_wilder@1",
+                "params": {
+                  "window": 14
+                }
+              }
+            }
           }
         },
-
         "take_profit": {
           "type": "min_of",
           "operands": [
             {
               "type": "max_of",
               "operands": [
-                { "type": "arith", "op": "+",
-                  "left": { "type": "price", "field": "close" },
-                  "right": { "type": "arith", "op": "*",
-                             "left": { "type": "constant", "value": 5.0 },
-                             "right": { "type": "primitive", "ref": "atr_wilder@1",
-                                        "params": { "window": 14 } } } },
-                { "type": "arith", "op": "*",
-                  "left": { "type": "position", "field": "entry_price" },
-                  "right": { "type": "constant", "value": 1.04 } }
+                {
+                  "type": "arith",
+                  "op": "+",
+                  "left": {
+                    "type": "price",
+                    "field": "close"
+                  },
+                  "right": {
+                    "type": "arith",
+                    "op": "*",
+                    "left": {
+                      "type": "constant",
+                      "value": 5.0
+                    },
+                    "right": {
+                      "type": "primitive",
+                      "ref": "atr_wilder@1",
+                      "params": {
+                        "window": 14
+                      }
+                    }
+                  }
+                },
+                {
+                  "type": "arith",
+                  "op": "*",
+                  "left": {
+                    "type": "position",
+                    "field": "entry_price"
+                  },
+                  "right": {
+                    "type": "constant",
+                    "value": 1.04
+                  }
+                }
               ]
             },
-            { "type": "arith", "op": "*",
-              "left": { "type": "price", "field": "close" },
-              "right": { "type": "constant", "value": 1.15 } }
+            {
+              "type": "arith",
+              "op": "*",
+              "left": {
+                "type": "price",
+                "field": "close"
+              },
+              "right": {
+                "type": "constant",
+                "value": 1.15
+              }
+            }
           ]
         }
       }

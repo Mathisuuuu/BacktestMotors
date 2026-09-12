@@ -4,6 +4,51 @@
       "oneOf": [
         {
           "additionalProperties": false,
+          "description": "Feuille : ce que la strategie sait de SON compte (equity, drawdown).",
+          "properties": {
+            "field": {
+              "default": "equity",
+              "description": "equity (marquee au marche), cash, peak_equity, initial_equity, drawdown (fraction negative ou nulle), total_return (fraction).",
+              "enum": [
+                "equity",
+                "cash",
+                "peak_equity",
+                "initial_equity",
+                "drawdown",
+                "total_return"
+              ],
+              "type": "string"
+            },
+            "note": {
+              "description": "Commentaire libre, ignore par le moteur. Une liste vaut plusieurs lignes.",
+              "oneOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                }
+              ]
+            },
+            "type": {
+              "const": "account"
+            },
+            "version": {
+              "const": 1,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "title": "account@1",
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
           "description": "Conjonction : vrai si tous les sous-signaux sont vrais.",
           "properties": {
             "note": {

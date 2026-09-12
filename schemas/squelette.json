@@ -86,6 +86,23 @@
     "qu'elle attendait."
   ],
   "noeuds": {
+    "account": {
+      "champs": {
+        "field": {
+          "choix": [
+            "equity",
+            "cash",
+            "peak_equity",
+            "initial_equity",
+            "drawdown",
+            "total_return"
+          ],
+          "defaut": "equity",
+          "type": "choix"
+        }
+      },
+      "resume": "Feuille : ce que la strategie sait de SON compte (equity, drawdown)."
+    },
     "all_of": {
       "champs": {
         "operands": {

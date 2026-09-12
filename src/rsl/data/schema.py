@@ -447,6 +447,99 @@ FLAT: Final[PositionState] = PositionState()
 il ne peut pas inventer une position qui n'existe pas."""
 
 
+@dataclass(frozen=True, slots=True)
+class AccountState:
+    """Ce qu'une strategie sait de SON compte, a la barre courante.
+
+    Le pendant de `PositionState` au niveau du PORTEFEUILLE : la position dit
+    ce qu'on detient, le compte dit ce que ca a donne.
+
+    Pourquoi cela ne rompt pas le contrat anti-look-ahead
+    ------------------------------------------------------
+    Exactement le meme argument qu'en `PositionState`, et il n'est pas affaibli
+    par le changement d'echelle. L'equity a la barre `t` est calculee par le
+    runner a partir des fills - qui viennent de barres deja closes - et des
+    marques de la barre `t`, deja close elle aussi. Aucune valeur n'est
+    posterieure a l'instant ou la strategie la lit.
+
+    Une strategie qui la lit n'apprend rien qu'elle n'ait elle-meme provoque :
+    l'equity est la consequence de ses propres decisions passees. La boucle de
+    retroaction est dans le TEMPS, jamais a l'interieur d'une barre.
+
+    Ce que cela rend exprimable, et qui ne l'etait pas
+    --------------------------------------------------
+    Couper apres un repli donne, alleger quand le drawdown se creuse, cesser
+    d'ajouter au-dela d'un gain - toute la gestion du risque pilotee par la
+    PERFORMANCE. Jusqu'au 2026-09-12, la couche risque voyait l'equity
+    (`RiskManager.contracts` la recoit) mais la DECISION non : le
+    dimensionnement pouvait composer avec le capital, aucune regle ne pouvait
+    y reagir.
+
+    Pourquoi il n'existe pas d'etat par defaut
+    -------------------------------------------
+    `PositionState` en a un - `FLAT` - et c'est une DEDUCTION : hors runner,
+    personne n'a pris de position. Il n'y a pas d'equivalent ici. Hors runner,
+    une equity n'est pas nulle, elle est INCONNUE, et repondre zero ferait
+    d'un `drawdown` une division par zero silencieuse. Le noeud `account`
+    leve donc, comme `session` leve sans calendrier declare : le socle
+    n'invente pas.
+    """
+
+    equity: float
+    """Valeur totale, marquee au marche."""
+
+    cash: float
+    peak_equity: float
+    """Plus haut atteint depuis le DEBUT DU RUN, prechauffage compris."""
+
+    initial_equity: float
+
+    @property
+    def drawdown(self) -> float:
+        """Repli depuis le sommet, en fraction. Negatif ou nul.
+
+        Sans unite, donc utilisable comme seuil sans dependre du capital de
+        depart - contrairement a `equity - peak_equity`.
+        """
+        if self.peak_equity <= 0.0:
+            return 0.0
+        return (self.equity - self.peak_equity) / self.peak_equity
+
+    @property
+    def total_return(self) -> float:
+        """Rendement depuis le debut du run, en fraction."""
+        if self.initial_equity <= 0.0:
+            return 0.0
+        return (self.equity / self.initial_equity) - 1.0
+
+    def field(self, name: str) -> float:
+        match name:
+            case "equity":
+                return self.equity
+            case "cash":
+                return self.cash
+            case "peak_equity":
+                return self.peak_equity
+            case "initial_equity":
+                return self.initial_equity
+            case "drawdown":
+                return self.drawdown
+            case "total_return":
+                return self.total_return
+        raise ValueError(f"champ de compte inconnu : '{name}'")
+
+
+ACCOUNT_FIELDS: Final[tuple[str, ...]] = (
+    "equity",
+    "cash",
+    "peak_equity",
+    "initial_equity",
+    "drawdown",
+    "total_return",
+)
+"""Champs lisibles par le noeud `account`. Publie dans le schema engendre."""
+
+
 TIME_FIELDS: Final[tuple[str, ...]] = (
     "weekday",
     "hour",

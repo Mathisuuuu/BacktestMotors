@@ -10,6 +10,7 @@ Voir `docs/no-lookahead.md` §2 et §3.
 
 from __future__ import annotations
 
+from collections import deque
 from collections.abc import Iterator
 from datetime import datetime
 from typing import Final, Protocol, runtime_checkable
@@ -19,6 +20,7 @@ import numpy as np
 from rsl.data.schema import (
     ABSENT,
     FLAT,
+    AccountState,
     Bar,
     BarStore,
     BarWindow,
@@ -128,6 +130,104 @@ class PositionHistory:
         )
 
 
+class AccountHistory:
+    """Etat de COMPTE par barre, ecrit par le runner, lu par le contexte.
+
+    Meme role que `PositionHistory`, avec deux differences qui viennent
+    toutes deux du fait qu'un compte est COMMUN a tout le portefeuille.
+
+    1. La cle est un INSTANT, pas un index de barre
+    ------------------------------------------------
+    Un seul compte pour tous les symboles - deux instruments d'un meme
+    portefeuille n'ont pas deux equities. Mais chaque symbole a son propre
+    index de barre, et sur un panneau la ligne `r` ne vaut pas l'index `r`
+    d'un symbole donne. Indexer par barre aurait donc fait lire a l'un ce qui
+    a ete ecrit pour l'autre.
+
+    L'horodatage de cloture est la seule coordonnee que tous partagent : le
+    calendrier d'un panneau est l'UNION des clotures, donc la cloture d'une
+    barre d'un symbole est toujours une ligne de ce calendrier.
+
+    2. Avant le premier enregistrement, l'etat se DEDUIT
+    -----------------------------------------------------
+    Le runner n'appelle pas la strategie pendant le prechauffage : aucun ordre
+    n'a pu etre emis, donc l'equity vaut le capital de depart et le sommet
+    aussi. Meme raisonnement que `FLAT` pour les positions.
+
+    Ce qui ne se deduit pas, c'est l'absence totale de runner : la, une equity
+    est INCONNUE et non nulle. Rendre zero ferait d'un `drawdown` une division
+    par zero silencieuse. On leve, comme `session` leve sans calendrier
+    declare - le socle n'invente pas.
+    """
+
+    __slots__ = ("_etats", "_initial", "_ordre", "_portee", "_premiere")
+
+    def __init__(self) -> None:
+        self._portee = PositionHistory.DEFAUT
+        self._etats: dict[int, AccountState] = {}
+        self._ordre: deque[int] = deque()
+        self._initial: float | None = None
+        self._premiere = -1
+
+    def set_depth(self, portee: int) -> None:
+        self._portee = max(portee, PositionHistory.DEFAUT)
+
+    def set_initial(self, cash: float) -> None:
+        """Capital de depart, declare par le runner avant la boucle.
+
+        C'est lui qui rend deductible l'etat des barres de prechauffage.
+        """
+        self._initial = cash
+
+    def taille(self) -> int:
+        return len(self._etats)
+
+    def record(self, ts_close_ns: int, state: AccountState) -> None:
+        """Enregistre, et laisse tomber le plus ancien au-dela de la portee.
+
+        File d'insertion plutot qu'arithmetique sur les cles : les instants
+        ne sont pas consecutifs, donc `cle - portee` ne designe rien.
+        """
+        if self._premiere < 0:
+            self._premiere = ts_close_ns
+        if ts_close_ns not in self._etats:
+            self._ordre.append(ts_close_ns)
+        self._etats[ts_close_ns] = state
+        while len(self._ordre) > self._portee + 1:
+            self._etats.pop(self._ordre.popleft(), None)
+
+    def at(self, ts_close_ns: int) -> AccountState:
+        etat = self._etats.get(ts_close_ns)
+        if etat is not None:
+            return etat
+        if self._initial is None:
+            raise ConfigurationError(
+                "account : aucun compte n'est tenu. Un `Context` construit hors "
+                "runner ne connait pas d'equity, et le socle n'en invente pas - "
+                "de meme qu'il n'invente pas de frontiere de seance. Ce noeud "
+                "n'a de sens que dans un run."
+            )
+        if self._premiere < 0 or ts_close_ns < self._premiere:
+            # Avant la premiere barre du run : prechauffage. Aucun ordre n'a pu
+            # etre emis, donc l'equity vaut le capital de depart. Deduction, pas
+            # defaut choisi - meme raisonnement que `FLAT` pour les positions.
+            return self._au_depart()
+        raise InsufficientHistoryError(
+            f"etat de compte demande a {ts_close_ns}, mais seules les "
+            f"{self._portee} dernieres barres sont retenues. Declarez un "
+            f"`extra_warmup` suffisant sur la strategie."
+        )
+
+    def _au_depart(self) -> AccountState:
+        assert self._initial is not None
+        return AccountState(
+            equity=self._initial,
+            cash=self._initial,
+            peak_equity=self._initial,
+            initial_equity=self._initial,
+        )
+
+
 @runtime_checkable
 class PeerResolver(Protocol):
     """Ce qui sait donner, a un instant fixe, le contexte d'un AUTRE instrument.
@@ -216,6 +316,16 @@ class Context(Protocol):
         """Ce que la strategie sait de SA position. Jamais du marche."""
         ...
 
+    def account_value(self, field: str) -> float:
+        """Grandeur de compte : equity, cash, drawdown, total_return...
+
+        METHODE et non propriete, comme `session_value` et pour la meme
+        raison : elle LEVE quand aucun compte n'est tenu, et `isinstance` sur
+        un `Protocol` evalue les proprietes. Une propriete qui leve rend
+        `isinstance(ctx, Context)` impossible - constate le 2026-09-12.
+        """
+        ...
+
     def peer(self, symbol: str) -> Context:
         """Contexte d'un autre instrument, au MEME instant."""
         ...
@@ -242,12 +352,13 @@ class BarContext:
     strategie n'a contourne le contrat.
     """
 
-    __slots__ = ("_i", "_peers", "_positions", "_store")
+    __slots__ = ("_account", "_i", "_peers", "_positions", "_store")
 
     def __init__(self, store: BarStore) -> None:
         self._store = store
         self._i = -1
         self._positions = PositionHistory()
+        self._account = AccountHistory()
         self._peers: PeerResolver | None = None
 
     # -- avancee du curseur : reserve au feed -----------------------------
@@ -275,6 +386,22 @@ class BarContext:
         """
         self._positions.record(self._i, state)
 
+    def _set_account(self, state: AccountState) -> None:
+        """Enregistre l'etat de compte DE CETTE BARRE. Reserve au runner.
+
+        Par l'instant de cloture et non par l'index : le compte est commun a
+        tous les symboles, qui n'ont pas le meme index a la meme ligne.
+        """
+        self._account.record(int(self._store.ts_close[self._i]), state)
+
+    def _share_account(self, history: AccountHistory) -> None:
+        """Fait pointer ce contexte vers un compte EXISTANT.
+
+        Un seul compte par run : les vues reculees, les pairs et tous les
+        symboles d'un panneau partagent le meme objet.
+        """
+        self._account = history
+
     def _set_position_depth(self, warmup_bars: int) -> None:
         """Profondeur de l'historique de positions. Reserve au runner.
 
@@ -283,6 +410,7 @@ class BarContext:
         personne n'a annonce vouloir lire.
         """
         self._positions.set_depth(warmup_bars + 1)
+        self._account.set_depth(warmup_bars + 1)
 
     def _share_positions(self, history: PositionHistory) -> None:
         """Fait pointer ce contexte vers un historique EXISTANT.
@@ -346,6 +474,15 @@ class BarContext:
         - et non l'etat courant, ce qui etait le cas jusqu'au 2026-09-11.
         """
         return self._positions.at(self._i)
+
+    def account_value(self, field: str) -> float:
+        """Grandeur de compte A CETTE BARRE.
+
+        Meme regle que `position` sur une vue reculee : on lit la barre visee,
+        pas le present. Leve hors runner - voir `AccountHistory`.
+        """
+        instant = int(self._store.ts_close[self._require_index(0)])
+        return self._account.at(instant).field(field)
 
     @property
     def symbol(self) -> str:
@@ -444,6 +581,7 @@ class BarContext:
         # faisait lire vingt fois la meme valeur a
         # `rolling(mean, 20, position("bars_held"))`.
         sub._share_positions(self._positions)
+        sub._share_account(self._account)
         # Les pairs, eux, RECULENT : ils le peuvent, puisque le panneau porte
         # tout leur historique. Jusqu'au 2026-09-11 ils restaient a l'instant
         # courant, ce qui rendait le terme distant constant sur toute une
@@ -556,12 +694,18 @@ class MultiContext:
     (`docs/no-lookahead.md` §4.1).
     """
 
-    __slots__ = ("_contexts", "_panel", "_row")
+    __slots__ = ("_account", "_contexts", "_panel", "_row")
 
     def __init__(self, panel: Panel) -> None:
         self._panel = panel
         self._row = -1
         self._contexts = {s: BarContext(panel.stores[s]) for s in panel.symbols}
+        # UN compte pour tout le panneau : deux instruments d'un meme
+        # portefeuille n'ont pas deux equities. Les positions, elles, restent
+        # par symbole - c'est la difference entre les deux etats.
+        self._account = AccountHistory()
+        for contexte in self._contexts.values():
+            contexte._share_account(self._account)
 
     def _seek_row(self, row: int) -> None:
         self._row = row
@@ -595,6 +739,17 @@ class MultiContext:
                 f"c'est ce que vous voulez."
             )
         return self._contexts[symbol]
+
+    def _set_account(self, state: AccountState) -> None:
+        """Enregistre l'etat de compte de la ligne courante. Reserve au runner.
+
+        Une seule fois par ligne, et non par symbole : le compte est commun.
+        """
+        self._account.record(int(self._panel.ts_close[self._row]), state)
+
+    def _account_history(self) -> AccountHistory:
+        """Le compte du panneau. Reserve au runner, pour le declarer."""
+        return self._account
 
     def _context_of(self, symbol: str) -> BarContext:
         """Le contexte d'un symbole, qu'il cote ou non a la ligne courante.
@@ -634,6 +789,7 @@ class MultiContext:
             self._panel,
             ts_close_ns,
             {s: c._positions for s, c in self._contexts.items()},
+            self._account,
         )
 
     def is_stale(self, symbol: str) -> bool:
@@ -669,17 +825,19 @@ class FrozenPeers:
     `docs/no-lookahead.md` §4.1 refuse explicitement.
     """
 
-    __slots__ = ("_historiques", "_instant", "_panel", "_row")
+    __slots__ = ("_compte", "_historiques", "_instant", "_panel", "_row")
 
     def __init__(
         self,
         panel: Panel,
         ts_close_ns: int,
         historiques: dict[str, PositionHistory] | None = None,
+        compte: AccountHistory | None = None,
     ) -> None:
         self._panel = panel
         self._instant = ts_close_ns
         self._row = -1  # cherche a la PREMIERE demande, pas ici
+        self._compte = compte
         self._historiques = historiques or {}
         """Historiques de position, par symbole.
 
@@ -726,6 +884,8 @@ class FrozenPeers:
         historique = self._historiques.get(symbol)
         if historique is not None:
             ctx._share_positions(historique)
+        if self._compte is not None:
+            ctx._share_account(self._compte)
         # Le pair peut lui-meme atteindre les autres, au MEME instant fige :
         # `peer(A, peer(B, ...))` doit rester coherent.
         ctx._set_peers(self)
@@ -736,7 +896,9 @@ class FrozenPeers:
 
     def at_instant(self, ts_close_ns: int) -> PeerResolver:
         """Reculer encore depuis une vue deja reculee reste possible."""
-        return FrozenPeers(self._panel, ts_close_ns, self._historiques)
+        return FrozenPeers(
+            self._panel, ts_close_ns, self._historiques, self._compte
+        )
 
 
 class PanelFeed:

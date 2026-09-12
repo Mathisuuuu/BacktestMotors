@@ -58,8 +58,8 @@ d'origine :
 
 Un `BarContext` porte exactement QUATRE choses : `_store`, `_i`, `_position`
 et `_peers`. La cle en couvre deux. Les deux autres ne sont atteignables que
-par les noeuds `peer` et `position`, et aucun des deux n'est une fonction de
-`(serie, barre)` :
+par les noeuds `peer`, `position` et `account`, et aucun des trois n'est une
+fonction de `(serie, barre)` :
 
 - `_peers` designe un PANNEAU, que la cle n'identifie pas. Deux panneaux
   partageant le meme magasin d'ES donneraient des valeurs differentes a la
@@ -67,7 +67,8 @@ par les noeuds `peer` et `position`, et aucun des deux n'est une fonction de
 - `_position` designe un HISTORIQUE de positions, propre a un run et a une
   strategie. La cle ne l'identifie pas davantage qu'elle n'identifie le
   panneau. (Jusqu'au 2026-09-11 la raison etait differente : `shifted`
-  recopiait l'etat courant. Corrige - mais le refus, lui, subsiste.)
+  recopiait l'etat courant. Corrige - mais le refus, lui, subsiste.) Le
+  compte, ajoute le 2026-09-12, est dans le meme cas et pour la meme raison.
 
 D'ou la regle, qui n'est pas une precaution mais une demonstration : un
 sous-arbre est memoisable si et seulement s'il ne contient ni `peer` ni
@@ -239,7 +240,9 @@ def _calculer(inner: Evaluable, vue: Context) -> Resultat:
         return LEVE
 
 
-NOEUDS_NON_MEMOISABLES: Final[frozenset[str]] = frozenset({"peer", "position"})
+NOEUDS_NON_MEMOISABLES: Final[frozenset[str]] = frozenset(
+    {"peer", "position", "account"}
+)
 """Les seuls noeuds dont la valeur depend d'autre chose que `(serie, barre)`.
 
 La liste est complete, et demontrable : un `BarContext` porte `_store`, `_i`,

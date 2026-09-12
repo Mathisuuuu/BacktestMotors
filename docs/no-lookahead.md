@@ -123,6 +123,31 @@ construction, et son suivi ne survit pas à la fin de `run()`.
 **Hors runner, la position est toujours à plat.** Un `Context` construit à la
 main ne peut pas inventer une position que personne n'a prise.
 
+**Le compte est exposé au même titre** (depuis le 2026-09-12). `account_value`
+donne l'equity, le cash, le sommet, le drawdown et le rendement depuis le
+début du run. L'argument du §2.5 tient mot pour mot, et le changement
+d'échelle ne l'affaiblit pas : l'equity à la barre `t` vient des fills — donc
+de barres closes — et des marques de la barre `t`, close elle aussi. La
+stratégie n'apprend rien qu'elle n'ait elle-même provoqué ; la boucle de
+rétroaction est dans le **temps**, jamais à l'intérieur d'une barre.
+
+Trois différences avec `position`, toutes délibérées :
+
+- c'est une **méthode**, pas une propriété, comme `session_value` — elle lève
+  quand aucun compte n'est tenu, et `isinstance` sur un `Protocol` évalue les
+  propriétés ;
+- **hors runner elle lève** au lieu de rendre un défaut. Une position est plate
+  par déduction ; une equity est *inconnue*, et rendre zéro ferait d'un
+  `drawdown` une division par zéro silencieuse ;
+- **un seul compte par portefeuille**, là où les positions sont par instrument.
+
+Le piège à connaître, qui n'est pas un défaut du socle : une règle qui lit son
+propre drawdown se referme sur elle-même. Couper à −10 % change l'equity, donc
+le drawdown, donc les coupes suivantes. Le backtest reste juste — il simule
+exactement cela — mais la sensibilité au seuil est bien plus forte qu'elle
+n'en a l'air, et un seuil ajusté sur l'échantillon est du sur-ajustement
+particulièrement difficile à voir.
+
 **Une vue reculée voit la position de SA barre** (depuis le 2026-09-11). Le
 runner enregistre l'état à chaque barre dans un historique **borné** porté par
 le feed, et `ctx.shifted(k)` y lit l'état de la barre `i-k`. Auparavant il

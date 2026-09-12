@@ -27,7 +27,14 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from rsl.data.feed import BarContext, BarFeed
-from rsl.data.schema import FLAT, Bar, BarStore, InstrumentSpec, PositionState
+from rsl.data.schema import (
+    FLAT,
+    AccountState,
+    Bar,
+    BarStore,
+    InstrumentSpec,
+    PositionState,
+)
 from rsl.engine.execution import (
     ExecutionConfig,
     ExecutionEngine,
@@ -292,6 +299,9 @@ class SingleAssetRunner:
             strategy.warmup_bars, self.risk.warmup_bars, self.config.min_warmup_bars
         )
         portfolio = Portfolio(self.config.initial_cash, {self.spec.symbol: self.spec})
+        # Le sommet court depuis le DEBUT du run : c'est ce qui rend
+        # `drawdown` comparable d'une barre a l'autre.
+        sommet = self.config.initial_cash
         recorder = EquityRecorder()
         counters = RunCounters(warmup_bars=warmup)
 
@@ -311,6 +321,7 @@ class SingleAssetRunner:
                 # que la strategie a annonce ; retenir au-dela serait payer
                 # pour ce que personne n'a dit vouloir lire.
                 ctx._set_position_depth(warmup)
+                ctx._account.set_initial(self.config.initial_cash)
                 profondeur_dite = True
             index = ctx.n_bars_seen - 1
             bar = ctx.bar
@@ -330,6 +341,15 @@ class SingleAssetRunner:
             track_positions(tracking, portfolio, {self.spec.symbol: bar}, index)
             ctx._set_position(
                 position_state(tracking, portfolio, self.spec.symbol, index)
+            )
+            sommet = max(sommet, equity)
+            ctx._set_account(
+                AccountState(
+                    equity=equity,
+                    cash=portfolio.cash,
+                    peak_equity=sommet,
+                    initial_equity=self.config.initial_cash,
+                )
             )
 
             if not started:
