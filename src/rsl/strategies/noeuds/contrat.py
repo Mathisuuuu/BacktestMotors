@@ -52,6 +52,25 @@ FromSpec = Callable[[SpecDict, Builder], Signal]
 
 NODE_REF: Final[str] = "#/$defs/node"
 
+NOTE_FIELD: Final[str] = "note"
+"""Champ de commentaire accepte sur TOUT noeud, et ignore par le moteur.
+
+JSON n'a pas de commentaires, et une expression declare `-1.5` ou `120` sans
+pouvoir dire d'ou ils viennent. C'est le seul manque reel de JSON face a YAML
+- mesure le 2026-09-12, le reste du proces ne tenant pas ici : les modeles
+stricts attrapent les coercions de YAML, et cinq des dix operateurs du
+vocabulaire (`>`, `>=`, `!=`, `-`, `*`) entrent en collision avec sa syntaxe,
+`>` devenant meme la chaine vide SANS erreur.
+
+Ignore, donc absent de `describe()`, donc absent du rapport de run et de
+l'empreinte. Un commentaire decrit l'INTENTION de qui a ecrit la
+specification ; le rapport decrit ce qui a TOURNE. Les deux ne se confondent
+pas, et corriger une faute de frappe dans un commentaire ne doit pas rendre
+un run incomparable a un run archive.
+
+Une LISTE vaut plusieurs lignes : JSON n'a pas de chaine multiligne.
+"""
+
 
 class FieldKind(StrEnum):
     """Nature d'un champ de noeud, du point de vue du schema."""
@@ -125,6 +144,20 @@ class NodeType:
         properties: SpecDict = {
             "type": {"const": self.name},
             "version": {"type": "integer", "const": self.version},
+            # Publie parce que le constructeur l'accepte. Un schema plus STRICT
+            # que le code refuserait ce qui tourne, et un editeur qui valide
+            # contre lui signalerait une erreur la ou il n'y en a pas - le
+            # defaut symetrique de celui que ce meme fichier evite plus bas.
+            NOTE_FIELD: {
+                "description": (
+                    "Commentaire libre, ignore par le moteur. Une liste vaut "
+                    "plusieurs lignes."
+                ),
+                "oneOf": [
+                    {"type": "string"},
+                    {"type": "array", "items": {"type": "string"}},
+                ],
+            },
         }
         for field_ in self.fields:
             properties[field_.name] = field_.json_schema()
@@ -276,14 +309,34 @@ def build_signal(spec: SpecDict) -> Signal:
     # ce qui fait coincider ce constructeur avec le schema publie, qui pose
     # `additionalProperties: false` ; un schema plus strict que le code laisse
     # passer a l'execution ce qu'il pretend interdire.
-    allowed = {"type", "version"} | {f.name for f in node_type.fields}
+    allowed = {"type", "version", NOTE_FIELD} | {f.name for f in node_type.fields}
     unknown = sorted(set(spec) - allowed)
     if unknown:
         raise ConfigurationError(
             f"noeud '{raw_type}' : champ(s) inconnu(s) {', '.join(unknown)}. "
             f"Attendus : {', '.join(sorted(allowed))}"
         )
+    _verifier_note(spec, raw_type)
     return node_type.from_spec(spec, build_signal)
+
+
+def _verifier_note(spec: SpecDict, raw_type: str) -> None:
+    """La note est libre, sa FORME ne l'est pas.
+
+    Un champ qu'on ne valide pas du tout est un champ ou une coquille passe :
+    `"note": {"pourquoi": "..."}` serait accepte en silence, et le jour ou
+    quelqu'un voudra afficher les notes il trouvera des formes inattendues.
+    Texte, ou liste de textes.
+    """
+    valeur = spec.get(NOTE_FIELD)
+    if valeur is None or isinstance(valeur, str):
+        return
+    if isinstance(valeur, list) and all(isinstance(v, str) for v in valeur):
+        return
+    raise ConfigurationError(
+        f"noeud '{raw_type}' : `{NOTE_FIELD}` doit etre un texte ou une liste "
+        f"de textes, recu {type(valeur).__name__}"
+    )
 
 
 def _child(spec: SpecDict, key: str, build: Builder) -> Signal:

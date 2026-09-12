@@ -260,6 +260,41 @@ demain y est couverte sans qu'une ligne soit ecrite. Il a trouve trois defauts
 reels le jour de sa mise en place, dont deux qu'aucune relecture n'aurait vus
 ([[lessons]] L16).
 
+## Dire POURQUOI : le champ `note`
+
+JSON n'a pas de commentaires. Depuis le 2026-09-12, **tout bloc de
+specification et tout noeud de signal** accepte un champ `note` - un texte, ou
+une liste de textes pour plusieurs lignes.
+
+```json
+{ "type": "rolling", "stat": "zscore", "window": 120,
+  "note": "120 jours ~ six mois de seances",
+  "inner": { "type": "price", "field": "close" } }
+```
+
+Trois proprietes, toutes verifiees par
+[tests/unit/test_notes.py](../../tests/unit/test_notes.py) :
+
+- **elle ne change aucun chiffre** - ni le `config_hash`, ni l'empreinte de
+  resultat. Reformuler un commentaire ne rend pas un run incomparable a un run
+  archive ;
+- **elle n'ouvre rien** : `extra="forbid"` reste entier, une coquille est
+  toujours une erreur, et la FORME de la note est verifiee (texte ou liste de
+  textes, pas un objet) ;
+- **elle ne survit pas a `describe()`** : un commentaire decrit l'INTENTION de
+  qui a ecrit la specification, le rapport decrit ce qui a TOURNE.
+
+Consequence : `note` est un mot **reserve**. Une cle de ce nom dans une
+specification est un commentaire, jamais une donnee.
+
+Le squelette ne le repete pas sur chacun des 22 noeuds - la regle vaut pour
+tous, elle est dite une fois dans ses `contraintes`.
+
+Pourquoi ce champ plutot qu'un changement de format : YAML a ete envisage et
+mesure le meme jour, puis ecarte ([[Failed Ideas/ledger]]). Cinq des dix
+operateurs du vocabulaire cassent quand on les ecrit a la main en YAML, et
+`>` - le plus courant - y devient la chaine vide sans une erreur.
+
 ## Les cles de `rules` : une liste, et elle est fermee
 
 Les neuf cles acceptees sont `entry_long`, `exit_long`, `entry_short`,

@@ -518,3 +518,42 @@ echouait sur du code juste, pour la meme raison mathematique que le defaut
 qu'il devait attraper.
 
 Fonde sur [[experiments/paire-es-nq-retour-a-la-moyenne]] · [[log]] (2026-09-11)
+
+---
+
+## L19 -- Une garantie qui tient sur la partie TYPEE peut tomber sur la partie libre
+
+Le champ `note` devait ne changer aucun chiffre : `Field(exclude=True)` le
+retire de `model_dump`, donc de `canonical()`, donc du `config_hash`. Verifie
+sur une specification : identique. Publie.
+
+Et faux la ou il comptait le plus.
+
+Les noeuds de signaux vivent dans `strategy.params.rules`, que
+`RuleStrategyParams` declare `dict[str, object]` - une region **libre**, que
+pydantic recopie telle quelle. `exclude=True` n'y a aucune prise, puisqu'il
+n'y a pas de champ a exclure. Annoter un seuil changeait donc le
+`config_hash` : mesure, `c686c31f` -> `bf0f2f3f` sur
+`examples/paire_es_nq.json`.
+
+La dissymetrie est le point a retenir. Ce depot protege sa partie typee par
+trois mecanismes - `frozen`, `extra="forbid"`, `exclude` - et **aucun des
+trois ne s'applique a un `dict[str, object]`**. Or c'est precisement la que
+vit l'expressivite : le vocabulaire de signaux est libre par construction, et
+c'est un choix defendu au ledger (dupliquer le registre dans un schema
+pydantic le ferait diverger de lui).
+
+Consequence : toute garantie formulee sur « la specification » doit etre
+verifiee DEUX fois, une fois sur un bloc type, une fois sur un noeud enfoui.
+Mon premier test ne faisait que la premiere - il passait.
+
+Ce qui l'a trouve : un test qui prenait un exemple REEL et annote, plutot
+qu'un objet construit dans le test. Les fixtures minimales n'ont pas de
+region libre a exercer.
+
+Le remede est dans `canonical()`, qui retire les notes a toute profondeur -
+recursif plutot que cible, pour qu'une region libre apparue demain soit
+couverte sans qu'on y pense. Effet de bord assume : `note` devient un mot
+RESERVE dans une specification.
+
+Fonde sur [[Failed Ideas/ledger]] (2026-09-12) · [[log]] (2026-09-12)

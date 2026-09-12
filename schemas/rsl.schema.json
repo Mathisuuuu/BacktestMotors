@@ -66,6 +66,25 @@
             "default": null,
             "title": "Max Gap Seconds"
           },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Commentaire libre. Ignore par le moteur, EXCLU du config_hash. Une liste de chaines vaut plusieurs lignes.",
+            "title": "Note"
+          },
           "path": {
             "format": "path",
             "title": "Path",
@@ -168,6 +187,25 @@
             "default": null,
             "title": "Max Fill Gap Seconds"
           },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Commentaire libre. Ignore par le moteur, EXCLU du config_hash. Une liste de chaines vaut plusieurs lignes.",
+            "title": "Note"
+          },
           "slippage": {
             "$ref": "#/$defs/SlippageSpec"
           }
@@ -191,6 +229,25 @@
             ],
             "title": "Kind",
             "type": "string"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Commentaire libre. Ignore par le moteur, EXCLU du config_hash. Une liste de chaines vaut plusieurs lignes.",
+            "title": "Note"
           },
           "per_contract": {
             "anyOf": [
@@ -253,6 +310,25 @@
             ],
             "default": null,
             "title": "Max Ffill Bars"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Commentaire libre. Ignore par le moteur, EXCLU du config_hash. Une liste de chaines vaut plusieurs lignes.",
+            "title": "Note"
           }
         },
         "title": "PanelSpec",
@@ -288,6 +364,25 @@
             "title": "N",
             "type": "integer"
           },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Commentaire libre. Ignore par le moteur, EXCLU du config_hash. Une liste de chaines vaut plusieurs lignes.",
+            "title": "Note"
+          },
           "offset": {
             "default": 0,
             "minimum": 0,
@@ -313,6 +408,25 @@
             ],
             "default": null,
             "title": "Max Gross Contracts"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Commentaire libre. Ignore par le moteur, EXCLU du config_hash. Une liste de chaines vaut plusieurs lignes.",
+            "title": "Note"
           },
           "sizing": {
             "$ref": "#/$defs/SizingSpec",
@@ -341,6 +455,25 @@
             "description": "Heure de fermeture locale, 'HH:MM'",
             "title": "End",
             "type": "string"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Commentaire libre. Ignore par le moteur, EXCLU du config_hash. Une liste de chaines vaut plusieurs lignes.",
+            "title": "Note"
           },
           "start": {
             "description": "Heure d'ouverture locale, 'HH:MM'",
@@ -429,6 +562,25 @@
             "description": "Plafond obligatoire pour kind='signal' : une expression arbitraire n'est pas bornee.",
             "title": "Max Contracts"
           },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Commentaire libre. Ignore par le moteur, EXCLU du config_hash. Une liste de chaines vaut plusieurs lignes.",
+            "title": "Note"
+          },
           "signal": {
             "anyOf": [
               {
@@ -499,6 +651,25 @@
             "title": "Kind",
             "type": "string"
           },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Commentaire libre. Ignore par le moteur, EXCLU du config_hash. Une liste de chaines vaut plusieurs lignes.",
+            "title": "Note"
+          },
           "ticks": {
             "anyOf": [
               {
@@ -522,6 +693,25 @@
       "StrategySpec": {
         "additionalProperties": false,
         "properties": {
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Commentaire libre. Ignore par le moteur, EXCLU du config_hash. Une liste de chaines vaut plusieurs lignes.",
+            "title": "Note"
+          },
           "params": {
             "additionalProperties": true,
             "title": "Params",
@@ -581,6 +771,25 @@
         "minLength": 1,
         "title": "Name",
         "type": "string"
+      },
+      "note": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "description": "Commentaire libre. Ignore par le moteur, EXCLU du config_hash. Une liste de chaines vaut plusieurs lignes.",
+        "title": "Note"
       },
       "panel": {
         "$ref": "#/$defs/PanelSpec",
@@ -668,6 +877,20 @@
             "additionalProperties": false,
             "description": "Conjonction : vrai si tous les sous-signaux sont vrais.",
             "properties": {
+              "note": {
+                "description": "Commentaire libre, ignore par le moteur. Une liste vaut plusieurs lignes.",
+                "oneOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  }
+                ]
+              },
               "operands": {
                 "items": {
                   "$ref": "#/$defs/node"
@@ -694,6 +917,20 @@
             "additionalProperties": false,
             "description": "Disjonction : vrai si au moins un sous-signal est vrai.",
             "properties": {
+              "note": {
+                "description": "Commentaire libre, ignore par le moteur. Une liste vaut plusieurs lignes.",
+                "oneOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  }
+                ]
+              },
               "operands": {
                 "items": {
                   "$ref": "#/$defs/node"
@@ -722,6 +959,20 @@
             "properties": {
               "left": {
                 "$ref": "#/$defs/node"
+              },
+              "note": {
+                "description": "Commentaire libre, ignore par le moteur. Une liste vaut plusieurs lignes.",
+                "oneOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  }
+                ]
               },
               "op": {
                 "enum": [
@@ -763,6 +1014,20 @@
                 "minimum": 1,
                 "type": "integer"
               },
+              "note": {
+                "description": "Commentaire libre, ignore par le moteur. Une liste vaut plusieurs lignes.",
+                "oneOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  }
+                ]
+              },
               "type": {
                 "const": "bars_since"
               },
@@ -785,6 +1050,20 @@
             "properties": {
               "left": {
                 "$ref": "#/$defs/node"
+              },
+              "note": {
+                "description": "Commentaire libre, ignore par le moteur. Une liste vaut plusieurs lignes.",
+                "oneOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  }
+                ]
               },
               "op": {
                 "enum": [
@@ -821,6 +1100,20 @@
             "additionalProperties": false,
             "description": "Valeur litterale, independante du contexte.",
             "properties": {
+              "note": {
+                "description": "Commentaire libre, ignore par le moteur. Une liste vaut plusieurs lignes.",
+                "oneOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  }
+                ]
+              },
               "type": {
                 "const": "constant"
               },
@@ -846,6 +1139,20 @@
             "properties": {
               "fast": {
                 "$ref": "#/$defs/node"
+              },
+              "note": {
+                "description": "Commentaire libre, ignore par le moteur. Une liste vaut plusieurs lignes.",
+                "oneOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  }
+                ]
               },
               "slow": {
                 "$ref": "#/$defs/node"
@@ -873,6 +1180,20 @@
               "fast": {
                 "$ref": "#/$defs/node"
               },
+              "note": {
+                "description": "Commentaire libre, ignore par le moteur. Une liste vaut plusieurs lignes.",
+                "oneOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  }
+                ]
+              },
               "slow": {
                 "$ref": "#/$defs/node"
               },
@@ -898,6 +1219,20 @@
             "properties": {
               "inner": {
                 "$ref": "#/$defs/node"
+              },
+              "note": {
+                "description": "Commentaire libre, ignore par le moteur. Une liste vaut plusieurs lignes.",
+                "oneOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  }
+                ]
               },
               "stat": {
                 "enum": [
@@ -934,6 +1269,20 @@
               "condition": {
                 "$ref": "#/$defs/node"
               },
+              "note": {
+                "description": "Commentaire libre, ignore par le moteur. Une liste vaut plusieurs lignes.",
+                "oneOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  }
+                ]
+              },
               "otherwise": {
                 "$ref": "#/$defs/node"
               },
@@ -969,6 +1318,20 @@
               "inner": {
                 "$ref": "#/$defs/node"
               },
+              "note": {
+                "description": "Commentaire libre, ignore par le moteur. Une liste vaut plusieurs lignes.",
+                "oneOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  }
+                ]
+              },
               "type": {
                 "const": "lag"
               },
@@ -991,6 +1354,20 @@
             "properties": {
               "inner": {
                 "$ref": "#/$defs/node"
+              },
+              "note": {
+                "description": "Commentaire libre, ignore par le moteur. Une liste vaut plusieurs lignes.",
+                "oneOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  }
+                ]
               },
               "op": {
                 "enum": [
@@ -1026,6 +1403,20 @@
             "additionalProperties": false,
             "description": "Plus grande valeur parmi plusieurs sous-signaux.",
             "properties": {
+              "note": {
+                "description": "Commentaire libre, ignore par le moteur. Une liste vaut plusieurs lignes.",
+                "oneOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  }
+                ]
+              },
               "operands": {
                 "items": {
                   "$ref": "#/$defs/node"
@@ -1052,6 +1443,20 @@
             "additionalProperties": false,
             "description": "Plus petite valeur parmi plusieurs sous-signaux.",
             "properties": {
+              "note": {
+                "description": "Commentaire libre, ignore par le moteur. Une liste vaut plusieurs lignes.",
+                "oneOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  }
+                ]
+              },
               "operands": {
                 "items": {
                   "$ref": "#/$defs/node"
@@ -1081,6 +1486,20 @@
               "inner": {
                 "$ref": "#/$defs/node"
               },
+              "note": {
+                "description": "Commentaire libre, ignore par le moteur. Une liste vaut plusieurs lignes.",
+                "oneOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  }
+                ]
+              },
               "type": {
                 "const": "not"
               },
@@ -1102,6 +1521,20 @@
             "properties": {
               "inner": {
                 "$ref": "#/$defs/node"
+              },
+              "note": {
+                "description": "Commentaire libre, ignore par le moteur. Une liste vaut plusieurs lignes.",
+                "oneOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  }
+                ]
               },
               "symbol": {
                 "description": "Symbole du panneau, ex. 'NQ.v.0'.",
@@ -1140,6 +1573,20 @@
                 ],
                 "type": "string"
               },
+              "note": {
+                "description": "Commentaire libre, ignore par le moteur. Une liste vaut plusieurs lignes.",
+                "oneOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  }
+                ]
+              },
               "type": {
                 "const": "position"
               },
@@ -1175,6 +1622,20 @@
                 "minimum": 0,
                 "type": "integer"
               },
+              "note": {
+                "description": "Commentaire libre, ignore par le moteur. Une liste vaut plusieurs lignes.",
+                "oneOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  }
+                ]
+              },
               "type": {
                 "const": "price"
               },
@@ -1193,6 +1654,20 @@
             "additionalProperties": false,
             "description": "Feuille : une primitive du registre, parametres figes.",
             "properties": {
+              "note": {
+                "description": "Commentaire libre, ignore par le moteur. Une liste vaut plusieurs lignes.",
+                "oneOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  }
+                ]
+              },
               "params": {
                 "description": "Parametres de la primitive. Leur schema depend de `ref` et ne peut donc pas etre fige ici : il est publie par le catalogue des primitives, une entree par reference.",
                 "type": "object"
@@ -1222,6 +1697,20 @@
             "properties": {
               "inner": {
                 "$ref": "#/$defs/node"
+              },
+              "note": {
+                "description": "Commentaire libre, ignore par le moteur. Une liste vaut plusieurs lignes.",
+                "oneOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  }
+                ]
               },
               "stat": {
                 "enum": [
@@ -1290,6 +1779,20 @@
                 "minimum": 0,
                 "type": "integer"
               },
+              "note": {
+                "description": "Commentaire libre, ignore par le moteur. Une liste vaut plusieurs lignes.",
+                "oneOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  }
+                ]
+              },
               "type": {
                 "const": "session"
               },
@@ -1322,6 +1825,20 @@
                 ],
                 "type": "string"
               },
+              "note": {
+                "description": "Commentaire libre, ignore par le moteur. Une liste vaut plusieurs lignes.",
+                "oneOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  }
+                ]
+              },
               "type": {
                 "const": "time"
               },
@@ -1348,6 +1865,25 @@
     "buy_and_hold@1": {
       "additionalProperties": false,
       "properties": {
+        "note": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Commentaire libre. Ignore par le moteur, EXCLU du config_hash. Une liste de chaines vaut plusieurs lignes.",
+          "title": "Note"
+        },
         "quantity": {
           "default": 1,
           "title": "Quantity",
@@ -1387,6 +1923,25 @@
           "title": "N Short",
           "type": "integer"
         },
+        "note": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Commentaire libre. Ignore par le moteur, EXCLU du config_hash. Une liste de chaines vaut plusieurs lignes.",
+          "title": "Note"
+        },
         "quantity": {
           "default": 1,
           "title": "Quantity",
@@ -1417,6 +1972,25 @@
           "default": 0,
           "title": "Extra Warmup",
           "type": "integer"
+        },
+        "note": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Commentaire libre. Ignore par le moteur, EXCLU du config_hash. Une liste de chaines vaut plusieurs lignes.",
+          "title": "Note"
         }
       },
       "title": "MultiRuleParams",
@@ -1435,6 +2009,25 @@
           "default": 0,
           "title": "Extra Warmup",
           "type": "integer"
+        },
+        "note": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Commentaire libre. Ignore par le moteur, EXCLU du config_hash. Une liste de chaines vaut plusieurs lignes.",
+          "title": "Note"
         },
         "quantity": {
           "default": 1,
@@ -1494,6 +2087,25 @@
           "title": "N Short",
           "type": "integer"
         },
+        "note": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Commentaire libre. Ignore par le moteur, EXCLU du config_hash. Une liste de chaines vaut plusieurs lignes.",
+          "title": "Note"
+        },
         "quantity": {
           "default": 1,
           "title": "Quantity",
@@ -1521,6 +2133,25 @@
           "default": 0,
           "title": "Extra Warmup",
           "type": "integer"
+        },
+        "note": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Commentaire libre. Ignore par le moteur, EXCLU du config_hash. Une liste de chaines vaut plusieurs lignes.",
+          "title": "Note"
         },
         "quantity": {
           "default": 1,
@@ -1573,6 +2204,25 @@
           "default": 20,
           "title": "Fast Window",
           "type": "integer"
+        },
+        "note": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Commentaire libre. Ignore par le moteur, EXCLU du config_hash. Une liste de chaines vaut plusieurs lignes.",
+          "title": "Note"
         },
         "quantity": {
           "default": 1,

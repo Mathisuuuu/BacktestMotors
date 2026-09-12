@@ -17,9 +17,9 @@ generated: true
 | Indicateur | Valeur |
 |---|---|
 | Pages de wiki | 23 |
-| Entrees de log | 101 |
-| Derniere activite | 2026-09-11 |
-| Idees ecartees (ledger) | 17 |
+| Entrees de log | 106 |
+| Derniere activite | 2026-09-12 |
+| Idees ecartees (ledger) | 18 |
 | Idees en attente (ledger) | 3 |
 | Pages `Failed Ideas/` | 1 |
 | Pages `concepts/` | 6 |
@@ -27,7 +27,7 @@ generated: true
 | Pages `reference/` | 7 |
 | Pages `research/` | 1 |
 
-**Activite par type :** note × 50, fix × 22, feat × 12, decision × 11, experiment × 2, setup × 1, lint × 1, audit × 1, refactor × 1
+**Activite par type :** note × 52, fix × 23, feat × 13, decision × 12, experiment × 2, setup × 1, lint × 1, audit × 1, refactor × 1
 
 ## Experiences
 
@@ -42,14 +42,14 @@ Le total des essais alimente le Deflated Sharpe : un essai non enregistre gonfle
 
 ## Derniere activite — 8 entree(s)
 
+- **2026-09-12** — note | fausse alerte de duree, tranchee par une seconde mesure | la suite complete a rendu 4 747 s (79 min) une fois, contre ~100 s d'habitude. Verifie plutot que suppose : suite rapide 41,7 s, partie `slow` normale, suite complete 67 s au passage suivant. Contention externe, pas une regression
+- **2026-09-12** — note | trouve par un test sur un exemple REEL, pas sur une fixture | les objets construits dans un test n'ont pas de region libre a exercer : mon test « une note ne change pas le config_hash » passait sur une specification minimale et ratait le cas des noeuds. Celui qui a trouve le defaut lisait `examples/paire_es_nq.json` apres l'avoir annote
+- **2026-09-12** — fix | ma premiere version de `note` cassait le `config_hash` la ou elle comptait le plus | `Field(exclude=True)` protege les blocs TYPES, et ne peut rien pour les noeuds, qui vivent dans `strategy.params.rules` -- un `dict[str, object]` que pydantic recopie tel quel. Annoter un seuil faisait passer le `config_hash` de `c686c31f` a `bf0f2f3f`. Corrige : `canonical()` retire les notes a toute profondeur, recursivement, pour qu'une region libre apparue demain soit couverte. `note` devient un mot RESERVE dans une specification -> [[lessons]] L19
+- **2026-09-12** — feat | champ `note` : le seul manque reel de JSON, comble sans changer de format | accepte sur tout bloc de specification, tout jeu de parametres de strategie, et TOUT noeud de signal. Texte, ou liste de textes pour plusieurs lignes -- JSON n'ayant pas de chaine multiligne. Ignore par le moteur, absent de `describe()`, absent du rapport. Publie dans les trois contrats engendres, mais dit UNE FOIS dans `contraintes` plutot que repete sur chacun des 22 noeuds. `examples/paire_es_nq.json` est annote pour que la fonctionnalite soit exercee et pas seulement publiee
+- **2026-09-12** — decision | YAML envisage puis ecarte, sur trois mesures et non sur un gout | (1) cinq des dix operateurs du vocabulaire cassent ecrits a la main sans guillemets -- `>` devient la chaine VIDE sans erreur, `>=`, `!=`, `-` et `*` levent ; (2) le proces habituel fait a YAML ne tenait pas ici : `17:00` -> `1020` et `NO` -> `False` sont bien produits, mais les modeles stricts les REFUSENT, donc le danger etait ergonomique et non une faille ; (3) YAML gagne reellement en compacite (21 lignes contre 29, indentation 8 contre 10) mais les arbres descendent a la profondeur 12, ou l'absence de delimiteur de fermeture coute plus qu'elle ne rapporte. PyYAML installe dans le bac a sable seulement, pour mesurer plutot qu'affirmer -> [[Failed Ideas/ledger]]
 - **2026-09-11** — note | mes trois premiers tests par le runner echouaient, et ils avaient tort | le `Watcher` lisait cinq barres en arriere sans declarer de `warmup_bars` : la borne a refuse, exactement comme elle doit. Une strategie a REGLES, elle, derive son warmup de son arbre -- le cas reel etait donc sur, et c'est le montage a la main qui devait etre corrige. Un test de plus verifie desormais ce chemin declaratif
 - **2026-09-11** — fix | ma premiere purge de l'historique balayait tout le dictionnaire a chaque barre | O(portee) par barre, soit 740 millions d'operations sur les 3,7 M de barres minute d'ES pour une profondeur de 200. Remplacee par un retrait en O(1) -- le runner enregistre barre par barre, donc une seule cle sort de la fenetre a chaque appel. Le balayage reste en secours pour le cas non sequentiel. Verifie sans regression : 11,2-12,3 ms des deux cotes sur `_moule_universel`, soit du bruit
 - **2026-09-11** — fix | trou referme, que j'avais introduit deux heures plus tot avec `FrozenPeers` | le resolveur de pairs fige construisait un `BarContext` neuf, donc sans historique de position : `peer(NQ, position("quantity"))` rendait zero depuis une vue reculee alors qu'il rendait la bonne valeur depuis la vue courante. Aucun exemple ne l'exercait, donc aucune empreinte ne l'aurait signale. Trouve en enumerant ce que `FrozenPeers` ne transmettait pas
-- **2026-09-11** — decision | l'historique de positions est BORNE par le `warmup_bars` declare, et ce qui est hors borne est distingue | un etat par barre sur 3,7 M de barres minute pese des centaines de Mo. La borne est le budget de lecture en arriere que la strategie annonce elle-meme -- une strategie a regles le derive de son arbre, donc le cas declaratif n'a rien a regler. Deux cas hors borne, traites differemment : AVANT la premiere barre enregistree, « a plat » est une DEDUCTION (le runner n'appelle pas la strategie pendant le prechauffage, aucun ordre n'a pu etre emis) ; AU-DELA de la borne, ca leve, plutot que de rendre un etat plat qui passerait pour une mesure
-- **2026-09-11** — fix | `position` sous une vue reculee : meme defaut que `peer`, corrige le meme jour | `shifted` recopiait l'etat COURANT, donc `rolling(mean, 20, position("bars_held"))` lisait vingt fois la meme valeur, en silence. Le runner enregistre desormais l'etat a chaque barre dans un `PositionHistory` porte par le feed, et `shifted(k)` y lit la barre `i-k`. **Les 7 empreintes sont inchangees** : aucun exemple ne lisait `position` sous un noeud qui recule, ce qui a ete VERIFIE avant de toucher au code plutot que constate apres
-- **2026-09-11** — experiment | paire ES/NQ : premiers chiffres ou le terme distant compte | Sharpe 0,61, 149 trades, profit factor 1,77 sur 2633 barres quotidiennes. **A ne pas lire comme une amelioration** : l'ancien 0,24 venait d'une strategie DIFFERENTE, qui ne regardait pas NQ. Un seul echantillon, aucun walk-forward, seuils herites de l'epoque ou le signal etait inerte, roulement non ajuste. Verdict `non-conclusif` -> [[experiments/paire-es-nq-retour-a-la-moyenne]]
-- **2026-09-11** — note | mon premier test de la correction echouait sur du code juste, pour la meme raison mathematique que le defaut | montage : `A = 100 + k` et `B = 1000 + 10k`, dont le ratio vaut 0,1 pour TOUT k. Deux rampes proportionnelles sont un cas degenere qui annule le terme a verifier. Corrige en prenant `B = 500 + 7k`
-- **2026-09-11** — note | ce qui ne pouvait pas voir ce defaut, et pourquoi les empreintes en font partie | tests unitaires (chaque noeud pris seul est juste), `mypy`/`ruff` (rien d'incorrect), corruption du futur (aucune fuite : `NQ[t]` lu en `t` est du passe), relecture (`sub._set_peers(self._peers)` est la ligne qu'on ecrit) -- et les EMPREINTES, qui garantissent qu'un resultat ne change pas, jamais qu'il est juste. Un defaut deterministe leur est transparent par construction -> [[lessons]] L18
 
 ## Next Actions
 

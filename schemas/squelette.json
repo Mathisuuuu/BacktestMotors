@@ -11,6 +11,15 @@
     "exit_quantity"
   ],
   "contraintes": [
+    "TOUT bloc de cette specification et TOUT noeud de signal accepte un champ",
+    "`note` : un texte, ou une liste de textes pour plusieurs lignes. Il est",
+    "ignore par le moteur et n'entre PAS dans le `config_hash` - deux",
+    "specifications qui ne different que par leurs notes restent comparables.",
+    "JSON n'ayant pas de commentaires, c'est le seul endroit ou dire POURQUOI",
+    "un seuil vaut ce qu'il vaut. Il n'est volontairement liste nulle part",
+    "ailleurs dans ce document : le repeter sur chacun des blocs et chacun des",
+    "noeuds noierait ce qui distingue reellement un noeud d'un autre.",
+    "",
     "Un meme instrument ne peut apparaitre qu'une fois dans `data` : deux",
     "granularites du meme symbole sont refusees ('X apparait deux fois').",
     "",

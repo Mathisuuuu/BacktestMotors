@@ -82,6 +82,15 @@ MODE_D_EMPLOI = [
 ]
 
 CONTRAINTES = [
+    "TOUT bloc de cette specification et TOUT noeud de signal accepte un champ",
+    "`note` : un texte, ou une liste de textes pour plusieurs lignes. Il est",
+    "ignore par le moteur et n'entre PAS dans le `config_hash` - deux",
+    "specifications qui ne different que par leurs notes restent comparables.",
+    "JSON n'ayant pas de commentaires, c'est le seul endroit ou dire POURQUOI",
+    "un seuil vaut ce qu'il vaut. Il n'est volontairement liste nulle part",
+    "ailleurs dans ce document : le repeter sur chacun des blocs et chacun des",
+    "noeuds noierait ce qui distingue reellement un noeud d'un autre.",
+    "",
     "Un meme instrument ne peut apparaitre qu'une fois dans `data` : deux",
     "granularites du meme symbole sont refusees ('X apparait deux fois').",
     "",
@@ -177,12 +186,17 @@ def _resoudre(schema: SpecDict, defs: SpecDict) -> SpecDict:
 
 
 def _champs(schema: SpecDict, defs: SpecDict) -> SpecDict:
+    """Les champs d'un bloc, `note` retire.
+
+    Meme raison que pour les noeuds : il vaut pour TOUS les blocs, il est donc
+    dit une fois dans `contraintes` plutot que repete partout.
+    """
     requis = set(schema.get("required", []))
     proprietes = schema.get("properties", {})
     return {
         nom: _slot(corps, defs, requis=nom in requis)
         for nom, corps in proprietes.items()
-        if isinstance(corps, dict)
+        if isinstance(corps, dict) and nom != "note"
     }
 
 
@@ -269,7 +283,10 @@ def _champs_de_noeud(schema: SpecDict) -> SpecDict:
     requis = set(schema.get("required", []))
     sortie: SpecDict = {}
     for nom, corps in schema.get("properties", {}).items():
-        if nom in ("type", "version") or not isinstance(corps, dict):
+        # `note` est retire comme `type` et `version` : il vaut pour TOUS les
+        # noeuds, il est donc dit une fois dans `contraintes`. Le lister vingt-
+        # deux fois noierait ce qui distingue un noeud d'un autre.
+        if nom in ("type", "version", "note") or not isinstance(corps, dict):
             continue
         if corps.get("$ref", "").endswith("/node"):
             sortie[nom] = {"type": "noeud", "requis": nom in requis}

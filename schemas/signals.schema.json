@@ -6,6 +6,20 @@
           "additionalProperties": false,
           "description": "Conjonction : vrai si tous les sous-signaux sont vrais.",
           "properties": {
+            "note": {
+              "description": "Commentaire libre, ignore par le moteur. Une liste vaut plusieurs lignes.",
+              "oneOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                }
+              ]
+            },
             "operands": {
               "items": {
                 "$ref": "#/$defs/node"
@@ -32,6 +46,20 @@
           "additionalProperties": false,
           "description": "Disjonction : vrai si au moins un sous-signal est vrai.",
           "properties": {
+            "note": {
+              "description": "Commentaire libre, ignore par le moteur. Une liste vaut plusieurs lignes.",
+              "oneOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                }
+              ]
+            },
             "operands": {
               "items": {
                 "$ref": "#/$defs/node"
@@ -60,6 +88,20 @@
           "properties": {
             "left": {
               "$ref": "#/$defs/node"
+            },
+            "note": {
+              "description": "Commentaire libre, ignore par le moteur. Une liste vaut plusieurs lignes.",
+              "oneOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                }
+              ]
             },
             "op": {
               "enum": [
@@ -101,6 +143,20 @@
               "minimum": 1,
               "type": "integer"
             },
+            "note": {
+              "description": "Commentaire libre, ignore par le moteur. Une liste vaut plusieurs lignes.",
+              "oneOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                }
+              ]
+            },
             "type": {
               "const": "bars_since"
             },
@@ -123,6 +179,20 @@
           "properties": {
             "left": {
               "$ref": "#/$defs/node"
+            },
+            "note": {
+              "description": "Commentaire libre, ignore par le moteur. Une liste vaut plusieurs lignes.",
+              "oneOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                }
+              ]
             },
             "op": {
               "enum": [
@@ -159,6 +229,20 @@
           "additionalProperties": false,
           "description": "Valeur litterale, independante du contexte.",
           "properties": {
+            "note": {
+              "description": "Commentaire libre, ignore par le moteur. Une liste vaut plusieurs lignes.",
+              "oneOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                }
+              ]
+            },
             "type": {
               "const": "constant"
             },
@@ -184,6 +268,20 @@
           "properties": {
             "fast": {
               "$ref": "#/$defs/node"
+            },
+            "note": {
+              "description": "Commentaire libre, ignore par le moteur. Une liste vaut plusieurs lignes.",
+              "oneOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                }
+              ]
             },
             "slow": {
               "$ref": "#/$defs/node"
@@ -211,6 +309,20 @@
             "fast": {
               "$ref": "#/$defs/node"
             },
+            "note": {
+              "description": "Commentaire libre, ignore par le moteur. Une liste vaut plusieurs lignes.",
+              "oneOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                }
+              ]
+            },
             "slow": {
               "$ref": "#/$defs/node"
             },
@@ -236,6 +348,20 @@
           "properties": {
             "inner": {
               "$ref": "#/$defs/node"
+            },
+            "note": {
+              "description": "Commentaire libre, ignore par le moteur. Une liste vaut plusieurs lignes.",
+              "oneOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                }
+              ]
             },
             "stat": {
               "enum": [
@@ -272,6 +398,20 @@
             "condition": {
               "$ref": "#/$defs/node"
             },
+            "note": {
+              "description": "Commentaire libre, ignore par le moteur. Une liste vaut plusieurs lignes.",
+              "oneOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                }
+              ]
+            },
             "otherwise": {
               "$ref": "#/$defs/node"
             },
@@ -307,6 +447,20 @@
             "inner": {
               "$ref": "#/$defs/node"
             },
+            "note": {
+              "description": "Commentaire libre, ignore par le moteur. Une liste vaut plusieurs lignes.",
+              "oneOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                }
+              ]
+            },
             "type": {
               "const": "lag"
             },
@@ -329,6 +483,20 @@
           "properties": {
             "inner": {
               "$ref": "#/$defs/node"
+            },
+            "note": {
+              "description": "Commentaire libre, ignore par le moteur. Une liste vaut plusieurs lignes.",
+              "oneOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                }
+              ]
             },
             "op": {
               "enum": [
@@ -364,6 +532,20 @@
           "additionalProperties": false,
           "description": "Plus grande valeur parmi plusieurs sous-signaux.",
           "properties": {
+            "note": {
+              "description": "Commentaire libre, ignore par le moteur. Une liste vaut plusieurs lignes.",
+              "oneOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                }
+              ]
+            },
             "operands": {
               "items": {
                 "$ref": "#/$defs/node"
@@ -390,6 +572,20 @@
           "additionalProperties": false,
           "description": "Plus petite valeur parmi plusieurs sous-signaux.",
           "properties": {
+            "note": {
+              "description": "Commentaire libre, ignore par le moteur. Une liste vaut plusieurs lignes.",
+              "oneOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                }
+              ]
+            },
             "operands": {
               "items": {
                 "$ref": "#/$defs/node"
@@ -419,6 +615,20 @@
             "inner": {
               "$ref": "#/$defs/node"
             },
+            "note": {
+              "description": "Commentaire libre, ignore par le moteur. Une liste vaut plusieurs lignes.",
+              "oneOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                }
+              ]
+            },
             "type": {
               "const": "not"
             },
@@ -440,6 +650,20 @@
           "properties": {
             "inner": {
               "$ref": "#/$defs/node"
+            },
+            "note": {
+              "description": "Commentaire libre, ignore par le moteur. Une liste vaut plusieurs lignes.",
+              "oneOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                }
+              ]
             },
             "symbol": {
               "description": "Symbole du panneau, ex. 'NQ.v.0'.",
@@ -478,6 +702,20 @@
               ],
               "type": "string"
             },
+            "note": {
+              "description": "Commentaire libre, ignore par le moteur. Une liste vaut plusieurs lignes.",
+              "oneOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                }
+              ]
+            },
             "type": {
               "const": "position"
             },
@@ -513,6 +751,20 @@
               "minimum": 0,
               "type": "integer"
             },
+            "note": {
+              "description": "Commentaire libre, ignore par le moteur. Une liste vaut plusieurs lignes.",
+              "oneOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                }
+              ]
+            },
             "type": {
               "const": "price"
             },
@@ -531,6 +783,20 @@
           "additionalProperties": false,
           "description": "Feuille : une primitive du registre, parametres figes.",
           "properties": {
+            "note": {
+              "description": "Commentaire libre, ignore par le moteur. Une liste vaut plusieurs lignes.",
+              "oneOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                }
+              ]
+            },
             "params": {
               "description": "Parametres de la primitive. Leur schema depend de `ref` et ne peut donc pas etre fige ici : il est publie par le catalogue des primitives, une entree par reference.",
               "type": "object"
@@ -560,6 +826,20 @@
           "properties": {
             "inner": {
               "$ref": "#/$defs/node"
+            },
+            "note": {
+              "description": "Commentaire libre, ignore par le moteur. Une liste vaut plusieurs lignes.",
+              "oneOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                }
+              ]
             },
             "stat": {
               "enum": [
@@ -628,6 +908,20 @@
               "minimum": 0,
               "type": "integer"
             },
+            "note": {
+              "description": "Commentaire libre, ignore par le moteur. Une liste vaut plusieurs lignes.",
+              "oneOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                }
+              ]
+            },
             "type": {
               "const": "session"
             },
@@ -659,6 +953,20 @@
                 "year"
               ],
               "type": "string"
+            },
+            "note": {
+              "description": "Commentaire libre, ignore par le moteur. Une liste vaut plusieurs lignes.",
+              "oneOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                }
+              ]
             },
             "type": {
               "const": "time"

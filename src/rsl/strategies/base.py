@@ -27,7 +27,7 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from typing import Final
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from rsl.data.feed import Context, MultiContext
 from rsl.errors import ConfigurationError, RegistryError
@@ -37,9 +37,38 @@ SpecDict = dict[str, object]
 
 
 class StrategyParams(BaseModel):
-    """Parametres d'une strategie : immuables et fermes."""
+    """Parametres d'une strategie : immuables, fermes, annotables."""
 
     model_config = ConfigDict(frozen=True, extra="forbid")
+
+    note: str | list[str] | None = Field(
+        default=None,
+        exclude=True,
+        description=(
+            "Commentaire libre. Ignore par le moteur, EXCLU du config_hash. "
+            "Une liste de chaines vaut plusieurs lignes."
+        ),
+    )
+    """Le « pourquoi », que JSON ne permet pas d'ecrire autrement.
+
+    Un bloc de parametres declare `quantity: 4` sans pouvoir dire pourquoi
+    quatre. C'est le seul manque reel de JSON face a YAML - mesure le
+    2026-09-12 : le reste du proces fait a JSON ne tenait pas ici, les modeles
+    stricts attrapant les coercions de YAML, et cinq des dix operateurs du
+    vocabulaire (`>`, `>=`, `!=`, `-`, `*`) entrant en collision avec sa
+    syntaxe.
+
+    `exclude=True` est le point qui compte : le champ ne figure pas dans
+    `model_dump`, donc pas dans `canonical()`, donc pas dans le `config_hash`.
+    Corriger une faute de frappe dans un commentaire n'invalide pas la
+    comparaison avec un run archive. Il reste PUBLIE dans le schema engendre -
+    une machine qui ecrit une specification doit savoir qu'elle peut
+    s'expliquer.
+
+    Une LISTE pour les notes de plusieurs lignes : JSON n'a pas de chaine
+    multiligne, et `
+` au milieu d'un texte est illisible.
+    """
 
 
 class NoStrategyParams(StrategyParams):

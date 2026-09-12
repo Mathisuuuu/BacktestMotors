@@ -16,7 +16,7 @@ from __future__ import annotations
 
 from datetime import timedelta
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -65,10 +65,58 @@ from rsl.strategies.signals import build_signal
 SpecDict = dict[str, object]
 
 
+def _sans_notes(valeur: object) -> Any:
+    """Copie de `valeur` sans aucune cle `note`, a toute profondeur.
+
+    `note` est donc un mot RESERVE dans une specification : une cle de ce nom
+    y est un commentaire, jamais une donnee. Aucun champ du vocabulaire ne
+    porte ce nom, et le squelette le dit dans ses contraintes.
+
+    Recursif plutot que cible sur `strategy.params` : une region libre qui
+    apparaitrait demain ailleurs serait couverte sans qu'on y pense - et sur
+    les blocs types, ou pydantic a deja retire la note, le passage ne fait
+    rien.
+    """
+    if isinstance(valeur, dict):
+        return {c: _sans_notes(v) for c, v in valeur.items() if c != "note"}
+    if isinstance(valeur, list):
+        return [_sans_notes(v) for v in valeur]
+    return valeur
+
+
 class StrictModel(BaseModel):
-    """Base commune : immuable et fermee aux champs inconnus."""
+    """Base commune : immuable, fermee aux champs inconnus, annotable."""
 
     model_config = ConfigDict(frozen=True, extra="forbid")
+
+    note: str | list[str] | None = Field(
+        default=None,
+        exclude=True,
+        description=(
+            "Commentaire libre. Ignore par le moteur, EXCLU du config_hash. "
+            "Une liste de chaines vaut plusieurs lignes."
+        ),
+    )
+    """Le « pourquoi », que JSON ne permet pas d'ecrire autrement.
+
+    Une specification declare `-1.5` et `120` sans pouvoir dire d'ou ils
+    viennent. C'est le seul manque reel de JSON face a YAML - mesure le
+    2026-09-12 : le reste du proces fait a JSON ne tenait pas ici, les modeles
+    stricts attrapant les coercions de YAML, et cinq des dix operateurs du
+    vocabulaire (`>`, `>=`, `!=`, `-`, `*`) entrant en collision avec sa
+    syntaxe.
+
+    `exclude=True` est le point qui compte : le champ ne figure pas dans
+    `model_dump`, donc pas dans `canonical()`, donc pas dans le `config_hash`.
+    Corriger une faute de frappe dans un commentaire n'invalide pas la
+    comparaison avec un run archive. Il reste PUBLIE dans le schema engendre -
+    une machine qui ecrit une specification doit savoir qu'elle peut
+    s'expliquer.
+
+    Une LISTE pour les notes de plusieurs lignes : JSON n'a pas de chaine
+    multiligne, et `
+` au milieu d'un texte est illisible.
+    """
 
 
 # ---------------------------------------------------------------------------
@@ -394,14 +442,25 @@ class BacktestSpec(StrictModel):
     def canonical(self) -> SpecDict:
         """Forme canonique hachee dans le manifeste.
 
-        Les chemins sont normalises en absolus : deux invocations depuis des
-        repertoires differents doivent donner la meme empreinte si elles
-        designent les memes fichiers.
+        Les chemins sont normalises : deux invocations depuis des repertoires
+        differents doivent donner la meme empreinte si elles designent les
+        memes fichiers.
+
+        Les `note` sont retirees a TOUTE profondeur. Sur les blocs types,
+        pydantic s'en charge deja (`exclude=True`) - mais les noeuds de
+        signaux vivent dans une region LIBRE (`strategy.params.rules`, que
+        `RuleStrategyParams` declare `dict[str, object]`), que `model_dump`
+        recopie telle quelle. Sans ce retrait, annoter un seuil changeait le
+        `config_hash` : mesure le 2026-09-12, `c686c31f` -> `bf0f2f3f` sur
+        `examples/paire_es_nq.json`. C'est exactement la ou une note sert le
+        plus, donc exactement la ou la garantie devait tenir.
         """
         payload = self.model_dump(mode="json")
         for entry, source in zip(payload["data"], self.data, strict=True):
             entry["path"] = source.canonical_path()
-        return payload
+        propre = _sans_notes(payload)
+        assert isinstance(propre, dict)
+        return propre
 
     def build_run_config(self) -> RunConfig:
         return RunConfig(
