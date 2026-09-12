@@ -22,7 +22,6 @@ import pytest
 from rsl.data.instruments import known_roots
 from rsl.errors import ConfigurationError
 from rsl.gui.montage import (
-    DOSSIERS,
     FRAIS,
     GLISSEMENTS,
     RESAMPLES,
@@ -133,13 +132,27 @@ class TestLesListesProposees:
             assert Montage(root=racine).symbole.startswith(racine)
 
 
-class TestLaTableDesDossiers:
-    """La dette assumee du module, tenue par ce test."""
+class TestLeCheminVientDeLaTableDesContrats:
+    """La dette est REMBOURSEE depuis le 2026-09-12.
 
-    def test_elle_couvre_exactement_les_instruments_connus(self):
-        """Un instrument ajoute a la table des contrats et oublie ici
-        produirait un chemin introuvable - au moment du run, pas avant."""
-        assert set(DOSSIERS) == set(known_roots())
+    Ce module portait une copie de l'arborescence (`DOSSIERS`), qu'un
+    instrument range ailleurs - ou simplement oublie - aurait fait mentir sans
+    prevenir. Le chemin se derive desormais de `InstrumentSpec.data_path`, et
+    il n'y a plus qu'une source.
+    """
+
+    def test_il_est_celui_que_la_table_des_contrats_annonce(self):
+        from rsl.data.instruments import get_instrument
+
+        for racine in known_roots():
+            assert Montage(root=racine).chemin == get_instrument(racine).data_path
+
+    def test_le_module_ne_porte_plus_de_copie(self):
+        """Une garde contre le retour du probleme : reintroduire une table de
+        dossiers ici recreerait la divergence qu'on vient de supprimer."""
+        import rsl.gui.montage as module
+
+        assert not hasattr(module, "DOSSIERS")
 
 
 class TestLeDefautProposeALOuverture:

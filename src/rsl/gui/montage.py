@@ -123,11 +123,12 @@ class Montage:
     def chemin(self) -> str:
         """Chemin RELATIF a la racine des donnees.
 
-        Relatif et non absolu : un chemin absolu ferait diverger le
-        `config_hash` entre deux machines, et c'est precisement le defaut
-        corrige le 2026-09-10.
+        Lu sur la table des contrats depuis le 2026-09-12. Ce module en portait
+        une COPIE - un dictionnaire `DOSSIERS` recopiant l'arborescence - qui
+        aurait menti sans prevenir le jour ou un instrument serait range
+        ailleurs, ou simplement oublie ici.
         """
-        return DOSSIERS[self.root] + f"/{self.root}_v0_1m.parquet"
+        return get_instrument(self.root).data_path
 
     def reglages(self) -> dict[str, object]:
         """Le dictionnaire que `compose()` fera valider par `BacktestSpec`."""
@@ -166,20 +167,3 @@ class Montage:
             f"{self.capital:,.0f}".replace(",", " ")
             + f"  -  {self.contrats} contrat(s)  -  {cout}"
         )
-
-
-DOSSIERS: Final[dict[str, str]] = {
-    "ES": "indices", "NQ": "indices", "YM": "indices", "FDAX": "indices",
-    "GC": "metaux", "CL": "energie",
-    "6E": "forex", "6B": "forex", "6J": "forex", "6A": "forex",
-}
-"""Sous-dossier de chaque racine sous la racine des donnees.
-
-Recopie de l'arborescence reelle, et c'est une DETTE assumee : le jour ou un
-instrument est range ailleurs, ce dictionnaire ment sans prevenir. La table
-d'instruments ne porte pas le chemin ; l'y ajouter serait le vrai correctif,
-et il touche a la couche donnees.
-
-`tests/unit/test_gui_montage.py` verifie au moins qu'il couvre exactement les
-racines connues, donc qu'un instrument ajoute ne soit pas oublie ici.
-"""

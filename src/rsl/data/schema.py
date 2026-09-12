@@ -22,6 +22,7 @@ from pydantic import BaseModel, ConfigDict, field_validator
 from pydantic import Field as PydField
 
 from rsl.data.session import SessionIndex
+from rsl.errors import ConfigurationError
 
 FloatArray = npt.NDArray[np.float64]
 IntArray = npt.NDArray[np.int64]
@@ -85,6 +86,21 @@ class Granularity:
         return f"{total}s"
 
 
+class AssetClass(StrEnum):
+    """Classe d'actif d'un contrat.
+
+    Propriete du CONTRAT, pas du disque : ES est un future d'indice, que ses
+    donnees soient rangees ici ou ailleurs. Le fait que l'arborescence de
+    `RSL_DATA_DIR` la reproduise est une commodite, et c'est `data_path` qui
+    porte cette hypothese - une seule fois, nommee.
+    """
+
+    INDICES = "indices"
+    METAUX = "metaux"
+    ENERGIE = "energie"
+    FOREX = "forex"
+
+
 class InstrumentSpec(BaseModel):
     """Specification economique d'un contrat future.
 
@@ -108,6 +124,43 @@ class InstrumentSpec(BaseModel):
     exchange_fee_per_contract: float = PydField(ge=0.0, description="Par contrat et par cote")
     initial_margin: float = PydField(gt=0.0)
     maintenance_margin: float = PydField(gt=0.0)
+
+    category: AssetClass | None = PydField(
+        default=None,
+        description="Classe d'actif. Absente sur un instrument synthetique.",
+    )
+    """`None` par defaut, et ce n'est pas un oubli : les instruments construits
+    dans les tests n'existent sur aucun disque, et leur en inventer une classe
+    laisserait croire qu'ils ont un fichier.
+
+    Les dix contrats de la table, eux, en ont tous une - un test le verifie,
+    pour qu'un instrument ajoute demain ne puisse pas l'omettre."""
+
+    @property
+    def data_path(self) -> str:
+        """Chemin RELATIF a la racine des donnees, ex. `indices/ES_v0_1m.parquet`.
+
+        Une seule convention, ecrite une seule fois : la classe d'actif donne
+        le dossier, et le nom de fichier suit `{root}_v0_1m` - `v0` pour la
+        serie continue non ajustee, `1m` pour la granularite native.
+
+        Elle vivait en double jusqu'au 2026-09-12 : une table `DOSSIERS`
+        recopiee dans `gui/montage.py`, qu'un instrument ajoute ailleurs
+        aurait fait mentir sans prevenir.
+
+        Relatif et jamais absolu : un chemin absolu ferait diverger le
+        `config_hash` entre deux machines.
+
+        Leve si l'instrument n'a pas de classe : il n'existe alors sur aucun
+        disque, et rendre un chemin plausible serait pire que refuser.
+        """
+        if self.category is None:
+            raise ConfigurationError(
+                f"'{self.symbol}' n'a pas de classe d'actif : c'est un "
+                f"instrument synthetique, il n'a de fichier nulle part. Un "
+                f"chemin plausible serait pire qu'un refus."
+            )
+        return f"{self.category.value}/{self.root}_v0_1m.parquet"
 
     @field_validator("maintenance_margin")
     @classmethod

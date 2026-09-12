@@ -21,7 +21,7 @@ from __future__ import annotations
 from types import MappingProxyType
 from typing import Final
 
-from rsl.data.schema import InstrumentSpec
+from rsl.data.schema import AssetClass, InstrumentSpec
 from rsl.errors import RegistryError
 
 _SPECS: Final[tuple[InstrumentSpec, ...]] = (
@@ -30,60 +30,70 @@ _SPECS: Final[tuple[InstrumentSpec, ...]] = (
         multiplier=50.0, tick_size=0.25,
         commission_per_contract=0.85, exchange_fee_per_contract=1.45,
         initial_margin=17_000.0, maintenance_margin=15_500.0,
+        category=AssetClass.INDICES,
     ),
     InstrumentSpec(
         symbol="NQ.v.0", root="NQ", name="Nasdaq 100", exchange="CME", currency="USD",
         multiplier=20.0, tick_size=0.25,
         commission_per_contract=0.85, exchange_fee_per_contract=1.45,
         initial_margin=27_000.0, maintenance_margin=24_500.0,
+        category=AssetClass.INDICES,
     ),
     InstrumentSpec(
         symbol="YM.v.0", root="YM", name="Dow Jones", exchange="CBOT", currency="USD",
         multiplier=5.0, tick_size=1.0,
         commission_per_contract=0.85, exchange_fee_per_contract=1.45,
         initial_margin=11_000.0, maintenance_margin=10_000.0,
+        category=AssetClass.INDICES,
     ),
     InstrumentSpec(
         symbol="FDAX.v.0", root="FDAX", name="DAX 40", exchange="EUREX", currency="EUR",
         multiplier=25.0, tick_size=0.5,
         commission_per_contract=1.00, exchange_fee_per_contract=0.50,
         initial_margin=33_000.0, maintenance_margin=30_000.0,
+        category=AssetClass.INDICES,
     ),
     InstrumentSpec(
         symbol="GC.v.0", root="GC", name="Or", exchange="COMEX", currency="USD",
         multiplier=100.0, tick_size=0.1,
         commission_per_contract=0.85, exchange_fee_per_contract=1.60,
         initial_margin=15_000.0, maintenance_margin=13_500.0,
+        category=AssetClass.METAUX,
     ),
     InstrumentSpec(
         symbol="CL.v.0", root="CL", name="Petrole WTI", exchange="NYMEX", currency="USD",
         multiplier=1_000.0, tick_size=0.01,
         commission_per_contract=0.85, exchange_fee_per_contract=1.60,
         initial_margin=6_500.0, maintenance_margin=5_900.0,
+        category=AssetClass.ENERGIE,
     ),
     InstrumentSpec(
         symbol="6E.v.0", root="6E", name="EUR/USD", exchange="CME", currency="USD",
         multiplier=125_000.0, tick_size=0.00005,
         commission_per_contract=0.85, exchange_fee_per_contract=1.60,
         initial_margin=3_000.0, maintenance_margin=2_700.0,
+        category=AssetClass.FOREX,
     ),
     InstrumentSpec(
         symbol="6B.v.0", root="6B", name="GBP/USD", exchange="CME", currency="USD",
         multiplier=62_500.0, tick_size=0.0001,
         commission_per_contract=0.85, exchange_fee_per_contract=1.60,
         initial_margin=2_500.0, maintenance_margin=2_250.0,
+        category=AssetClass.FOREX,
     ),
     InstrumentSpec(
         symbol="6J.v.0", root="6J", name="USD/JPY", exchange="CME", currency="USD",
         multiplier=12_500_000.0, tick_size=0.0000005,
         commission_per_contract=0.85, exchange_fee_per_contract=1.60,
         initial_margin=4_000.0, maintenance_margin=3_600.0,
+        category=AssetClass.FOREX,
     ),
     InstrumentSpec(
         symbol="6A.v.0", root="6A", name="AUD/USD", exchange="CME", currency="USD",
         multiplier=100_000.0, tick_size=0.00005,
         commission_per_contract=0.85, exchange_fee_per_contract=1.60,
         initial_margin=2_000.0, maintenance_margin=1_800.0,
+        category=AssetClass.FOREX,
     ),
 )
 

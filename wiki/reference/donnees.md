@@ -9,6 +9,22 @@ autorite: docs/no-lookahead.md §4 + src/rsl/data/
 > Page routeur. Le repertoire de donnees **n'est pas versionne** (`data/` est
 > dans `.gitignore`). Autorite : [src/rsl/env.py](../../src/rsl/env.py).
 
+## Ou vit le fichier d'un instrument
+
+`InstrumentSpec.category` porte la classe d'actif - une propriete du CONTRAT,
+pas du disque - et `InstrumentSpec.data_path` en derive le chemin RELATIF :
+`indices/ES_v0_1m.parquet`, `metaux/GC_v0_1m.parquet`.
+
+Une seule convention, ecrite une seule fois : la classe donne le dossier, le
+nom de fichier suit `{root}_v0_1m` (`v0` pour la serie continue non ajustee,
+`1m` pour la granularite native). Elle vivait en DOUBLE jusqu'au 2026-09-12 -
+`gui/montage.py` en portait une copie, qu'un instrument range ailleurs aurait
+fait mentir sans prevenir.
+
+Un instrument sans classe - ceux que construisent les tests - n'a pas de
+chemin et le dit en levant : il n'existe sur aucun disque, et rendre un chemin
+plausible serait pire qu'un refus.
+
 ## Ou sont les cotations — `RSL_DATA_DIR`
 
 Les cotations ne vivent pas au meme endroit chez deux personnes. Une
