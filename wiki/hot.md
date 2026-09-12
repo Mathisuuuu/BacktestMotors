@@ -17,7 +17,7 @@ generated: true
 | Indicateur | Valeur |
 |---|---|
 | Pages de wiki | 24 |
-| Entrees de log | 133 |
+| Entrees de log | 134 |
 | Derniere activite | 2026-09-12 |
 | Idees ecartees (ledger) | 18 |
 | Idees en attente (ledger) | 4 |
@@ -27,7 +27,7 @@ generated: true
 | Pages `reference/` | 7 |
 | Pages `research/` | 1 |
 
-**Activite par type :** note × 62, fix × 27, feat × 19, decision × 17, experiment × 2, essai × 2, setup × 1, lint × 1, audit × 1, refactor × 1
+**Activite par type :** note × 62, fix × 28, feat × 19, decision × 17, experiment × 2, essai × 2, setup × 1, lint × 1, audit × 1, refactor × 1
 
 ## Experiences
 
@@ -43,6 +43,7 @@ Le total des essais alimente le Deflated Sharpe : un essai non enregistre gonfle
 
 ## Derniere activite — 8 entree(s)
 
+- **2026-09-12** — fix | P7 : `rsl <commande> > fichier` ecrivait dans l'encodage de la LOCALE (cp1252 sous Windows), pas en UTF-8 | corrige a l'entree de la CLI et non dans `schema` : trois commandes sur neuf saignaient (`schema --what all|spec|strategies`), les six autres passaient parce que leur sortie etait ASCII par hasard. 28 tests, valides en neutralisant le correctif
 - **2026-09-12** — fix | Trou ouvert et referme le meme jour : un panneau agrege en intra-journalier avec des seances differentes | ES + FDAX en 4 h donnaient 100 % de lignes a un seul instrument, en silence. `allow_mixed_granularity` est aveugle au cas (meme granularite, ancrage different). Refuse a la validation
 - **2026-09-12** — essai | Verification de bout en bout : `sma_crossover@1` sur ES en tranches de 1 h ancrees sur la seance CME | 62 785 barres, Sharpe 0,42, empreinte `f2f0e7e5`. Essai TECHNIQUE - la machinerie etait l'objet, pas la strategie - mais il compte au compteur du Deflated Sharpe, et aucun chiffre n'en a ete exploite pour choisir quoi que ce soit
 - **2026-09-12** — note | Le garde-fou « jamais avant la derniere cloture observee » n'est pas theorique : il mord 74 fois sur 16 417 tranches de 4 h d'ES | des barres 1 min horodatees 16:00 cloturent a 16:01, apres la fermeture declaree. Sans lui, 74 barres agregees auraient ete disponibles avant une de leurs composantes. Lecon [[lessons]] L22
@@ -50,7 +51,6 @@ Le total des essais alimente le Deflated Sharpe : un essai non enregistre gonfle
 - **2026-09-12** — essai | Momentum 12-1, trois regles d'allocation, deux niveaux de capital -- SIX essais comptes | les trois premiers etaient inexploitables : la troncature en contrats entiers eliminait 28 a 43 % des noms, les GROS contrats d'abord. A 20 M$ : Sharpe 0,84 / 0,45 / 0,71. Verdict non-conclusif, lecon [[lessons]] L21
 - **2026-09-12** — feat | Allocation transversale : `ranking@1` sait repartir (`equal_weight`, `inverse_volatility`, `signal`), `MultiContext.contract_value` donne la taille d'un contrat | livre ; 3923 tests ; 7 empreintes et 7 config_hash inchanges ; la combinaison allocation-en-argent + sizing est refusee a la validation
 - **2026-09-12** — fix | Les plafonds etaient evalues ordre par ordre contre le portefeuille commite : un rebalancement transversal de dix ordres les franchissait tous ensemble | `max_positions=2` laissait detenir SIX instruments sur momentum_12_1 ; corrige par reservation de fournee, verifie en rejouant les fills. Lecon [[lessons]] L20
-- **2026-09-12** — feat | Contraintes de portefeuille : quatre plafonds sous `risk.limits`, regle de non-aggravation, reservation par fournee | livre ; 3869 tests ; 7 empreintes ET 7 config_hash inchanges
 
 ## Next Actions
 
@@ -122,12 +122,18 @@ suivante, qui viennent de l'audit fonctionnel du 2026-09-10.
       Corrige : `bool(self.data_sources)` est desormais une condition a part
       entiere. Deux tests de regression FIXENT l'etat git, parce que l'ancien
       ne voyait le defaut que sur un arbre propre -- voir [[lessons]] L11.
-- [ ] **P7 nouveau** -- `rsl schema > fichier.json` ecrit du **CP1252**, pas de
-      l'UTF-8 (`ensure_ascii=False` + stdout Windows). Le `§` sort en octet
-      `0xA7` et le fichier devient illisible en UTF-8. `--out` ecrit
-      correctement : seul le chemin de redirection est touche. Aujourd'hui le
-      seul caractere concerne est encodable en CP1252 -- le jour ou une
-      docstring portera un `≥` ou une fleche, la commande levera.
+- [x] **P7 resolu (2026-09-12).** `sys.stdout` prenait l'encodage de la locale
+      des qu'il etait redirige, donc du cp1252 sous Windows. Corrige a l'ENTREE
+      (`cli.sortie_en_utf8`), pas dans `schema` : le defaut appartenait a toute
+      commande qui ecrit.
+      Trois choses apprises en le corrigeant. **Trois** commandes sur neuf
+      etaient cassees, pas deux -- la premiere mesure avait oublie
+      `schema --what spec` ; les six autres passaient parce que leur sortie
+      etait ASCII par hasard. La prediction « la commande levera » etait
+      EXACTE : verifie avant correction, un `→` donne
+      `UnicodeEncodeError`, code 1, sortie tronquee. Et les tests ont ete
+      valides en neutralisant le correctif -- sans quoi ils auraient pu etre
+      verts sans rien garder.
 - [x] **P2 fait (2026-09-10)**, revu le 2026-09-11 : le `.venv` tourne
       desormais en **Python 3.11.9** avec **numpy 2.4.6**, conforme au manifeste
       archive du README.

@@ -1,6 +1,6 @@
 ---
 type: reference
-updated: 2026-09-11
+updated: 2026-09-12
 autorite: src/rsl/cli.py + README.md
 ---
 
@@ -21,6 +21,8 @@ autorite: src/rsl/cli.py + README.md
 | `rsl walkforward CONFIG --train N --test N` | fenetres successives |
 | `rsl verify CONFIG` | execute DEUX fois et compare les empreintes |
 | `rsl squelette [--out F]` | squelette a trous : tout ce qu'on peut ecrire, engendre depuis les registres |
+
+> **Redirection et `--out` sont equivalents depuis le 2026-09-12.** Ils ne l'etaient pas : `> fichier` ecrivait dans l'encodage de la LOCALE, donc du cp1252 sous Windows, et trois commandes sur neuf produisaient un fichier qu'aucun lecteur JSON n'ouvrait en UTF-8. Corrige a l'entree de la CLI ([cli.py](../../src/rsl/cli.py), `sortie_en_utf8`). Seul ecart restant : `print` ajoute un saut de ligne final.
 | `rsl gui [CONFIG]` | tableau de bord graphique — voir [[reference/tableau-de-bord]] |
 | `rsl run CONFIG --gui` | run ordinaire, puis ouverture du tableau de bord |
 

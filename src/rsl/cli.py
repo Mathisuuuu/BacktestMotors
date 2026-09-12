@@ -82,7 +82,55 @@ EXAMPLE_SETTINGS: dict[str, object] = {
 }
 
 
+def sortie_en_utf8() -> None:
+    """Force `stdout` et `stderr` en UTF-8, quelle que soit la machine.
+
+    Le probleme
+    -----------
+    Sous Windows, `sys.stdout` prend l'encodage de la locale des qu'il est
+    REDIRIGE : `cp1252` ici. `rsl schema --what all > contrat.json` produisait
+    donc un fichier en cp1252 qu'aucun lecteur JSON n'ouvre en UTF-8 - mesure
+    le 2026-09-12 : octet `0xa7` en position 126, la ou le texte porte un `§`.
+    `--out` n'etait pas touche, parce qu'il ouvre le fichier en UTF-8
+    explicitement.
+
+    Le meme jour, TROIS des neuf commandes qui ecrivent etaient deja cassees
+    (`schema --what all`, `--what spec`, `--what strategies` : `§`, `«`, `»`).
+    Les six autres passaient uniquement parce que leur sortie etait purement
+    ASCII - c'est-a-dire par chance, et jusqu'au premier caractere accentue
+    ajoute a une docstring. C'est la raison pour laquelle la correction est
+    ici : compter les commandes atteintes aujourd'hui ne dit rien de celles
+    qui le seront demain.
+
+    Pire que le fichier illisible : un caractere ABSENT de cp1252 ne se
+    degrade pas, il leve. Verifie, toujours le 2026-09-12 : une fleche `->` ou
+    un `>=` typographique dans une description donne `UnicodeEncodeError`,
+    code de sortie 1, et une sortie tronquee au milieu.
+
+    Pourquoi ici plutot que dans `_cmd_schema`
+    -------------------------------------------
+    Parce que le defaut n'appartient pas a `schema`. Il appartient a toute
+    commande qui ecrit, et corriger la seule qui saignait aujourd'hui aurait
+    laisse les six autres attendre leur tour. La propriete voulue est que la
+    sortie du programme **ne depende pas de la machine qui l'execute** - la
+    meme exigence que pour un `config_hash`.
+
+    Le garde `hasattr` n'est pas de la prudence decorative : sous pytest,
+    `sys.stdout` est un objet de capture qui n'est pas un `TextIOWrapper` et
+    n'a pas de `reconfigure`.
+
+    Ce que cela ne resout pas : une console Windows reglee sur une page de
+    code ancienne affichera mal ces caracteres. C'est du RENDU, pas de la
+    donnee - le fichier redirige, lui, est juste.
+    """
+    for flux in (sys.stdout, sys.stderr):
+        reconfigurer = getattr(flux, "reconfigure", None)
+        if callable(reconfigurer):
+            reconfigurer(encoding="utf-8")
+
+
 def main(argv: Sequence[str] | None = None) -> int:
+    sortie_en_utf8()
     parser = _build_parser()
     args = parser.parse_args(argv)
     handler = getattr(args, "handler", None)
