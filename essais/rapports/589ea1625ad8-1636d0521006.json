@@ -1,0 +1,413 @@
+{
+  "cross_sectional": false,
+  "deflated_sharpe": {
+    "deflated_sharpe": 7.771561172376096e-16,
+    "expected_max_sharpe": 0.17644173855269796,
+    "is_significant": false,
+    "kurtosis": 38.35941834852013,
+    "n_observations": 2551,
+    "n_trials": 22,
+    "observed_sharpe_per_period": 0.017237446376548976,
+    "probabilistic_sharpe": 0.8059213775164964,
+    "skewness": -0.8496469464446557,
+    "variance_of_trial_sharpes": 0.008251841542574885,
+    "warnings": []
+  },
+  "manifest": {
+    "config_hash": "589ea1625ad881873defdfad352ad6fc35e39a575c53f473d37083f8283e68b0",
+    "created_at": "2026-09-12T15:03:13+00:00",
+    "data_sources": [
+      {
+        "first_ts": "2016-01-05T00:00:00+00:00",
+        "granularity": "1d",
+        "last_ts": "2026-08-29T00:00:00+00:00",
+        "n_bars": 2753,
+        "path": "C:\\Users\\Mathis\\Desktop\\Cotations\\indices\\ES_v0_1m.parquet",
+        "source_hash": "17bdf284b5b8f01f37f7dc1a4209b6d442302c04a512919561af8f0fad1e1f53|resample:day",
+        "symbol": "ES.v.0",
+        "transformations": [
+          "resample:day(2753 periodes, 564 ecartee(s))"
+        ]
+      }
+    ],
+    "dependencies": {
+      "numpy": "2.4.6",
+      "polars": "1.44.2",
+      "pyarrow": "25.0.1",
+      "pydantic": "2.13.5"
+    },
+    "git": {
+      "available": true,
+      "branch": "main",
+      "commit": "6cb748ea6736104238e9fc4006e8c452e5569255",
+      "detail": "12 fichier(s) modifie(s)",
+      "dirty": true,
+      "is_reproducible": false
+    },
+    "is_reproducible": false,
+    "platform": "Windows 10 (AMD64)",
+    "primitives": [
+      "acceleration_bands@1",
+      "ad@1",
+      "adosc@1",
+      "adx@1",
+      "adxr@1",
+      "alma@1",
+      "apo@1",
+      "aroon@1",
+      "atr@1",
+      "atr_ratio@1",
+      "atr_wilder@1",
+      "atr_wilder_pct@1",
+      "autocorrelation@1",
+      "average_price@1",
+      "awesome@1",
+      "bar_range@1",
+      "bar_range_pct@1",
+      "beta@1",
+      "bias@1",
+      "body_ratio@1",
+      "bollinger@1",
+      "bop@1",
+      "cci@1",
+      "center_of_gravity@1",
+      "cfo@1",
+      "chaikin_volatility@1",
+      "chop@1",
+      "close_location@1",
+      "cmf@1",
+      "cmo@1",
+      "coppock@1",
+      "correlation@1",
+      "cti@1",
+      "dema@1",
+      "dollar_volume@1",
+      "donchian@1",
+      "downside_deviation@1",
+      "dpo@1",
+      "dx@1",
+      "efficiency_ratio@1",
+      "elder_ray@1",
+      "ema@1",
+      "entropy@1",
+      "envelope@1",
+      "eom@1",
+      "fisher@1",
+      "force_index@1",
+      "gap@1",
+      "garman_klass@1",
+      "heikin_ashi@1",
+      "hma@1",
+      "hurst@1",
+      "inertia@1",
+      "kama@1",
+      "keltner@1",
+      "klinger@1",
+      "kurtosis@1",
+      "linreg@1",
+      "linreg_angle@1",
+      "linreg_forecast@1",
+      "linreg_intercept@1",
+      "linreg_r2@1",
+      "macd@1",
+      "mad@1",
+      "mass_index@1",
+      "max_drawdown@1",
+      "median@1",
+      "median_price@1",
+      "mfi@1",
+      "midpoint@1",
+      "midprice@1",
+      "mom@1",
+      "natr@1",
+      "nvi@1",
+      "obv@1",
+      "parkinson@1",
+      "percentile_rank@1",
+      "pgo@1",
+      "pivot@1",
+      "pmo@1",
+      "ppo@1",
+      "psar@1",
+      "psl@1",
+      "pvi@1",
+      "pvo@1",
+      "pvt@1",
+      "pwma@1",
+      "qstick@1",
+      "quantile@1",
+      "returns@1",
+      "roc@1",
+      "rocr@1",
+      "rogers_satchell@1",
+      "rolling_high@1",
+      "rolling_low@1",
+      "rsi@1",
+      "rsi_wilder@1",
+      "rvgi@1",
+      "rvi_volatility@1",
+      "skew@1",
+      "slope@1",
+      "sma@1",
+      "smi@1",
+      "smma@1",
+      "squeeze@1",
+      "stderr@1",
+      "stdev@1",
+      "stoch@1",
+      "stoch_rsi@1",
+      "stochastic@1",
+      "supertrend@1",
+      "swma@1",
+      "t3@1",
+      "tema@1",
+      "trima@1",
+      "trix@1",
+      "true_range@1",
+      "tsi@1",
+      "ttm_trend@1",
+      "typical_price@1",
+      "ulcer_index@1",
+      "ultimate@1",
+      "upside_deviation@1",
+      "variance@1",
+      "vhf@1",
+      "volatility@1",
+      "volatility_ratio@1",
+      "volume_oscillator@1",
+      "vortex@1",
+      "vwap@1",
+      "vwma@1",
+      "weighted_close@1",
+      "williams_r@1",
+      "wma@1",
+      "zlema@1",
+      "zscore@1"
+    ],
+    "python_version": "3.11.9",
+    "seed": 0,
+    "warnings": [
+      "arbre de travail modifie (12 fichier(s) modifie(s)) : le commit 6cb748ea ne suffit PAS a rejouer ce run"
+    ]
+  },
+  "metrics": {
+    "activity": {
+      "average_gross_contracts": 0.13518808777429467,
+      "average_loss": -4600.433333333333,
+      "average_win": 11114.150000000001,
+      "exposure": 0.13518808777429467,
+      "fees_paid": 25.300000000000004,
+      "hit_rate": 0.4,
+      "n_trades": 5,
+      "profit_factor": 1.6105946541267853,
+      "slippage_paid": 125.0,
+      "turnover_annual": 0.489935505274235
+    },
+    "is_ruined": false,
+    "return": {
+      "cagr": 0.00769341227866871,
+      "final_equity": 539312.2000000001,
+      "initial_equity": 500000.0,
+      "total_return": 0.07862440000000004
+    },
+    "risk": {
+      "downside_deviation_annual": 0.020823789144686074,
+      "drawdown_daily": {
+        "longest_underwater_days": 1439.0,
+        "longest_underwater_periods": 1017,
+        "max_drawdown": -0.059433992107730926,
+        "peak_index": 2402,
+        "recovered": true,
+        "recovery_index": 2533,
+        "trough_index": 2443
+      },
+      "drawdown_full": {
+        "longest_underwater_days": 1439.0,
+        "longest_underwater_periods": 1017,
+        "max_drawdown": -0.059433992107730926,
+        "peak_index": 2402,
+        "recovered": true,
+        "recovery_index": 2533,
+        "trough_index": 2443
+      },
+      "n_returns": 2551,
+      "returns_kurtosis": 38.35941834852013,
+      "returns_skewness": -0.8496469464446557,
+      "sharpe": 0.2770963756764231,
+      "sharpe_per_period": 0.017237446376548976,
+      "sortino": 0.38868929217001835,
+      "volatility_annual": 0.029209995414726832
+    },
+    "sample": {
+      "annualisation_factor": 16.075256718617226,
+      "n_bars": 2552,
+      "n_daily_points": 2552,
+      "periods_per_year": 258.4138785694483,
+      "risk_free_annual": 0.0,
+      "span_years": 9.875630574207547
+    },
+    "warnings": []
+  },
+  "name": "sma-20-200",
+  "result_fingerprint": "1636d052100631a619328d780a45315eb3d815470b1b4698dc8964d7b7aeab79",
+  "run": {
+    "config": {
+      "check_invariant": true,
+      "execution": {
+        "execution_lag": 1,
+        "fees": {
+          "model": "per_contract_fee",
+          "source": "instrument_spec"
+        },
+        "intrabar_priority": "pessimistic",
+        "margin_policy": "reject",
+        "max_fill_gap_seconds": null,
+        "slippage": {
+          "model": "tick_slippage",
+          "ticks": 1.0
+        }
+      },
+      "initial_cash": 500000.0,
+      "liquidate_at_end": false,
+      "min_warmup_bars": 0,
+      "stop": null
+    },
+    "counters": {
+      "n_bars": 2552,
+      "n_intrabar_ambiguous": 0,
+      "n_orders_cancelled_unfilled": 0,
+      "n_orders_dropped_risk": 0,
+      "n_orders_expired_gap": 0,
+      "n_orders_submitted": 8,
+      "n_protection_fills": 3,
+      "terminal_liquidation": false,
+      "warmup_bars": 201
+    },
+    "execution_stats": {
+      "n_fills": 11,
+      "n_limit_not_touched": 0,
+      "n_slippage_clamped": 1,
+      "n_stop_not_triggered": 0
+    },
+    "final_equity": 539312.2000000001,
+    "n_equity_points": 2552,
+    "n_fills": 11,
+    "portfolio": {
+      "cash": 508424.70000000007,
+      "initial_cash": 500000.0,
+      "n_closed_trades": 5,
+      "positions": {
+        "ES.v.0": 1
+      },
+      "stats": {
+        "contracts_traded": 11,
+        "fees_paid": 25.300000000000004,
+        "max_margin_used": 17000.0,
+        "n_fills": 11,
+        "realized_pnl": 8450.0,
+        "slippage_paid": 125.0,
+        "turnover_notional": 2411050.0
+      }
+    },
+    "risk_stats": {
+      "n_dropped_sizing": 0,
+      "n_reduce_only_dropped": 0,
+      "n_rejected_gross_cap": 0,
+      "n_rejected_gross_exposure": 0,
+      "n_rejected_margin": 0,
+      "n_rejected_net_exposure": 0,
+      "n_rejected_per_category": 0,
+      "n_rejected_positions": 0,
+      "n_warned_margin": 0
+    },
+    "strategy": {
+      "atr_multiple": 2.0,
+      "atr_window": 14,
+      "class": "SmaCrossover",
+      "fast_window": 20,
+      "quantity": 1,
+      "slow_window": 200,
+      "symbol": "ES.v.0"
+    },
+    "symbol": "ES.v.0",
+    "total_return": 0.07862440000000004,
+    "warnings": []
+  },
+  "specification": {
+    "check_invariant": true,
+    "data": [
+      {
+        "alias": null,
+        "allow_non_positive_prices": true,
+        "close_stamp": "period_end",
+        "granularity_minutes": 1,
+        "max_gap_seconds": null,
+        "path": "indices/ES_v0_1m.parquet",
+        "resample": "day",
+        "resample_min_bars": 200,
+        "root": "ES",
+        "session": null,
+        "timestamp_column": null
+      }
+    ],
+    "execution": {
+      "fees": {
+        "kind": "per_contract",
+        "per_contract": null
+      },
+      "intrabar_priority": "pessimistic",
+      "lag_bars": 1,
+      "margin_policy": "reject",
+      "max_fill_gap_seconds": null,
+      "slippage": {
+        "bps": null,
+        "kind": "tick",
+        "ticks": 1.0
+      }
+    },
+    "initial_cash": 500000.0,
+    "liquidate_at_end": false,
+    "min_warmup_bars": 0,
+    "name": "sma-20-200",
+    "panel": {
+      "align_policy": "drop",
+      "allow_mixed_granularity": false,
+      "max_ffill_bars": null
+    },
+    "rebalance": {
+      "kind": "every_row",
+      "n": 1,
+      "offset": 0
+    },
+    "risk": {
+      "max_gross_contracts": null,
+      "sizing": {
+        "atr_multiple": 2.0,
+        "atr_window": 14,
+        "contracts": 1,
+        "fraction": null,
+        "kind": "fixed",
+        "max_contracts": null,
+        "signal": null,
+        "vol_max_multiple": 4.0,
+        "vol_target": null,
+        "vol_window": 20
+      }
+    },
+    "risk_free_annual": 0.0,
+    "seed": 0,
+    "stop": null,
+    "strategy": {
+      "params": {
+        "fast_window": 20,
+        "slow_window": 200,
+        "symbol": "ES.v.0"
+      },
+      "ref": "sma_crossover@1"
+    },
+    "with_data_hash": true
+  },
+  "symbols": [
+    "ES.v.0"
+  ]
+}

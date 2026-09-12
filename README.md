@@ -55,7 +55,7 @@ for ctx in BarFeed(store, warmup_bars=signal.warmup_bars):
 | Metriques, Deflated Sharpe | fait |
 | CLI, manifeste et rapport | fait |
 | Runner walk-forward | fait |
-| PBO / CSCV | protocole seulement |
+| PBO / CSCV | **implemente** (`rsl pbo`) — voir `src/rsl/metrics/surapprentissage.py` |
 
 ## Les trois strategies de reference
 

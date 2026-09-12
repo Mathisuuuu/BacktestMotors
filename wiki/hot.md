@@ -16,18 +16,18 @@ generated: true
 
 | Indicateur | Valeur |
 |---|---|
-| Pages de wiki | 24 |
-| Entrees de log | 137 |
+| Pages de wiki | 25 |
+| Entrees de log | 140 |
 | Derniere activite | 2026-09-12 |
 | Idees ecartees (ledger) | 18 |
 | Idees en attente (ledger) | 4 |
 | Pages `Failed Ideas/` | 1 |
 | Pages `concepts/` | 6 |
-| Pages `experiments/` | 5 |
+| Pages `experiments/` | 6 |
 | Pages `reference/` | 7 |
 | Pages `research/` | 1 |
 
-**Activite par type :** note × 63, fix × 28, feat × 21, decision × 17, experiment × 2, essai × 2, setup × 1, lint × 1, audit × 1, refactor × 1
+**Activite par type :** note × 64, fix × 28, feat × 22, decision × 17, essai × 3, experiment × 2, setup × 1, lint × 1, audit × 1, refactor × 1
 
 ## Experiences
 
@@ -36,6 +36,7 @@ generated: true
 | [[experiments/allocation-momentum-12-1-trois-regles]] | `termine` | `non-conclusif` | 6 | 2026-09-12 |
 | [[experiments/dsr-grille-sma-8-essais]] | `termine` | `non-conclusif` | 8 | 2026-09-10 |
 | [[experiments/paire-es-nq-retour-a-la-moyenne]] | `termine` | `non-conclusif` | 1 | 2026-09-12 |
+| [[experiments/pbo-grille-sma-es-quotidien]] | `termine` | `negatif` | 16 | 2026-09-12 |
 | [[experiments/rsi-survendu-hors-lundi]] | `termine` | `non-conclusif` | 1 | 2026-09-11 |
 | [[experiments/sma-es-daily-walkforward]] | `termine` | `fragile` | 1 | 2026-09-12 |
 
@@ -43,14 +44,14 @@ Le total des essais alimente le Deflated Sharpe : un essai non enregistre gonfle
 
 ## Derniere activite — 8 entree(s)
 
+- **2026-09-12** — note | Deux problemes de METHODE trouves en lancant la premiere grille reelle | (1) une grille de fenetres inegales ne partage pas son echantillon - quatre longueurs pour seize configurations - donc la CSCV comparait des epoques ; le warmup est desormais aligne. (2) quatre configurations ne negocient pas du tout sur une sous-periode ; leur donner zero les classerait au-dessus des perdantes, elles sont retirees sur demande explicite
+- **2026-09-12** — essai | Grille SMA 4x4 sur ES quotidien, 16 configurations : PBO **0,70 a 0,80** | le processus de selection n'a pas montre de pouvoir predictif. Et une fois les 31 essais du registre comptes, le DSR de l'exemple phare `sma_es_daily` tombe de 0,9719 SIGNIFICATIF a **0,0000** - le maximum attendu sous H0 vaut 0,1600 contre un Sharpe observe de 0,0376. Voir [[experiments/pbo-grille-sma-es-quotidien]]
+- **2026-09-12** — feat | PBO par CSCV implementee (`rsl pbo`, `metrics/surapprentissage.py`) : le protocole fige le 2026-09-10 avait attendu deux ans de sessions | 45 tests, dont deux matrices dont la PBO se calcule de tete (1,0 et 0,0 exactement) plutot que des seuls tirages aleatoires
 - **2026-09-12** — note | A-P2 mesure enfin, apres avoir ete annonce « urgent » deux sessions de suite | la memoisation apporte 8x au segment memoisable et 1,07x au segment a pair - c'est-a-dire rien. Il ne reste donc qu'un seul cas, et il ne mord qu'a la granularite MINUTE : en quotidien, un signal a pair sur tout l'echantillon coute 3,7 secondes. L'entree hot.md decrivait un probleme deja resolu aux trois quarts
 - **2026-09-12** — feat | `rsl walkforward --archive` : un walk-forward compte pour UN essai, avec le Sharpe de la serie GROUPEE | la regle « un pli n'est pas un essai » etait un commentaire depuis la premiere version de `walkforward.py` ; elle devient executable. L'agregat groupe est publie au passage : 0,62 annualise contre 0,32 en moyenne des plis sur `sma_es_daily` - une moyenne par pli donne le meme poids a un pli qui a negocie une fois et a un pli qui a negocie tout du long
 - **2026-09-12** — feat | Registre des ESSAIS : `essais/registre.jsonl` versionne, `rsl run --archive`, `rsl essais` | le compteur du Deflated Sharpe survit enfin aux sessions. 14 essais archives avec leur rapport complet, dont les 7 exemples du depot et les 7 essais de la journee. Les DSR publies AVANT cette date sont des PSR deguises
 - **2026-09-12** — fix | P7 : `rsl <commande> > fichier` ecrivait dans l'encodage de la LOCALE (cp1252 sous Windows), pas en UTF-8 | corrige a l'entree de la CLI et non dans `schema` : trois commandes sur neuf saignaient (`schema --what all|spec|strategies`), les six autres passaient parce que leur sortie etait ASCII par hasard. 28 tests, valides en neutralisant le correctif
 - **2026-09-12** — fix | Trou ouvert et referme le meme jour : un panneau agrege en intra-journalier avec des seances differentes | ES + FDAX en 4 h donnaient 100 % de lignes a un seul instrument, en silence. `allow_mixed_granularity` est aveugle au cas (meme granularite, ancrage different). Refuse a la validation
-- **2026-09-12** — essai | Verification de bout en bout : `sma_crossover@1` sur ES en tranches de 1 h ancrees sur la seance CME | 62 785 barres, Sharpe 0,42, empreinte `f2f0e7e5`. Essai TECHNIQUE - la machinerie etait l'objet, pas la strategie - mais il compte au compteur du Deflated Sharpe, et aucun chiffre n'en a ete exploite pour choisir quoi que ce soit
-- **2026-09-12** — note | Le garde-fou « jamais avant la derniere cloture observee » n'est pas theorique : il mord 74 fois sur 16 417 tranches de 4 h d'ES | des barres 1 min horodatees 16:00 cloturent a 16:01, apres la fermeture declaree. Sans lui, 74 barres agregees auraient ete disponibles avant une de leurs composantes. Lecon [[lessons]] L22
-- **2026-09-12** — feat | Granularites intra-journalieres : `5min` a `4h`, ancrees sur la SEANCE declaree (`Period`, `tranches_de_seance`, champ SEANCE du montage) | livre ; 3992 tests ; 7 empreintes et 7 config_hash inchanges ; `docs/execution-model.md` §1.3
 
 ## Next Actions
 
@@ -238,7 +239,31 @@ suivante, qui viennent de l'audit fonctionnel du 2026-09-10.
       n'y aurait rien a comparer et n'aurait leve aucune erreur. La combinaison
       est refusee a la validation ; tous les instruments d'un panneau agrege en
       intra-journalier doivent declarer la MEME seance.
+- [x] **PBO / CSCV : IMPLEMENTEE ET APPLIQUEE (2026-09-12).** `rsl pbo`,
+      [surapprentissage.py](../src/rsl/metrics/surapprentissage.py) pour le
+      calcul, [pbo.py](../src/rsl/pbo.py) pour la matrice. Le protocole etait
+      fige depuis le 2026-09-10 et attendait son implementation.
+      **Le resultat est mauvais, et c'est ce qui le rend utile** : la grille SMA
+      4x4 d'ES quotidien rend une PBO de 0,70 a 0,80, et le DSR de l'exemple
+      phare tombe de 0,9719 SIGNIFICATIF a 0,0000 une fois les 31 essais du
+      registre comptes. Voir [[experiments/pbo-grille-sma-es-quotidien]].
+      Deux problemes de METHODE trouves en chemin : une grille de fenetres
+      inegales ne partage pas son echantillon (quatre longueurs pour seize
+      configurations), et quatre configurations ne negocient pas du tout sur une
+      sous-periode.
+- [ ] **Elargir la grille.** Le ledger le dit depuis le 2026-09-10 et c'est
+      desormais la SEULE chose qui manque au chiffre : a huit configurations
+      retenues, le rang hors echantillon ne prend que huit valeurs. L'article
+      travaille sur des centaines. Le programme emet lui-meme l'avertissement.
+- [ ] **Choisir une configuration pour une raison EXTERIEURE aux donnees.**
+      C'est la conclusion de l'essai PBO, et ce n'est pas une tache de code : la
+      CSCV qualifie le fait d'avoir pris le maximum d'une grille. Une
+      configuration choisie sur une hypothese economique n'est pas concernee par
+      ce chiffre - encore faut-il en formuler une.
 - [ ] Obtenir et ingerer la source du Deflated Sharpe (independance des essais).
+      **Devenu plus urgent** : le registre suppose que 31 essais sont 31 tirages
+      independants, et il vient de signaler lui-meme que deux d'entre eux sont
+      la meme strategie sous deux noms.
 <!-- NEXT-ACTIONS:END -->
 
 ---

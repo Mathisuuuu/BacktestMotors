@@ -41,6 +41,17 @@ Deux quantites a ne pas confondre :
 - Le pas d'annualisation est **mesure sur l'echantillon**, jamais suppose —
   voir la ligne correspondante du [[Failed Ideas/ledger]].
 
+## Son complement : la PBO
+
+Le DSR corrige UN chiffre. La CSCV qualifie le PROCESSUS qui l'a produit :
+« si je choisis la meilleure configuration sur une moitie de l'echantillon,
+quelle chance a-t-elle de finir sous la mediane sur l'autre ? »
+
+Implementee le 2026-09-12 : [src/rsl/metrics/surapprentissage.py](../../src/rsl/metrics/surapprentissage.py),
+commande `rsl pbo`. Les deux mesures se lisent ENSEMBLE, et sur la grille SMA
+d'ES elles disent la meme chose par deux chemins independants :
+[[experiments/pbo-grille-sma-es-quotidien]].
+
 ## Ce que le registre refuse de faire a votre place
 
 Trois decisions lui sont deliberement interdites, parce que chacune est un

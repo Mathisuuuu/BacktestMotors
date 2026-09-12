@@ -8,6 +8,8 @@
     rsl run CONFIG              execute un backtest et ecrit son rapport
     rsl walkforward CONFIG      evalue par fenetres successives
     rsl verify CONFIG           execute deux fois et compare les empreintes
+    rsl essais                  registre des essais : ce que le DSR compte
+    rsl pbo CONFIG...           probabilite de surapprentissage d'une grille
 
 `verify` merite d'exister comme commande a part entiere. L'exigence "deux runs
 identiques produisent des resultats bit-a-bit identiques" est facile a ecrire
@@ -35,6 +37,7 @@ from rsl.errors import ConfigurationError, RslError
 from rsl.essais import EssaiDejaArchiveError, Registre, registre_par_defaut
 from rsl.manifest import canonical_hash
 from rsl.metrics.statistics import AnchoredWalkForward, RollingWalkForward
+from rsl.pbo import construire_grille
 from rsl.primitives.registry import describe_registry
 from rsl.report import BacktestReport, run_backtest
 from rsl.skeleton import build_skeleton
@@ -247,6 +250,49 @@ def _build_parser() -> argparse.ArgumentParser:
         "--json", action="store_true", help="sortie JSON plutot que tableau"
     )
     essais.set_defaults(handler=_cmd_essais)
+
+    pbo = sub.add_parser(
+        "pbo",
+        help="probabilite de surapprentissage (CSCV) d'une grille de configurations",
+    )
+    pbo.add_argument(
+        "configs",
+        type=Path,
+        nargs="+",
+        help=(
+            "au moins DEUX specifications, evaluees sur le meme echantillon. "
+            "La PBO mesure le surapprentissage d'une SELECTION : sans choix a "
+            "faire, il n'y a rien a mesurer."
+        ),
+    )
+    pbo.add_argument(
+        "--settings",
+        type=Path,
+        help="reglages communs, quand les CONFIGS sont des strategies seules",
+    )
+    pbo.add_argument("--symbol", help="instrument, pour une strategie mono-instrument")
+    pbo.add_argument(
+        "--blocks",
+        type=int,
+        default=8,
+        help=(
+            "nombre de sous-periodes S, PAIR. Le nombre de combinaisons croit "
+            "comme C(S, S/2) : 70 a S=8, 252 a S=10, 184 756 a S=20. Defaut : 8."
+        ),
+    )
+    pbo.add_argument(
+        "--drop-idle",
+        action="store_true",
+        help=(
+            "retire les configurations qui n'ont pris AUCUNE position sur une "
+            "sous-periode, au lieu de refuser. Le retrait est nomme : ces "
+            "configurations ne sont pas neutres, et la PBO porte alors sur les "
+            "restantes."
+        ),
+    )
+    pbo.add_argument("--out", type=Path, help="ecrit le resultat JSON dans ce fichier")
+    pbo.add_argument("--json", action="store_true", help="affiche le JSON")
+    pbo.set_defaults(handler=_cmd_pbo)
 
     squelette = sub.add_parser(
         "squelette",
@@ -557,6 +603,54 @@ def _cmd_essais(args: argparse.Namespace) -> int:
             empreintes = ", ".join(sorted({e.result_fingerprint[:12] for e in lignes}))
             print(f"  {cle[:12]} -> {empreintes}")
     return EXIT_OK
+
+
+def _cmd_pbo(args: argparse.Namespace) -> int:
+    """Probabilite de surapprentissage d'une grille, par CSCV.
+
+    Repond a une question que le Deflated Sharpe ne pose pas : si je choisis la
+    meilleure configuration sur une moitie de l'echantillon, quelle chance
+    a-t-elle de finir sous la mediane sur l'autre ? Le DSR qualifie un CHIFFRE ;
+    la PBO qualifie le PROCESSUS qui l'a produit.
+
+    Code de sortie 2 quand la PBO depasse le seuil : une grille surapprise est
+    une verification qui echoue, pas une erreur d'usage - c'est la meme
+    distinction que pour `verify`.
+    """
+    specs = [_load_spec(chemin, args.settings, args.symbol) for chemin in args.configs]
+    grille = construire_grille(
+        specs, args.blocks, ignorer_inactives=args.drop_idle
+    )
+    resultat = grille.evaluer()
+
+    if args.json:
+        print(json.dumps(
+            {"grille": grille.describe(), "pbo": resultat.describe()},
+            indent=2, ensure_ascii=False, sort_keys=True,
+        ))
+    else:
+        rule = "-" * 78
+        print(rule)
+        print(grille.render())
+        print(rule)
+        print(resultat.render())
+        print(rule)
+        for avertissement in grille.warnings:
+            print(f"Avertissement  {avertissement}")
+
+    if args.out is not None:
+        args.out.parent.mkdir(parents=True, exist_ok=True)
+        args.out.write_text(
+            json.dumps(
+                {"grille": grille.describe(), "pbo": resultat.describe()},
+                indent=2, sort_keys=True, ensure_ascii=False,
+            ),
+            encoding="utf-8",
+        )
+        if not args.json:
+            print(f"\nResultat JSON ecrit dans {args.out}")
+
+    return EXIT_CHECK_FAILED if resultat.est_surapprise else EXIT_OK
 
 
 def _cmd_squelette(args: argparse.Namespace) -> int:
