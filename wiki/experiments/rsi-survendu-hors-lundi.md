@@ -23,11 +23,11 @@ de 49 h, cf. [[reference/donnees]]).
 
 ## Montage
 
-- Config : [examples/rsi_survendu_hors_lundi.json](../../examples/rsi_survendu_hors_lundi.json)
+- Config : [examples/strategies/rsi_survendu_hors_lundi.json](../../examples/strategies/rsi_survendu_hors_lundi.json)
 - Donnees : `ES.v.0`, 1 min reechantillonne en `day`, 2732 barres, 10,57 ans
 - Vocabulaire employe : `rules@1` + `all_of`, `any_of`, `compare`, `primitive`
   (`rsi@1`, `atr@1`), `time`, `position`, `arith`, `price`, `constant`
-- Commande : `rsl run examples/rsi_survendu_hors_lundi.json`
+- Commande : `rsl run examples/strategies/rsi_survendu_hors_lundi.json --settings examples/reglages/rsi_survendu_hors_lundi.json --symbol ES.v.0`
 - Empreinte : `80e646bf9477a627e0ac1344a2f3a4a0bfbb252350fff560087925395824fdd2`
 - **Rapport non archive** : aucun `--out`. L'essai n'est donc pas rejouable en
   l'etat, et `rsl verify` rend d'ailleurs `2` (arbre de travail modifie).

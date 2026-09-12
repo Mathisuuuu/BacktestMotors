@@ -23,10 +23,10 @@ Les deux garanties que ce fichier verrouille
 from __future__ import annotations
 
 import json
-from pathlib import Path
 
 import pytest
 
+from fixtures.exemples import attendues, montage, noms, specification, strategie
 from rsl.composition import (
     FORMAT,
     StrategyFile,
@@ -111,62 +111,38 @@ class TestLeHashCouvreLesDeuxMoities:
 class TestLaCompositionReproduitLaSpecComplete:
     """Les deux chemins d'ecriture doivent donner le MEME run."""
 
-    @pytest.mark.parametrize(
-        "exemple", sorted(p.name for p in Path("examples").glob("*.json"))
-    )
-    def test_chaque_exemple_se_recompose_a_l_identique(self, exemple):
-        """La verification qui vaut pour tout le depot, et non pour un cas.
+    @pytest.mark.parametrize("exemple", noms())
+    def test_chaque_exemple_retrouve_son_config_hash_archive(self, exemple):
+        """La garantie qui a remplace l'aller-retour, et qui vaut mieux.
 
-        Chaque specification complete a ete coupee en deux : une strategie
-        dans `examples/strategies/`, un montage dans `examples/reglages/`.
-        Les recoller doit redonner EXACTEMENT la forme canonique d'origine -
-        sinon les deux chemins d'ecriture donneraient deux backtests, et il
-        faudrait savoir lequel croire.
+        Jusqu'au 2026-09-12, `examples/` portait aussi les specifications
+        COMPLETES, et ce test comparait la composition a l'une d'elles. Elles
+        ont ete supprimees - le fichier que l'on ecrit est une strategie.
+
+        Comparer a une archive vaut mieux que comparer a un fichier voisin :
+        `empreintes_attendues.json` porte le `config_hash` mesure AVANT la
+        separation. Le retrouver prouve que recoller les deux morceaux redonne
+        exactement le run d'origine, et pas seulement qu'ils sont coherents
+        entre eux.
+
+        Sans donnees reelles : un `config_hash` ne depend que de la
+        specification.
         """
-        from rsl.config import BacktestSpec
-
-        complet = json.loads(Path("examples", exemple).read_text(encoding="utf-8"))
-        strategie = StrategyFile.model_validate_json(
-            Path("examples/strategies", exemple).read_text(encoding="utf-8")
-        )
-        montage = json.loads(
-            Path("examples/reglages", exemple).read_text(encoding="utf-8")
-        )
-        symbole = (
-            complet["strategy"]["params"].get("symbol")
-            if attend_un_symbole(strategie.strategy.ref)
-            else None
+        assert canonical_hash(specification(exemple).canonical()) == (
+            attendues()[exemple]["config_hash"]
         )
 
-        attendu = BacktestSpec.model_validate(complet).canonical()
-        obtenu = compose(strategie, montage, symbol=symbole).canonical()
-        differences = [
-            cle for cle in set(attendu) | set(obtenu)
-            if json.dumps(attendu.get(cle), sort_keys=True)
-            != json.dumps(obtenu.get(cle), sort_keys=True)
-        ]
-        assert differences == [], differences
-
-    @pytest.mark.parametrize(
-        "exemple", sorted(p.name for p in Path("examples").glob("*.json"))
-    )
+    @pytest.mark.parametrize("exemple", noms())
     def test_aucune_strategie_ne_nomme_son_actif(self, exemple):
         """Le point de la separation : un fichier qui nomme son instrument
         n'est pas applicable a un autre."""
-        strategie = json.loads(
-            Path("examples/strategies", exemple).read_text(encoding="utf-8")
-        )
-        assert "symbol" not in strategie["strategy"]["params"]
+        assert "symbol" not in strategie(exemple).strategy.params
 
-    @pytest.mark.parametrize(
-        "exemple", sorted(p.name for p in Path("examples").glob("*.json"))
-    )
+    @pytest.mark.parametrize("exemple", noms())
     def test_aucun_montage_ne_porte_de_regle(self, exemple):
-        montage = json.loads(
-            Path("examples/reglages", exemple).read_text(encoding="utf-8")
-        )
-        assert "strategy" not in montage
-        assert "name" not in montage
+        reglage = montage(exemple)
+        assert "strategy" not in reglage
+        assert "name" not in reglage
 
     def test_le_symbole_est_bien_injecte(self):
         spec = compose(fichier(), reglages(), symbol="ES.v.0")
@@ -246,9 +222,9 @@ class TestReconnaitreLeFormat:
         assert est_fichier_de_strategie(STRATEGIE)
 
     def test_une_specification_complete_ne_l_est_pas(self):
-        complet = json.loads(
-            Path("examples/sma_es_daily.json").read_text(encoding="utf-8")
-        )
+        """Une specification complete reste lisible - `rsl run` l'accepte
+        toujours - elle n'est simplement plus ce qu'on ECRIT."""
+        complet = {**reglages(), "name": "x", "strategy": STRATEGIE["strategy"]}
         assert not est_fichier_de_strategie(complet)
 
     def test_un_format_inconnu_est_refuse(self):

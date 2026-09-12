@@ -44,8 +44,21 @@ EXIT_OK = 0
 EXIT_ERROR = 1
 EXIT_CHECK_FAILED = 2
 
-EXAMPLE_SPEC: dict[str, object] = {
+EXAMPLE_STRATEGY: dict[str, object] = {
+    "format": "rsl-strategy@1",
     "name": "sma-crossover-es-quotidien",
+    "note": [
+        "Croisement 20/100. Le fichier ne nomme NI l'actif, NI le capital, NI",
+        "les couts : ce sont des choix de run, pas de strategie, et ils se",
+        "donnent par `--settings` ou dans l'onglet MONTAGE de `rsl gui`.",
+    ],
+    "strategy": {
+        "ref": "sma_crossover@1",
+        "params": {"fast_window": 20, "slow_window": 100},
+    },
+}
+
+EXAMPLE_SETTINGS: dict[str, object] = {
     "initial_cash": 500000.0,
     "seed": 0,
     "risk_free_annual": 0.0,
@@ -66,10 +79,6 @@ EXAMPLE_SPEC: dict[str, object] = {
         "margin_policy": "reject",
     },
     "risk": {"sizing": {"kind": "fixed", "contracts": 1}},
-    "strategy": {
-        "ref": "sma_crossover@1",
-        "params": {"symbol": "ES.v.0", "fast_window": 20, "slow_window": 100},
-    },
 }
 
 
@@ -128,7 +137,18 @@ def _build_parser() -> argparse.ArgumentParser:
     schema.add_argument("--out", type=Path, help="ecrit dans ce fichier")
     schema.set_defaults(handler=_cmd_schema)
 
-    example = sub.add_parser("example", help="specification d'exemple")
+    example = sub.add_parser(
+        "example", help="strategie d'exemple, ou reglages de run"
+    )
+    example.add_argument(
+        "--what",
+        choices=("strategy", "settings"),
+        default="strategy",
+        help=(
+            "`strategy` (defaut) : ce qu'on ECRIT. `settings` : l'actif, le "
+            "capital et les couts, que la fenetre choisit aussi."
+        ),
+    )
     example.set_defaults(handler=_cmd_example)
 
     run = sub.add_parser("run", help="execute un backtest")
@@ -175,6 +195,18 @@ def _build_parser() -> argparse.ArgumentParser:
         "walkforward", help="evalue la strategie par fenetres successives"
     )
     walk.add_argument("config", type=Path)
+    walk.add_argument(
+        "--settings",
+        type=Path,
+        help=(
+            "reglages du run (actif, capital, couts) quand CONFIG est une "
+            "strategie seule"
+        ),
+    )
+    walk.add_argument(
+        "--symbol",
+        help="instrument sur lequel appliquer une strategie mono-instrument",
+    )
     walk.add_argument("--train", type=int, required=True, help="barres d'apprentissage")
     walk.add_argument("--test", type=int, required=True, help="barres de test par pli")
     walk.add_argument("--step", type=int, help="pas entre plis (defaut : la taille du test)")
@@ -197,6 +229,18 @@ def _build_parser() -> argparse.ArgumentParser:
 
     verify = sub.add_parser("verify", help="execute deux fois et compare les empreintes")
     verify.add_argument("config", type=Path)
+    verify.add_argument(
+        "--settings",
+        type=Path,
+        help=(
+            "reglages du run (actif, capital, couts) quand CONFIG est une "
+            "strategie seule"
+        ),
+    )
+    verify.add_argument(
+        "--symbol",
+        help="instrument sur lequel appliquer une strategie mono-instrument",
+    )
     verify.set_defaults(handler=_cmd_verify)
 
     return parser
@@ -312,7 +356,16 @@ def _cmd_schema(args: argparse.Namespace) -> int:
 
 
 def _cmd_example(args: argparse.Namespace) -> int:
-    print(json.dumps(EXAMPLE_SPEC, indent=2, ensure_ascii=False))
+    """Un exemple a rediriger dans un fichier.
+
+    Emet une STRATEGIE par defaut, et non une specification complete : depuis
+    le 2026-09-12, ce qu'on ecrit est une strategie. Le montage se choisit dans
+    la fenetre, ou se donne par `--settings`.
+    """
+    charge = (
+        EXAMPLE_SETTINGS if args.what == "settings" else EXAMPLE_STRATEGY
+    )
+    print(json.dumps(charge, indent=2, ensure_ascii=False))
     return EXIT_OK
 
 
@@ -358,7 +411,7 @@ def _cmd_gui(args: argparse.Namespace) -> int:
 
 
 def _cmd_walkforward(args: argparse.Namespace) -> int:
-    spec = _load_spec(args.config)
+    spec = _load_spec(args.config, args.settings, args.symbol)
     splitter = (
         AnchoredWalkForward(initial_train_bars=args.train, test_bars=args.test)
         if args.anchored
@@ -385,7 +438,7 @@ def _cmd_walkforward(args: argparse.Namespace) -> int:
 
 def _cmd_verify(args: argparse.Namespace) -> int:
     """Deux runs, deux empreintes. Elles doivent etre egales."""
-    spec = _load_spec(args.config)
+    spec = _load_spec(args.config, args.settings, args.symbol)
     first = run_backtest(spec)
     second = run_backtest(spec)
 

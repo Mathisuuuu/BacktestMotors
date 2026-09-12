@@ -417,11 +417,28 @@ class TestCliInformationalCommands:
         refs = {entry["ref"] for entry in catalogue["strategies"]}
         assert refs >= {"buy_and_hold@1", "sma_crossover@1", "cross_sectional_momentum@1"}
 
-    def test_the_example_is_a_valid_specification(self, capsys):
+    def test_the_example_is_a_valid_strategy(self, capsys):
+        """`rsl example` emet une STRATEGIE depuis le 2026-09-12.
+
+        Ce qu'on ecrit est une strategie ; l'actif, le capital et les couts
+        sont des choix de run et se donnent par `--settings`.
+        """
+        from rsl.composition import StrategyFile
+
         main(["example"])
-        payload = json.loads(capsys.readouterr().out)
-        payload["data"][0]["path"] = "peu-importe.parquet"
-        BacktestSpec.model_validate(payload)
+        assert StrategyFile.model_validate(json.loads(capsys.readouterr().out))
+
+    def test_the_example_settings_complete_it(self, capsys):
+        """Les deux moities doivent se recoller : un exemple qui ne compose pas
+        serait un exemple que personne ne peut executer."""
+        from rsl.composition import StrategyFile, compose
+
+        main(["example"])
+        strategie = StrategyFile.model_validate(json.loads(capsys.readouterr().out))
+        main(["example", "--what", "settings"])
+        reglages = json.loads(capsys.readouterr().out)
+        reglages["data"][0]["path"] = "peu-importe.parquet"
+        assert compose(strategie, reglages, symbol="ES.v.0") is not None
 
     def test_no_command_prints_help(self, capsys):
         assert main([]) == EXIT_ERROR

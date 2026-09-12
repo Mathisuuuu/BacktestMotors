@@ -21,6 +21,7 @@ import pathlib
 import pytest
 from jsonschema import Draft202012Validator
 
+from fixtures.exemples import noms
 from rsl.config import BacktestSpec
 from rsl.strategies.base import describe_strategies
 from rsl.strategies.signals import (
@@ -247,17 +248,24 @@ class TestCli:
 
 
 class TestExamplesValidate:
-    """Les fichiers versionnes dans `examples/` doivent passer leur propre schema."""
+    """Les strategies versionnees doivent passer le schema qu'elles publient.
 
-    def test_the_rule_example_validates(self, validator: Draft202012Validator):
-        import pathlib
+    Un schema qui refuserait les exemples du depot serait faux ; des exemples
+    que le schema refuse seraient faux. On ne sait pas lequel des deux sans le
+    verifier, et c'est tout l'objet de ce test.
+    """
 
-        path = pathlib.Path("examples/retour_moyenne_dans_tendance.json")
-        if not path.exists():
-            pytest.skip("exemple absent")
-        spec = json.loads(path.read_text(encoding="utf-8"))
-        for rule in spec["strategy"]["params"]["rules"].values():
-            validator.validate(rule)
+    @pytest.mark.parametrize("exemple", noms())
+    def test_every_rule_of_every_example_validates(
+        self, validator: Draft202012Validator, exemple: str
+    ):
+        from fixtures.exemples import strategie
+
+        regles = strategie(exemple).strategy.params.get("rules")
+        if not isinstance(regles, dict):
+            pytest.skip("ce moule ne s'ecrit pas en regles nommees")
+        for regle in regles.values():
+            validator.validate(regle)
 
 
 class TestCommittedSchemasStayInSync:

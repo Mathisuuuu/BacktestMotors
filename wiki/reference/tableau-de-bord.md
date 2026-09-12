@@ -32,7 +32,7 @@ quatre a la fois.
 ```
 
 ```bash
-.venv/Scripts/rsl.exe gui examples/sma_es_daily.json
+.venv/Scripts/rsl.exe gui examples/strategies/sma_es_daily.json --settings examples/reglages/sma_es_daily.json --symbol ES.v.0
 ```
 
 `rsl gui` sans argument ouvre la fenetre vide ; le bouton **CHARGER UN JSON**

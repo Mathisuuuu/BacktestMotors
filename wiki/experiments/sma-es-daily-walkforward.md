@@ -23,10 +23,10 @@ fenetres ?
 
 ## Montage
 
-- Config : [examples/sma_es_daily.json](../../examples/sma_es_daily.json)
+- Config : [examples/strategies/sma_es_daily.json](../../examples/strategies/sma_es_daily.json)
 - Donnees : `ES.v.0`, reechantillonne au quotidien, 2753 barres / 10,65 ans,
   258,6 periodes/an **mesurees**
-- Commande : `rsl walkforward examples/sma_es_daily.json --train 500 --test 250`
+- Commande : `rsl walkforward examples/strategies/sma_es_daily.json --settings examples/reglages/sma_es_daily.json --symbol ES.v.0 --train 500 --test 250`
 
 ## Resultat
 

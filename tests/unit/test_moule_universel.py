@@ -10,16 +10,17 @@ ici, avec le nom du manquant.
 from __future__ import annotations
 
 import json
-import pathlib
 
 import pytest
 
+from fixtures.exemples import STRATEGIES, montage, specification
+from rsl.composition import StrategyFile
 from rsl.config import BacktestSpec
 from rsl.strategies.base import get_strategy
 from rsl.strategies.signals import build_signal, list_node_types
 
-MOULE = pathlib.Path("examples/_moule_universel.json")
-DEMARRAGE = pathlib.Path("examples/_moule.json")
+MOULE = STRATEGIES / "_moule_universel.json"
+DEMARRAGE = STRATEGIES / "_moule.json"
 
 
 @pytest.fixture(scope="module")
@@ -76,9 +77,18 @@ class TestCouverture:
 
 
 class TestValidite:
-    def test_la_specification_est_valide(self, moule):
-        """Pydantic en `extra=forbid` : un champ en trop ferait echouer ici."""
-        assert BacktestSpec.model_validate(moule) is not None
+    def test_le_fichier_de_strategie_est_valide(self, moule):
+        """Pydantic en `extra=forbid` : un champ en trop ferait echouer ici.
+
+        C'est un fichier de STRATEGIE depuis le 2026-09-12 : il ne porte plus
+        ni actif, ni capital, ni couts.
+        """
+        assert StrategyFile.model_validate(moule) is not None
+
+    def test_et_recolle_a_son_montage_il_donne_un_run_valide(self):
+        """La verification qui compte vraiment : une strategie qui ne se
+        compose pas est une strategie qu'on ne peut pas executer."""
+        assert isinstance(specification("_moule_universel.json"), BacktestSpec)
 
     def test_chaque_regle_se_reconstruit_en_signal(self, moule):
         for nom, regle in regles(moule).items():
@@ -92,14 +102,20 @@ class TestValidite:
     def test_le_moule_de_demarrage_reste_valide(self):
         """Le moule simple n'est pas remplace par l'universel : il demarre."""
         contenu = json.loads(DEMARRAGE.read_text(encoding="utf-8"))
-        assert BacktestSpec.model_validate(contenu) is not None
+        assert StrategyFile.model_validate(contenu) is not None
+        assert specification("_moule.json") is not None
 
 
 class TestLisibilite:
-    def test_les_chemins_de_donnees_sont_relatifs(self, moule):
-        """Un chemin absolu rendrait le moule inutilisable chez un collaborateur
-        ET ferait diverger le `config_hash` entre machines."""
-        sources = moule["data"]
+    def test_les_chemins_de_donnees_sont_relatifs(self):
+        """Un chemin absolu rendrait le montage inutilisable chez un
+        collaborateur ET ferait diverger le `config_hash` entre machines.
+
+        Le chemin vit desormais dans le MONTAGE, pas dans la strategie : une
+        strategie qui nommerait un fichier ne serait applicable a rien
+        d'autre.
+        """
+        sources = montage("_moule_universel.json")["data"]
         assert isinstance(sources, list)
         for source in sources:
             assert isinstance(source, dict)

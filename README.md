@@ -176,7 +176,7 @@ sinon l'exigence de reproductibilite serait inverifiable.
 ## Walk-forward : la performance tient-elle sur toute la periode ?
 
 ```bash
-rsl walkforward examples/sma_es_daily.json --train 500 --test 250
+rsl walkforward examples/strategies/sma_es_daily.json --settings examples/reglages/sma_es_daily.json --symbol ES.v.0 --train 500 --test 250
 ```
 
 ```
@@ -242,7 +242,7 @@ le depot :
 ```
 
 ```bash
-rsl run examples/retour_moyenne_dans_tendance.json
+rsl run examples/strategies/retour_moyenne_dans_tendance.json --settings examples/reglages/retour_moyenne_dans_tendance.json --symbol ES.v.0
 ```
 
 Aucune ligne de Python n'est ecrite NI GENEREE. C'est ce qui rend la phase
@@ -330,7 +330,7 @@ instrument au meme instant ; le second eleve n'importe quelle expression en
 statistique glissante. L'un sans l'autre ne sert a rien : on saurait calculer
 un spread sans pouvoir le normaliser, et un niveau de spread brut ne se trade
 pas. Ensemble, une strategie de paires s'ecrit en JSON - voir
-`examples/paire_es_nq.json`, qui tourne sur ES/NQ reels.
+`examples/strategies/paire_es_nq.json`, qui tourne sur ES/NQ reels.
 
 **`rolling` a un cout assume** : il reevalue son sous-arbre `window` fois par
 barre, via `ctx.shifted(k)`. Sur une fenetre de 120 et un sous-arbre de trois

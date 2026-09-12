@@ -24,14 +24,14 @@ sur 120 jours descend sous -1,5 ; sortir au retour a zero, ou apres 40 barres.
 
 ## Montage
 
-- Config : [examples/paire_es_nq.json](../../examples/paire_es_nq.json) —
+- Config : [examples/strategies/paire_es_nq.json](../../examples/strategies/paire_es_nq.json) —
   **inchangee** ; c'est le moteur qui a ete corrige, pas la specification, et
   le `config_hash` le montre (identique avant et apres).
 - Donnees : `ES.v.0` et `NQ.v.0`, 1 min reechantillonnes en `day`, panneau de
   2633 lignes, 10,19 ans
 - Vocabulaire : `panel_rules@1` + `rolling(zscore)`, `arith`, `peer`,
   `position`, `compare`, `any_of`
-- Commande : `rsl run examples/paire_es_nq.json`
+- Commande : `rsl run examples/strategies/paire_es_nq.json --settings examples/reglages/paire_es_nq.json --symbol ES.v.0`
 - Empreinte : `479348a0ff34b8e36d5ed79d26d9642573ea67d6890bf193fff2c1ca4bb86ac3`
 - **Rapport non archive** : aucun `--out`, donc pas rejouable en l'etat.
 

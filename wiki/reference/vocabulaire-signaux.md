@@ -19,8 +19,8 @@ autorite: schemas/signals.schema.json (engendre, ne pas editer a la main)
 | Comment regenerer les schemas ? | `rsl schema --out schemas/signals.schema.json` |
 | Comment un arbre est-il reconstruit depuis du JSON ? | `build_signal(spec)` dans [src/rsl/strategies/signals.py](../../src/rsl/strategies/signals.py) |
 | Que peut-on mettre dans CHAQUE emplacement ? | [schemas/squelette.json](../../schemas/squelette.json) — engendre par `rsl squelette`. Chaque trou y est decrit par ses valeurs acceptees |
-| Par quoi commencer pour ecrire une strategie ? | [examples/_moule.json](../../examples/_moule.json), a copier puis editer |
-| A quoi ressemble CHAQUE type de noeud en JSON ? | [examples/_moule_universel.json](../../examples/_moule_universel.json) — les 20, dans un fichier qui tourne |
+| Par quoi commencer pour ecrire une strategie ? | [examples/strategies/_moule.json](../../examples/strategies/_moule.json), a copier puis editer |
+| A quoi ressemble CHAQUE type de noeud en JSON ? | [examples/strategies/_moule_universel.json](../../examples/strategies/_moule_universel.json) — les 20, dans un fichier qui tourne |
 | Comment lire une grandeur de SEANCE ? | `session` et `cumulative` — exigent un calendrier declare, voir [[reference/seances]] |
 | Comment lisser une EXPRESSION (pas un champ de prix) ? | `rolling` avec `stat: "ema"`. `primitive` est une feuille : elle ne lit que des champs de prix |
 | Wilder ou moyenne simple ? | `atr@1` / `rsi@1` sont des moyennes ARITHMETIQUES ; `atr_wilder@1` / `rsi_wilder@1` sont les variantes de Wilder. Des noms distincts, jamais des versions — voir [[lessons]] L10 |
@@ -213,7 +213,7 @@ coupure.
 |---|---|---|
 | [schemas/squelette.json](../../schemas/squelette.json) | **ecrire** : chaque emplacement avec ses valeurs acceptees, les 10 instruments, les 136 primitives, les 23 noeuds, les 7 strategies | oui, `rsl squelette` |
 | [schemas/signals.schema.json](../../schemas/signals.schema.json) | **valider** : JSON Schema exact | oui, `rsl schema` |
-| [examples/_moule_universel.json](../../examples/_moule_universel.json) | **imiter** : un fichier qui tourne et exerce les 20 noeuds | non, teste |
+| [examples/strategies/_moule_universel.json](../../examples/strategies/_moule_universel.json) | **imiter** : un fichier qui tourne et exerce les 20 noeuds | non, teste |
 
 Le squelette est en **ASCII pur** et se redirige donc sans risque (`rsl schema`
 en sortie standard, lui, sort en CP1252 sur Windows).
@@ -227,12 +227,12 @@ document.
 
 | Fichier | Ce qu'il montre |
 |---|---|
-| [examples/_moule_universel.json](../../examples/_moule_universel.json) | **la reference exhaustive** : les **20** types de noeuds, long ET short, stop adaptatif, objectif borne. Un test echoue si un type de noeud enregistre n'y figure pas |
-| [examples/_moule.json](../../examples/_moule.json) | **le gabarit de demarrage**, plus court : tous les blocs d'une specification et une strategie `rules@1` complete. Tourne tel quel |
-| [examples/sma_es_daily.json](../../examples/sma_es_daily.json) | croisement de moyennes, mono-instrument |
-| [examples/retour_moyenne_dans_tendance.json](../../examples/retour_moyenne_dans_tendance.json) | `rules@1` — strategie ecrite nulle part dans le code |
-| [examples/paire_es_nq.json](../../examples/paire_es_nq.json) | `peer` + `rolling` — paire ES/NQ sur donnees reelles |
-| [examples/momentum_12_1_mensuel.json](../../examples/momentum_12_1_mensuel.json) | transversal, classement |
+| [examples/strategies/_moule_universel.json](../../examples/strategies/_moule_universel.json) | **la reference exhaustive** : les **20** types de noeuds, long ET short, stop adaptatif, objectif borne. Un test echoue si un type de noeud enregistre n'y figure pas |
+| [examples/strategies/_moule.json](../../examples/strategies/_moule.json) | **le gabarit de demarrage**, plus court : tous les blocs d'une specification et une strategie `rules@1` complete. Tourne tel quel |
+| [examples/strategies/sma_es_daily.json](../../examples/strategies/sma_es_daily.json) | croisement de moyennes, mono-instrument |
+| [examples/strategies/retour_moyenne_dans_tendance.json](../../examples/strategies/retour_moyenne_dans_tendance.json) | `rules@1` — strategie ecrite nulle part dans le code |
+| [examples/strategies/paire_es_nq.json](../../examples/strategies/paire_es_nq.json) | `peer` + `rolling` — paire ES/NQ sur donnees reelles |
+| [examples/strategies/momentum_12_1_mensuel.json](../../examples/strategies/momentum_12_1_mensuel.json) | transversal, classement |
 
 ## Combien d'indicateurs, et comment ils sont verifies
 
@@ -370,7 +370,7 @@ aucun ordre n'a pu etre emis.
 Le cas `peer`, lui, **etait** un bug. Le terme distant restait a l'instant
 courant, donc constant sur toute la fenetre ; un z-score etant invariant
 d'echelle, il n'avait aucun effet - ecart 2,08e-14 avec un z-score du seul
-numerateur. L'empreinte de [examples/paire_es_nq.json](../../examples/paire_es_nq.json)
+numerateur. L'empreinte de [examples/strategies/paire_es_nq.json](../../examples/strategies/paire_es_nq.json)
 change avec la correction, et son `config_hash` non : le moteur a change, pas
 la specification. Voir [[lessons]] L18 et
 [[experiments/paire-es-nq-retour-a-la-moyenne]].

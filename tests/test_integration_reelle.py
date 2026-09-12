@@ -30,7 +30,6 @@ qui distingue les deux cas.
 
 from __future__ import annotations
 
-import json
 import math
 import os
 import subprocess
@@ -39,6 +38,7 @@ from pathlib import Path
 
 import pytest
 
+from fixtures.exemples import attendues, specification
 from rsl.config import BacktestSpec
 from rsl.env import data_root
 from rsl.manifest import canonical_hash
@@ -53,18 +53,18 @@ pytestmark = [
     pytest.mark.skipif(not DONNEES.exists(), reason=f"donnees absentes : {DONNEES}"),
 ]
 
-EXEMPLES = Path("examples")
-ATTENDUES = json.loads(
-    (Path(__file__).parent / "fixtures" / "empreintes_attendues.json").read_text(
-        encoding="utf-8"
-    )
-)
+ATTENDUES = attendues()
 
 
 def spec_de(nom: str) -> BacktestSpec:
-    return BacktestSpec.model_validate_json(
-        (EXEMPLES / nom).read_text(encoding="utf-8")
-    )
+    """L'exemple RECOLLE : strategie + montage.
+
+    Depuis le 2026-09-12 il n'existe plus de specification complete sur le
+    disque. Ce que ces tests verrouillent n'a pas change pour autant - ils
+    verifient toujours qu'un run reel rend les memes chiffres qu'hier ; ils
+    verifient en plus, desormais, que la COMPOSITION les rend.
+    """
+    return specification(nom)
 
 
 @pytest.fixture(scope="module")
@@ -156,14 +156,13 @@ class TestMemoisationSurDonneesReelles:
 
     def test_sans_memoisation_l_empreinte_est_la_meme(self):
         nom = "retour_moyenne_dans_tendance.json"
+        # L'interpreteur fils recompose l'exemple par le MEME chemin que le
+        # reste de la suite : `tests/` sur le chemin, puis `specification()`.
         programme = (
-            "import json;"
-            "from pathlib import Path;"
-            "from rsl.config import BacktestSpec;"
+            "import sys; sys.path.insert(0, 'tests');"
+            "from fixtures.exemples import specification;"
             "from rsl.report import run_backtest;"
-            f"spec = BacktestSpec.model_validate_json(Path(r'{EXEMPLES / nom}')"
-            ".read_text(encoding='utf-8'));"
-            "print(run_backtest(spec).result_fingerprint)"
+            f"print(run_backtest(specification({nom!r})).result_fingerprint)"
         )
         resultat = subprocess.run(
             [sys.executable, "-c", programme],

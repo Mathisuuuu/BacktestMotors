@@ -17,7 +17,7 @@ generated: true
 | Indicateur | Valeur |
 |---|---|
 | Pages de wiki | 23 |
-| Entrees de log | 117 |
+| Entrees de log | 121 |
 | Derniere activite | 2026-09-12 |
 | Idees ecartees (ledger) | 18 |
 | Idees en attente (ledger) | 3 |
@@ -27,7 +27,7 @@ generated: true
 | Pages `reference/` | 7 |
 | Pages `research/` | 1 |
 
-**Activite par type :** note × 58, fix × 23, feat × 16, decision × 14, experiment × 2, setup × 1, lint × 1, audit × 1, refactor × 1
+**Activite par type :** note × 60, fix × 24, feat × 16, decision × 15, experiment × 2, setup × 1, lint × 1, audit × 1, refactor × 1
 
 ## Experiences
 
@@ -42,14 +42,14 @@ Le total des essais alimente le Deflated Sharpe : un essai non enregistre gonfle
 
 ## Derniere activite — 8 entree(s)
 
+- **2026-09-12** — fix | `walkforward` et `verify` appelaient le meme chargeur sans en avoir les options | les commandes documentees dans les pages d'experience etaient donc devenues impossibles. Verifie en les EXECUTANT toutes, extraites du README et du wiki par expression reguliere : quatre commandes, quatre succes. Une commande documentee qu'on n'execute pas est une commande qu'on suppose
+- **2026-09-12** — note | un seul chemin pour charger un exemple : `tests/fixtures/exemples.py` | cinq fichiers de tests chargeaient un exemple, chacun a sa maniere. Avec DEUX morceaux a recoller et un symbole a injecter, cinq manieres seraient devenues cinq occasions de le faire differemment. Le symbole vient de `empreintes_attendues.json`, deja verite terrain : le stocker ailleurs ferait une seconde source
+- **2026-09-12** — note | le test d'aller-retour a disparu, remplace par une garantie PLUS FORTE | il comparait la composition a la specification complete voisine. Celles-ci supprimees, il compare desormais au `config_hash` ARCHIVE dans `empreintes_attendues.json`, mesure AVANT la separation. Comparer a une archive vaut mieux que comparer a un fichier voisin : cela prouve que recoller les deux morceaux redonne le run d'origine, et pas seulement qu'ils sont coherents entre eux. Sans donnees reelles, un `config_hash` ne dependant que de la specification
+- **2026-09-12** — decision | les specifications completes sont SUPPRIMEES de `examples/` | il ne reste que `examples/strategies/` (la decision) et `examples/reglages/` (l'actif, le capital, les couts). Ce qu'on ecrit est une strategie ; le montage se choisit dans l'onglet MONTAGE ou par `--settings`. `rsl example` emet desormais une strategie par defaut, et `--what settings` donne l'autre moitie
 - **2026-09-12** — note | dette assumee et tenue par un test : la table des dossiers de `gui/montage.py` | elle recopie l'arborescence reelle (`ES` -> `indices`, `GC` -> `metaux`...), que la table d'instruments ne porte pas. Le vrai correctif serait de l'y ajouter, et il touche a la couche donnees. En attendant, `test_gui_montage.py` verifie qu'elle couvre EXACTEMENT les racines connues, donc qu'un instrument ajoute ne soit pas oublie
 - **2026-09-12** — note | deux details de la fenetre, corriges parce qu'un defaut arbitraire n'est pas neutre | (1) l'actif propose a l'ouverture etait `6A`, premier par ordre alphabetique, un contrat sur le dollar australien que personne ne teste en premier -- c'est `ES` desormais, choisi expres ; (2) `ttk.Notebook.select` n'etant pas annotee en amont, un `type: ignore` CIBLE sur une ligne plutot que l'elargissement de l'exception `disallow_untyped_calls` a sept cents lignes d'appels tkinter
 - **2026-09-12** — feat | onglet MONTAGE dans la fenetre : actif, agregation, capital, contrats, frais, glissement | six reglages, ceux qu'on change d'un essai a l'autre. Les autres (`lag_bars`, `intrabar_priority`, `margin_policy`...) gardent les defauts du socle, qui sont des choix de prudence : les rendre reglables d'un clic inviterait a les desactiver sans y penser. La logique vit dans `gui/montage.py`, SANS tkinter, donc testee -- meme separation que `gui/model.py`
 - **2026-09-12** — note | les 7 exemples se recomposent SANS UNE SEULE DIFFERENCE | chaque specification complete a ete coupee en `examples/strategies/` + `examples/reglages/`, et les recoller redonne exactement la forme canonique d'origine -- y compris pour les moules transversaux. Les 7 empreintes de resultat sont inchangees. Le test est parametre sur le repertoire : un exemple ajoute demain est couvert sans qu'une ligne soit ecrite
-- **2026-09-12** — decision | le `config_hash` continue de couvrir le TOUT, et c'est le point non negociable | `compose()` construit une `BacktestSpec` complete, qui reste ce qui est hache et archive. Verifie : changer l'actif, le capital ou le glissement change le hash. La separation est une commodite d'ECRITURE, jamais un relachement de la reproductibilite. `compose()` ne redeclare aucun champ non plus -- il fait valider le dictionnaire de reglages PAR `BacktestSpec`, donc rien ne peut diverger d'elle
-- **2026-09-12** — feat | la STRATEGIE est separee de son MONTAGE | une `BacktestSpec` melangeait la decision (`strategy`) et le montage (`data`, `initial_cash`, `execution`, `risk`) : la meme strategie sur ES et sur NQ demandait deux fichiers presque identiques, et rien ne disait lequel des deux mots avait change. Un fichier `"format": "rsl-strategy@1"` ne porte desormais que la decision ; le reste se choisit dans la fenetre ou par `rsl run --settings`. Le symbole est INJECTE a la composition, la detection se faisant sur le modele de parametres du moule et non sur une liste tenue a la main
-- **2026-09-12** — note | seul le `config_hash` de `_moule_universel` change, pas son empreinte de resultat | `190584bb` -> `d990888c`. C'est la signature exacte d'un changement de SPECIFICATION sans changement de resultat, et c'est precisement ce que `test_integration_reelle.py` a ete ecrit pour rendre lisible. Les 7 empreintes de resultat sont inchangees
-- **2026-09-12** — note | le moule universel exerce le noeud, et j'ai verifie qu'il n'etait pas INERTE | coupe-circuit a -12 % de drawdown ajoute a `exit_long` et `exit_short`. L'empreinte ne bouge pas -- exactement le piege de [[lessons]] L18. Verifie plutot que suppose : le drawdown maximum du run est de -9,65 %, le seuil n'est donc jamais atteint, et abaisser le seuil a -5 %, -2 % puis -1 % CHANGE bien l'empreinte a chaque fois. Le noeud est vivant
 
 ## Next Actions
 

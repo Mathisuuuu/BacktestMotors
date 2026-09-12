@@ -32,13 +32,14 @@ from pathlib import Path
 import pytest
 from jsonschema import Draft202012Validator
 
+from fixtures.exemples import STRATEGIES, specification
 from rsl.config import BacktestSpec
 from rsl.errors import ConfigurationError
 from rsl.manifest import canonical_hash
 from rsl.skeleton import build_skeleton
 from rsl.strategies.signals import build_signal, signal_json_schema
 
-BASE = json.loads(Path("examples/sma_es_daily.json").read_text(encoding="utf-8"))
+BASE = specification("sma_es_daily.json").model_dump(mode="json")
 
 UNE_NOTE = "seuil a 20 parce que c'est la convention du papier d'origine"
 PLUSIEURS = ["premiere ligne", "seconde ligne", "troisieme"]
@@ -217,16 +218,14 @@ class TestUnExempleReelEstAnnote:
 
     def test_paire_es_nq_porte_des_notes(self):
         spec_brute = json.loads(
-            Path("examples/paire_es_nq.json").read_text(encoding="utf-8")
+            (STRATEGIES / "paire_es_nq.json").read_text(encoding="utf-8")
         )
         assert "note" in spec_brute
         regles = spec_brute["strategy"]["params"]["rules"]
         assert "note" in regles["entry_long"]
 
     def test_et_il_reste_valide(self):
-        BacktestSpec.model_validate_json(
-            Path("examples/paire_es_nq.json").read_text(encoding="utf-8")
-        )
+        assert specification("paire_es_nq.json") is not None
 
     def test_ses_notes_ne_figurent_pas_dans_sa_forme_canonique(self):
         """Le test qui a trouve le defaut : les notes de NOEUDS vivent dans
@@ -234,9 +233,7 @@ class TestUnExempleReelEstAnnote:
         telle quelle. Elles entraient donc dans le `config_hash`
         (`c686c31f` -> `bf0f2f3f`), exactement la ou la garantie comptait le
         plus. `canonical()` les retire desormais a toute profondeur."""
-        depuis = BacktestSpec.model_validate_json(
-            Path("examples/paire_es_nq.json").read_text(encoding="utf-8")
-        )
+        depuis = specification("paire_es_nq.json")
         assert "note" not in json.dumps(depuis.canonical())
 
     def test_son_config_hash_est_celui_d_avant_les_notes(self):
@@ -245,7 +242,5 @@ class TestUnExempleReelEstAnnote:
         archive = json.loads(
             Path("tests/fixtures/empreintes_attendues.json").read_text(encoding="utf-8")
         )["paire_es_nq.json"]["config_hash"]
-        depuis = BacktestSpec.model_validate_json(
-            Path("examples/paire_es_nq.json").read_text(encoding="utf-8")
-        )
+        depuis = specification("paire_es_nq.json")
         assert canonical_hash(depuis.canonical()) == archive

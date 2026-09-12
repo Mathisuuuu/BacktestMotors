@@ -15,9 +15,9 @@ autorite: src/rsl/cli.py + README.md
 | `rsl instruments` | table des contrats |
 | `rsl catalogue` | primitives, noeuds et strategies enregistres |
 | `rsl schema [--what signals\|strategies\|spec\|all]` | JSON Schema du vocabulaire. **Le defaut est `signals`** : regenerer `schemas/rsl.schema.json` exige `--what all`, sinon le fichier complet est ecrase par le seul schema des signaux |
-| `rsl example` | specification d'exemple, a rediriger dans un fichier |
+| `rsl example [--what strategy\|settings]` | **strategie** d'exemple par defaut, ou reglages de run. Ce qu'on ecrit est une strategie |
 | `rsl run CONFIG` | execute un backtest, affiche le rapport, ecrit le JSON |
-| `rsl run STRATEGIE --settings MONTAGE [--symbol ES.v.0]` | meme chose depuis une strategie SEULE : le montage (actif, capital, couts) est fourni a part |
+| `rsl run STRATEGIE --settings MONTAGE [--symbol ES.v.0]` | forme NORMALE depuis le 2026-09-12 : `examples/` ne contient plus de specification complete. `walkforward` et `verify` prennent les memes options |
 | `rsl walkforward CONFIG --train N --test N` | fenetres successives |
 | `rsl verify CONFIG` | execute DEUX fois et compare les empreintes |
 | `rsl squelette [--out F]` | squelette a trous : tout ce qu'on peut ecrire, engendre depuis les registres |
