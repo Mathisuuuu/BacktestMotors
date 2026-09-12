@@ -1,0 +1,99 @@
+{
+  "format": "rsl-strategy@1",
+  "name": "rsi-survendu-hors-lundi",
+  "strategy": {
+    "ref": "rules@1",
+    "params": {
+      "quantity": 1,
+      "rules": {
+        "entry_long": {
+          "type": "all_of",
+          "operands": [
+            {
+              "type": "compare",
+              "op": "<",
+              "left": {
+                "type": "primitive",
+                "ref": "rsi@1",
+                "params": {
+                  "window": 14
+                }
+              },
+              "right": {
+                "type": "constant",
+                "value": 30.0
+              }
+            },
+            {
+              "type": "compare",
+              "op": ">",
+              "left": {
+                "type": "time",
+                "field": "weekday"
+              },
+              "right": {
+                "type": "constant",
+                "value": 0.0
+              }
+            }
+          ]
+        },
+        "exit_long": {
+          "type": "any_of",
+          "operands": [
+            {
+              "type": "compare",
+              "op": ">",
+              "left": {
+                "type": "primitive",
+                "ref": "rsi@1",
+                "params": {
+                  "window": 14
+                }
+              },
+              "right": {
+                "type": "constant",
+                "value": 55.0
+              }
+            },
+            {
+              "type": "compare",
+              "op": ">=",
+              "left": {
+                "type": "position",
+                "field": "bars_held"
+              },
+              "right": {
+                "type": "constant",
+                "value": 15.0
+              }
+            }
+          ]
+        },
+        "stop_loss": {
+          "type": "arith",
+          "op": "-",
+          "left": {
+            "type": "price",
+            "field": "close"
+          },
+          "right": {
+            "type": "arith",
+            "op": "*",
+            "left": {
+              "type": "constant",
+              "value": 2.5
+            },
+            "right": {
+              "type": "primitive",
+              "ref": "atr@1",
+              "params": {
+                "window": 20
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

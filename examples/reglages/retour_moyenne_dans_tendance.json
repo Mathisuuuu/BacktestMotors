@@ -1,0 +1,27 @@
+{
+  "initial_cash": 500000.0,
+  "seed": 0,
+  "data": [
+    {
+      "root": "ES",
+      "path": "indices/ES_v0_1m.parquet",
+      "resample": "day",
+      "resample_min_bars": 200
+    }
+  ],
+  "execution": {
+    "fees": {
+      "kind": "per_contract"
+    },
+    "slippage": {
+      "kind": "tick",
+      "ticks": 1.0
+    }
+  },
+  "risk": {
+    "sizing": {
+      "kind": "fixed",
+      "contracts": 1
+    }
+  }
+}

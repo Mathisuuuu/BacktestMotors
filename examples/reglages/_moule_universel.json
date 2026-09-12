@@ -1,0 +1,51 @@
+{
+  "initial_cash": 200000.0,
+  "seed": 0,
+  "risk_free_annual": 0.0,
+  "min_warmup_bars": 0,
+  "liquidate_at_end": false,
+  "data": [
+    {
+      "root": "ES",
+      "path": "indices/ES_v0_1m.parquet",
+      "granularity_minutes": 1,
+      "resample": "day",
+      "resample_min_bars": 200,
+      "session": {
+        "start": "17:00",
+        "end": "16:00",
+        "timezone": "America/Chicago"
+      }
+    },
+    {
+      "root": "NQ",
+      "path": "indices/NQ_v0_1m.parquet",
+      "granularity_minutes": 1,
+      "resample": "day",
+      "resample_min_bars": 200
+    }
+  ],
+  "panel": {
+    "align_policy": "drop",
+    "max_ffill_bars": null
+  },
+  "execution": {
+    "fees": {
+      "kind": "per_contract"
+    },
+    "slippage": {
+      "kind": "tick",
+      "ticks": 1.0
+    },
+    "lag_bars": 1,
+    "intrabar_priority": "pessimistic",
+    "margin_policy": "reject"
+  },
+  "risk": {
+    "sizing": {
+      "kind": "fixed",
+      "contracts": 1
+    },
+    "max_gross_contracts": null
+  }
+}

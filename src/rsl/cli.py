@@ -27,10 +27,11 @@ import sys
 from collections.abc import Sequence
 from pathlib import Path
 
+from rsl.composition import StrategyFile, compose, est_fichier_de_strategie
 from rsl.config import BacktestSpec
 from rsl.data.instruments import INSTRUMENTS, get_instrument
 from rsl.data.loader import validate_file
-from rsl.errors import RslError
+from rsl.errors import ConfigurationError, RslError
 from rsl.metrics.statistics import AnchoredWalkForward, RollingWalkForward
 from rsl.primitives.registry import describe_registry
 from rsl.report import BacktestReport, run_backtest
@@ -132,6 +133,18 @@ def _build_parser() -> argparse.ArgumentParser:
 
     run = sub.add_parser("run", help="execute un backtest")
     run.add_argument("config", type=Path)
+    run.add_argument(
+        "--settings",
+        type=Path,
+        help=(
+            "reglages du run (actif, capital, couts) quand CONFIG est une "
+            "strategie seule"
+        ),
+    )
+    run.add_argument(
+        "--symbol",
+        help="instrument sur lequel appliquer une strategie mono-instrument",
+    )
     run.add_argument("--out", type=Path, help="ecrit le rapport JSON dans ce fichier")
     run.add_argument("--json", action="store_true", help="affiche le rapport JSON")
     run.add_argument(
@@ -304,7 +317,7 @@ def _cmd_example(args: argparse.Namespace) -> int:
 
 
 def _cmd_run(args: argparse.Namespace) -> int:
-    spec = _load_spec(args.config)
+    spec = _load_spec(args.config, args.settings, args.symbol)
     report = run_backtest(spec)
     _emit(report, as_json=args.json, out=args.out)
     if args.gui:
@@ -392,8 +405,40 @@ def _cmd_verify(args: argparse.Namespace) -> int:
     return EXIT_OK
 
 
-def _load_spec(path: Path) -> BacktestSpec:
-    return BacktestSpec.model_validate_json(path.read_text(encoding="utf-8"))
+def _load_spec(
+    path: Path, settings: Path | None = None, symbol: str | None = None
+) -> BacktestSpec:
+    """Charge un run, que le fichier soit complet ou une strategie seule.
+
+    Le type est lu au marqueur `format`, jamais devine d'apres les champs
+    presents : deviner marcherait presque toujours, et c'est le « presque » qui
+    coute. Un fichier de strategie sans reglages est refuse avec la commande a
+    taper - il lui manque l'actif, le capital et les couts, qui ne sont pas des
+    details qu'on peut supposer.
+    """
+    charge = json.loads(path.read_text(encoding="utf-8"))
+    if not est_fichier_de_strategie(charge):
+        if settings is not None or symbol is not None:
+            raise ConfigurationError(
+                f"{path.name} est une specification COMPLETE : elle porte deja "
+                f"ses donnees, son capital et ses couts. `--settings` et "
+                f"`--symbol` ne s'appliquent qu'a un fichier de strategie "
+                f"(`\"format\": \"rsl-strategy@1\"`)."
+            )
+        return BacktestSpec.model_validate(charge)
+
+    if settings is None:
+        raise ConfigurationError(
+            f"{path.name} est une strategie SEULE : elle ne dit ni sur quoi la "
+            f"faire tourner, ni avec combien, ni a quels couts. Fournissez ces "
+            f"reglages : rsl run {path.name} --settings reglages.json "
+            f"[--symbol ES.v.0]"
+        )
+    return compose(
+        StrategyFile.model_validate(charge),
+        json.loads(settings.read_text(encoding="utf-8")),
+        symbol=symbol,
+    )
 
 
 def _emit(report: BacktestReport, *, as_json: bool, out: Path | None) -> None:

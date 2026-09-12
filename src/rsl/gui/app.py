@@ -23,7 +23,10 @@ from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
 from typing import Any, Final, Literal
 
+from rsl.composition import StrategyFile, compose
 from rsl.config import BacktestSpec
+from rsl.data.instruments import known_roots
+from rsl.errors import ConfigurationError
 from rsl.gui.charts import ChartPanel, PricePanel
 from rsl.gui.model import (
     Bars,
@@ -37,6 +40,13 @@ from rsl.gui.model import (
     format_duration,
     format_ts,
     select_trades,
+)
+from rsl.gui.montage import (
+    FRAIS,
+    GLISSEMENTS,
+    RESAMPLES,
+    Montage,
+    racine_initiale,
 )
 from rsl.report import run_backtest_detailed
 
@@ -154,6 +164,17 @@ class DashboardApp(tk.Tk):
         self._valeurs: dict[str, tk.StringVar] = {}
         self._teintes: dict[str, tk.Label] = {}
 
+        # Le MONTAGE : ce que le fichier de strategie ne dit pas.
+        self.var_strategie = tk.StringVar(value="")
+        self.var_actif = tk.StringVar(value=racine_initiale())
+        self.var_agregation = tk.StringVar(value="day")
+        self.var_capital = tk.StringVar(value="1000000")
+        self.var_frais = tk.StringVar(value="per_contract")
+        self.var_glissement = tk.StringVar(value="tick")
+        self.var_glissement_valeur = tk.StringVar(value="1")
+        self.var_contrats = tk.StringVar(value="1")
+        self._chemin_strategie: Path | None = None
+
         self._styler()
         self._bandeau()
         self._barre_filtres()
@@ -261,10 +282,149 @@ class DashboardApp(tk.Tk):
     def _onglets(self) -> None:
         self.onglets = ttk.Notebook(self)
         self.onglets.pack(fill="both", expand=True, padx=18, pady=(14, 0))
+        self._onglet_montage()
         self._onglet_synthese()
         self._onglet_courbes()
         self._onglet_prix()
         self._onglet_carnet()
+
+    def _onglet_montage(self) -> None:
+        """Le MONTAGE : l'actif, l'argent, les couts.
+
+        Separe de la strategie depuis le 2026-09-12. Un fichier de strategie ne
+        porte que la decision ; ce qu'elle ne dit pas se choisit ici, ce qui
+        permet d'appliquer la meme strategie a un autre actif sans reecrire une
+        ligne de JSON.
+
+        Six reglages seulement - ceux qu'on change d'un essai a l'autre. Les
+        autres gardent les defauts du socle, qui sont des choix de prudence :
+        les rendre reglables d'un clic inviterait a les desactiver sans y
+        penser. Qui veut y toucher passe par `rsl run --settings`.
+        """
+        page = tk.Frame(self.onglets, bg=BLANC)
+        self.onglets.add(page, text="MONTAGE")
+
+        corps = tk.Frame(page, bg=BLANC)
+        corps.pack(fill="both", expand=True, padx=24, pady=20)
+
+        tk.Label(corps, text="STRATEGIE", font=UI_PETIT, bg=BLANC, fg=GRIS,
+                 anchor="w").pack(fill="x")
+        ligne = tk.Frame(corps, bg=BLANC)
+        ligne.pack(fill="x", pady=(4, 2))
+        tk.Entry(ligne, textvariable=self.var_strategie, font=UI, bg=BLANC,
+                 fg=ENCRE, relief="flat", highlightthickness=1,
+                 highlightbackground=FILET, highlightcolor=ENCRE,
+                 state="readonly", readonlybackground=BLANC).pack(
+            side="left", fill="x", expand=True, ipady=4)
+        self._bouton(ligne, "Choisir...", self.choisir_strategie).pack(
+            side="left", padx=(10, 0))
+        tk.Label(
+            corps,
+            text=("Un fichier `\"format\": \"rsl-strategy@1\"`. Une specification "
+                  "complete s'ouvre par Charger, en bas."),
+            font=UI_PETIT, bg=BLANC, fg=GRIS_CLAIR, anchor="w", justify="left",
+        ).pack(fill="x", pady=(0, 18))
+
+        grille = tk.Frame(corps, bg=BLANC)
+        grille.pack(fill="x")
+        for colonne in range(4):
+            grille.columnconfigure(colonne, weight=1, uniform="montage")
+
+        self._champ_liste(grille, 0, 0, "ACTIF", self.var_actif, sorted(known_roots()))
+        self._champ_liste(grille, 0, 1, "AGREGATION", self.var_agregation, RESAMPLES)
+        self._champ_saisie(grille, 0, 2, "CAPITAL INITIAL", self.var_capital)
+        self._champ_saisie(grille, 0, 3, "CONTRATS PAR ENTREE", self.var_contrats)
+        self._champ_liste(grille, 1, 0, "FRAIS", self.var_frais, FRAIS)
+        self._champ_liste(grille, 1, 1, "GLISSEMENT", self.var_glissement, GLISSEMENTS)
+        self._champ_saisie(grille, 1, 2, "TICKS / BPS", self.var_glissement_valeur)
+
+        bas = tk.Frame(corps, bg=BLANC)
+        bas.pack(fill="x", pady=(26, 0))
+        self._filet(bas)
+        action = tk.Frame(corps, bg=BLANC)
+        action.pack(fill="x", pady=(16, 0))
+        self._bouton(action, "LANCER LE BACKTEST", self.lancer_montage,
+                     principal=True).pack(side="left")
+        tk.Label(
+            action,
+            text=("Le `config_hash` couvre la strategie ET ce montage : deux "
+                  "capitaux differents sont deux runs differents."),
+            font=UI_PETIT, bg=BLANC, fg=GRIS_CLAIR,
+        ).pack(side="left", padx=(16, 0))
+
+    def _champ_liste(self, parent: tk.Misc, rangee: int, colonne: int, titre: str,
+                     variable: tk.StringVar, valeurs: tuple[str, ...] | list[str]) -> None:
+        cellule = tk.Frame(parent, bg=BLANC)
+        cellule.grid(row=rangee, column=colonne, sticky="ew", padx=(0, 14), pady=(0, 14))
+        tk.Label(cellule, text=titre, font=UI_PETIT, bg=BLANC, fg=GRIS,
+                 anchor="w").pack(fill="x", pady=(0, 4))
+        ttk.Combobox(cellule, textvariable=variable, values=list(valeurs), font=UI,
+                     state="readonly").pack(fill="x")
+
+    def _champ_saisie(self, parent: tk.Misc, rangee: int, colonne: int, titre: str,
+                      variable: tk.StringVar) -> None:
+        cellule = tk.Frame(parent, bg=BLANC)
+        cellule.grid(row=rangee, column=colonne, sticky="ew", padx=(0, 14), pady=(0, 14))
+        tk.Label(cellule, text=titre, font=UI_PETIT, bg=BLANC, fg=GRIS,
+                 anchor="w").pack(fill="x", pady=(0, 4))
+        tk.Entry(cellule, textvariable=variable, font=UI, bg=BLANC, fg=ENCRE,
+                 relief="flat", highlightthickness=1, highlightbackground=FILET,
+                 highlightcolor=ENCRE).pack(fill="x", ipady=4)
+
+    def choisir_strategie(self) -> None:
+        chemin = filedialog.askopenfilename(
+            title="Choisir une strategie", filetypes=[("Strategie JSON", "*.json")],
+        )
+        if not chemin:
+            return
+        self._chemin_strategie = Path(chemin)
+        self.var_strategie.set(chemin)
+
+    def montage(self) -> Montage:
+        """Lit le formulaire. Les erreurs de saisie sont nommees, pas devinees."""
+        def nombre(variable: tk.StringVar, titre: str) -> float:
+            texte = variable.get().strip().replace(" ", "").replace(",", ".")
+            try:
+                return float(texte)
+            except ValueError as erreur:
+                raise ConfigurationError(
+                    f"{titre} : '{variable.get()}' n'est pas un nombre."
+                ) from erreur
+
+        return Montage(
+            root=self.var_actif.get(),
+            resample=self.var_agregation.get(),
+            capital=nombre(self.var_capital, "Capital initial"),
+            frais=self.var_frais.get(),
+            glissement=self.var_glissement.get(),
+            glissement_valeur=nombre(self.var_glissement_valeur, "Ticks / bps"),
+            contrats=int(nombre(self.var_contrats, "Contrats par entree")),
+        )
+
+    def lancer_montage(self) -> None:
+        """Compose la strategie choisie avec le montage, puis execute."""
+        if self._chemin_strategie is None:
+            messagebox.showwarning(
+                "Aucune strategie",
+                "Choisissez d'abord un fichier de strategie.",
+            )
+            return
+        self.var_statut.set("composition...")
+        self.update_idletasks()
+        try:
+            strategie = StrategyFile.model_validate_json(
+                self._chemin_strategie.read_text(encoding="utf-8")
+            )
+            reglage = self.montage()
+            spec = compose(strategie, reglage.reglages(), symbol=reglage.symbole)
+        except Exception as erreur:
+            self.var_statut.set("echec")
+            messagebox.showerror(
+                "Montage impossible",
+                f"{type(erreur).__name__}\n\n{erreur}",
+            )
+            return
+        self.executer_spec(spec, f"{strategie.name}  -  {reglage.resume()}")
 
     def _onglet_synthese(self) -> None:
         page = tk.Frame(self.onglets, bg=BLANC)
@@ -494,16 +654,42 @@ class DashboardApp(tk.Tk):
             self.executer(Path(chemin))
 
     def executer(self, config: Path) -> None:
-        """Lance le backtest decrit par `config` et affiche son resultat."""
+        """Lance le backtest decrit par un fichier COMPLET."""
         self.var_statut.set(f"execution de {config.name}...")
         self.update_idletasks()
         try:
             self.charger(dashboard_depuis_config(config))
-            n = len(self.table.get_children())
-            self.var_statut.set(f"{config.name}  -  {n} trade(s)")
         except Exception as erreur:  # la fenetre ne doit pas mourir sur un run rate
             self.var_statut.set("echec")
             messagebox.showerror("Echec du backtest", f"{type(erreur).__name__}\n\n{erreur}")
+            return
+        n = len(self.table.get_children())
+        self.var_statut.set(f"{config.name}  -  {n} trade(s)")
+
+    def executer_spec(self, spec: BacktestSpec, libelle: str) -> None:
+        """Lance une specification deja composee.
+
+        `libelle` dit d'ou elle vient : une composition n'a pas de nom de
+        fichier, et « execution de ... » sans objet ne renseigne personne.
+        """
+        self.var_statut.set(f"execution : {libelle}")
+        self.update_idletasks()
+        try:
+            self.charger(dashboard_depuis_spec(spec))
+        except Exception as erreur:
+            self.var_statut.set("echec")
+            messagebox.showerror("Echec du backtest", f"{type(erreur).__name__}\n\n{erreur}")
+            return
+        n = len(self.table.get_children())
+        self.var_statut.set(f"{libelle}  -  {n} trade(s)")
+        # On bascule sur la SYNTHESE : l'utilisateur vient de lancer un run, ce
+        # qu'il veut voir est son resultat, pas le formulaire qu'il a rempli.
+        #
+        # `ignore` cible sur UNE ligne : `ttk.Notebook.select` n'est pas annotee
+        # en amont. Elargir l'exception `disallow_untyped_calls` a tout ce
+        # module - comme elle l'est pour `gui/charts.py` - couvrirait sept cents
+        # lignes d'appels tkinter pour un seul besoin reel.
+        self.onglets.select(1)  # type: ignore[no-untyped-call]
 
     def exporter_csv(self) -> None:
         if self.dashboard is None:
@@ -598,8 +784,19 @@ def bars_depuis_stores(stores: dict[str, Any]) -> dict[str, Bars]:
 
 
 def dashboard_depuis_config(config: Path) -> Dashboard:
-    """Execute une specification et en fait un jeu de donnees d'affichage."""
-    spec = BacktestSpec.model_validate_json(config.read_text(encoding="utf-8"))
+    """Execute une specification COMPLETE lue sur disque."""
+    return dashboard_depuis_spec(
+        BacktestSpec.model_validate_json(config.read_text(encoding="utf-8"))
+    )
+
+
+def dashboard_depuis_spec(spec: BacktestSpec) -> Dashboard:
+    """Execute une specification deja construite et en fait un affichage.
+
+    Separe de `dashboard_depuis_config` depuis le 2026-09-12 : une
+    specification peut desormais venir d'un fichier COMPLET ou de la
+    composition « strategie + montage » faite dans la fenetre.
+    """
     artefacts = run_backtest_detailed(spec)
     return build_dashboard(
         artefacts.report, artefacts.result.fills,

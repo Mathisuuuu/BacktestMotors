@@ -1,0 +1,172 @@
+"""Le MONTAGE : l'actif, l'argent, les couts, choisis dans la fenetre.
+
+Sans tkinter, comme `test_gui_model.py` et pour la meme raison : l'interface
+est du dessin, ce qu'elle produit est du calcul. Ce fichier teste le calcul.
+
+Ce qu'il garde
+--------------
+1. **Les reglages produits sont acceptes par `BacktestSpec`.** Le formulaire
+   ne redeclare aucun champ ; s'il en inventait un, `extra="forbid"` le
+   refuserait - encore faut-il que quelqu'un le constate.
+2. **Une saisie fautive est NOMMEE.** Un capital a zero, un instrument
+   inconnu, un glissement negatif : chacun doit dire ce qui ne va pas, pas
+   echouer plus loin sous une forme meconnaissable.
+3. **La table des dossiers suit la table des instruments.** C'est une dette
+   assumee du module ; ce test est ce qui l'empeche de pourrir en silence.
+"""
+
+from __future__ import annotations
+
+import pytest
+
+from rsl.data.instruments import known_roots
+from rsl.errors import ConfigurationError
+from rsl.gui.montage import (
+    DOSSIERS,
+    FRAIS,
+    GLISSEMENTS,
+    RESAMPLES,
+    Montage,
+    racine_initiale,
+)
+
+
+class TestCeQueLeFormulaireProduit:
+    def test_les_reglages_sont_acceptes_par_la_specification(self):
+        """La verification qui compte : ce que le formulaire produit doit
+        composer un run valide, sans qu'aucun champ soit invente."""
+        from rsl.composition import StrategyFile, compose
+
+        strategie = StrategyFile.model_validate({
+            "format": "rsl-strategy@1", "name": "t",
+            "strategy": {"ref": "rules@1", "params": {
+                "quantity": 1,
+                "rules": {"entry_long": {"type": "constant", "value": 1.0}},
+            }},
+        })
+        montage = Montage(root="ES")
+        spec = compose(strategie, montage.reglages(), symbol=montage.symbole)
+        assert spec.initial_cash == montage.capital
+        assert spec.data[0].root == "ES"
+
+    def test_le_chemin_est_relatif(self):
+        """Un chemin absolu ferait diverger le `config_hash` entre deux
+        machines - le defaut corrige le 2026-09-10."""
+        from pathlib import Path
+
+        chemin = Montage(root="ES").chemin
+        assert not Path(chemin).is_absolute()
+        assert "\\" not in chemin, "un chemin canonique est en POSIX"
+
+    def test_brut_ne_reechantillonne_pas(self):
+        """`brut` est nomme plutot que represente par une chaine vide : un menu
+        deroulant ne doit jamais montrer une case dont personne ne sait si elle
+        veut dire « rien » ou « pas encore choisi »."""
+        donnees = Montage(root="ES", resample="brut").reglages()["data"]
+        assert isinstance(donnees, list)
+        assert "resample" not in donnees[0]
+
+    def test_une_agregation_pose_un_minimum_de_barres(self):
+        """Une seance tronquee produirait sinon une barre quotidienne batie sur
+        quelques minutes, qui ressemble a une vraie barre."""
+        donnees = Montage(root="ES", resample="day").reglages()["data"]
+        assert isinstance(donnees, list)
+        assert donnees[0]["resample_min_bars"] > 0
+
+    @pytest.mark.parametrize(("genre", "champ"), [("tick", "ticks"), ("bps", "bps")])
+    def test_le_glissement_porte_sa_valeur(self, genre, champ):
+        execution = Montage(root="ES", glissement=genre, glissement_valeur=2.0).reglages()
+        assert isinstance(execution, dict)
+        assert execution["execution"]["slippage"][champ] == 2.0
+
+    def test_un_glissement_nul_n_en_porte_aucune(self):
+        """`zero` n'a pas de parametre : lui en donner un serait refuse."""
+        execution = Montage(root="ES", glissement="zero").reglages()
+        assert isinstance(execution, dict)
+        assert execution["execution"]["slippage"] == {"kind": "zero"}
+
+
+class TestLesSaisiesFautives:
+    """Chacune doit dire ce qui ne va pas, et pourquoi c'est un probleme."""
+
+    def test_un_instrument_inconnu_enumere_les_connus(self):
+        with pytest.raises(ConfigurationError, match="instrument inconnu"):
+            Montage(root="AAPL")
+
+    def test_un_capital_nul_est_refuse(self):
+        with pytest.raises(ConfigurationError, match="ne peut rien acheter"):
+            Montage(root="ES", capital=0.0)
+
+    def test_zero_contrat_est_refuse(self):
+        with pytest.raises(ConfigurationError, match="rien a mesurer"):
+            Montage(root="ES", contrats=0)
+
+    def test_un_glissement_negatif_est_refuse(self):
+        """Il ferait GAGNER de l'argent a chaque execution - une erreur de
+        saisie qui embellirait tous les resultats."""
+        with pytest.raises(ConfigurationError, match="gagner de l'argent"):
+            Montage(root="ES", glissement="tick", glissement_valeur=-1.0)
+
+    @pytest.mark.parametrize(("champ", "valeur"), [
+        ("resample", "quotidien"), ("frais", "gratuit"), ("glissement", "aucun"),
+    ])
+    def test_une_valeur_hors_liste_est_refusee(self, champ, valeur):
+        with pytest.raises(ConfigurationError, match="inconnu"):
+            Montage(root="ES", **{champ: valeur})
+
+
+class TestLesListesProposees:
+    def test_chaque_choix_de_frais_est_accepte(self):
+        for genre in FRAIS:
+            assert Montage(root="ES", frais=genre) is not None
+
+    def test_chaque_choix_de_glissement_est_accepte(self):
+        for genre in GLISSEMENTS:
+            assert Montage(root="ES", glissement=genre) is not None
+
+    def test_chaque_agregation_est_acceptee(self):
+        for genre in RESAMPLES:
+            assert Montage(root="ES", resample=genre) is not None
+
+    def test_chaque_instrument_connu_est_acceptable(self):
+        for racine in known_roots():
+            assert Montage(root=racine).symbole.startswith(racine)
+
+
+class TestLaTableDesDossiers:
+    """La dette assumee du module, tenue par ce test."""
+
+    def test_elle_couvre_exactement_les_instruments_connus(self):
+        """Un instrument ajoute a la table des contrats et oublie ici
+        produirait un chemin introuvable - au moment du run, pas avant."""
+        assert set(DOSSIERS) == set(known_roots())
+
+
+class TestLeDefautProposeALOuverture:
+    def test_c_est_es_et_non_le_premier_par_ordre_alphabetique(self):
+        """L'ordre alphabetique donnait `6A`, un contrat sur le dollar
+        australien. Un defaut arbitraire n'est pas neutre : il est choisi par
+        accident au lieu de l'etre expres."""
+        assert racine_initiale() == "ES"
+
+    def test_il_est_toujours_un_instrument_connu(self):
+        assert racine_initiale() in known_roots()
+
+
+class TestLeResume:
+    """Ce que le bandeau affiche : ce qui a servi, pas ce qui est possible."""
+
+    def test_il_nomme_l_actif_l_agregation_et_le_capital(self):
+        texte = Montage(root="ES", resample="day", capital=250_000.0).resume()
+        assert "ES.v.0" in texte
+        assert "day" in texte
+        assert "250 000" in texte
+
+    def test_brut_s_affiche_en_unite_de_temps(self):
+        """« brut » est un mot du formulaire ; ce que l'utilisateur veut lire
+        est la granularite reelle."""
+        assert "1 min" in Montage(root="ES", resample="brut").resume()
+
+    def test_un_run_sans_cout_le_dit(self):
+        texte = Montage(root="ES", frais="zero", glissement="zero").resume()
+        assert "sans cout" in texte

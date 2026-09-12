@@ -1,0 +1,11 @@
+{
+  "format": "rsl-strategy@1",
+  "name": "sma-crossover-es-quotidien",
+  "strategy": {
+    "ref": "sma_crossover@1",
+    "params": {
+      "fast_window": 20,
+      "slow_window": 100
+    }
+  }
+}

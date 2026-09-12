@@ -1,0 +1,131 @@
+{
+  "format": "rsl-strategy@1",
+  "name": "mon-essai",
+  "strategy": {
+    "ref": "rules@1",
+    "params": {
+      "quantity": 1,
+      "allow_pyramiding": false,
+      "extra_warmup": 0,
+      "rules": {
+        "entry_long": {
+          "type": "all_of",
+          "operands": [
+            {
+              "type": "compare",
+              "op": ">",
+              "left": {
+                "type": "price",
+                "field": "close"
+              },
+              "right": {
+                "type": "primitive",
+                "ref": "sma@1",
+                "params": {
+                  "window": 200
+                }
+              }
+            },
+            {
+              "type": "crosses_above",
+              "fast": {
+                "type": "primitive",
+                "ref": "sma@1",
+                "params": {
+                  "window": 20
+                }
+              },
+              "slow": {
+                "type": "primitive",
+                "ref": "sma@1",
+                "params": {
+                  "window": 50
+                }
+              }
+            }
+          ]
+        },
+        "exit_long": {
+          "type": "any_of",
+          "operands": [
+            {
+              "type": "crosses_below",
+              "fast": {
+                "type": "primitive",
+                "ref": "sma@1",
+                "params": {
+                  "window": 20
+                }
+              },
+              "slow": {
+                "type": "primitive",
+                "ref": "sma@1",
+                "params": {
+                  "window": 50
+                }
+              }
+            },
+            {
+              "type": "compare",
+              "op": ">=",
+              "left": {
+                "type": "position",
+                "field": "bars_held"
+              },
+              "right": {
+                "type": "constant",
+                "value": 60.0
+              }
+            }
+          ]
+        },
+        "stop_loss": {
+          "type": "arith",
+          "op": "-",
+          "left": {
+            "type": "price",
+            "field": "close"
+          },
+          "right": {
+            "type": "arith",
+            "op": "*",
+            "left": {
+              "type": "constant",
+              "value": 2.5
+            },
+            "right": {
+              "type": "primitive",
+              "ref": "atr@1",
+              "params": {
+                "window": 20
+              }
+            }
+          }
+        },
+        "take_profit": {
+          "type": "arith",
+          "op": "+",
+          "left": {
+            "type": "price",
+            "field": "close"
+          },
+          "right": {
+            "type": "arith",
+            "op": "*",
+            "left": {
+              "type": "constant",
+              "value": 6.0
+            },
+            "right": {
+              "type": "primitive",
+              "ref": "atr@1",
+              "params": {
+                "window": 20
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

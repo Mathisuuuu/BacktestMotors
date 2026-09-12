@@ -1,0 +1,85 @@
+{
+  "format": "rsl-strategy@1",
+  "name": "retour-a-la-moyenne-dans-une-tendance",
+  "strategy": {
+    "ref": "rules@1",
+    "params": {
+      "quantity": 1,
+      "rules": {
+        "entry_long": {
+          "type": "all_of",
+          "operands": [
+            {
+              "type": "compare",
+              "op": ">",
+              "left": {
+                "type": "price",
+                "field": "close"
+              },
+              "right": {
+                "type": "primitive",
+                "ref": "sma@1",
+                "params": {
+                  "window": 200
+                }
+              }
+            },
+            {
+              "type": "compare",
+              "op": "<",
+              "left": {
+                "type": "primitive",
+                "ref": "zscore@1",
+                "params": {
+                  "window": 100
+                }
+              },
+              "right": {
+                "type": "constant",
+                "value": -1.5
+              }
+            }
+          ]
+        },
+        "exit_long": {
+          "type": "compare",
+          "op": ">",
+          "left": {
+            "type": "primitive",
+            "ref": "zscore@1",
+            "params": {
+              "window": 100
+            }
+          },
+          "right": {
+            "type": "constant",
+            "value": 0.5
+          }
+        },
+        "stop_loss": {
+          "type": "arith",
+          "op": "-",
+          "left": {
+            "type": "price",
+            "field": "close"
+          },
+          "right": {
+            "type": "arith",
+            "op": "*",
+            "left": {
+              "type": "constant",
+              "value": 2.0
+            },
+            "right": {
+              "type": "primitive",
+              "ref": "atr@1",
+              "params": {
+                "window": 20
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

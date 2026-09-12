@@ -1,0 +1,101 @@
+{
+  "format": "rsl-strategy@1",
+  "name": "paire-es-nq-retour-a-la-moyenne",
+  "strategy": {
+    "ref": "panel_rules@1",
+    "params": {
+      "quantity": 1,
+      "rules": {
+        "entry_long": {
+          "type": "compare",
+          "op": "<",
+          "left": {
+            "type": "rolling",
+            "stat": "zscore",
+            "window": 120,
+            "inner": {
+              "type": "arith",
+              "op": "/",
+              "left": {
+                "type": "price",
+                "field": "close"
+              },
+              "right": {
+                "type": "peer",
+                "symbol": "NQ.v.0",
+                "inner": {
+                  "type": "price",
+                  "field": "close"
+                }
+              },
+              "note": "Le RATIO et non l'ecart : deux contrats de multiplicateurs differents ne se soustraient pas."
+            }
+          },
+          "right": {
+            "type": "constant",
+            "value": -1.5
+          },
+          "note": [
+            "Fenetre de 120 jours ~ six mois de seances.",
+            "-1,5 ecart-type : assez rare pour que le retour soit l'hypothese la plus",
+            "simple, assez frequent pour donner un echantillon lisible."
+          ]
+        },
+        "exit_long": {
+          "type": "any_of",
+          "operands": [
+            {
+              "type": "compare",
+              "op": ">",
+              "left": {
+                "type": "rolling",
+                "stat": "zscore",
+                "window": 120,
+                "inner": {
+                  "type": "arith",
+                  "op": "/",
+                  "left": {
+                    "type": "price",
+                    "field": "close"
+                  },
+                  "right": {
+                    "type": "peer",
+                    "symbol": "NQ.v.0",
+                    "inner": {
+                      "type": "price",
+                      "field": "close"
+                    }
+                  }
+                }
+              },
+              "right": {
+                "type": "constant",
+                "value": 0.0
+              }
+            },
+            {
+              "type": "compare",
+              "op": ">=",
+              "left": {
+                "type": "position",
+                "field": "bars_held"
+              },
+              "right": {
+                "type": "constant",
+                "value": 40.0
+              },
+              "note": "Sortie de secours a 40 barres : sans elle, une divergence durable immobilise le capital sans limite."
+            }
+          ]
+        }
+      }
+    }
+  },
+  "note": [
+    "Retour a la moyenne du ratio ES/NQ. Essai enregistre :",
+    "wiki/experiments/paire-es-nq-retour-a-la-moyenne.md - verdict non-conclusif.",
+    "Les seuils viennent de la version d'avant le 2026-09-12, ou le terme",
+    "distant etait inerte : ils n'ont donc jamais ete evalues sur ce qu'ils",
+    "gouvernent aujourd'hui."
+  ]
+}

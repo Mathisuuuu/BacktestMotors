@@ -1,0 +1,34 @@
+{
+  "initial_cash": 1000000.0,
+  "seed": 0,
+  "data": [
+    {
+      "root": "ES",
+      "path": "indices/ES_v0_1m.parquet",
+      "resample": "day",
+      "resample_min_bars": 200,
+      "note": "Reechantillonne en quotidien : le ratio n'a pas de sens a la minute, les deux contrats ne cotant pas aux memes instants."
+    },
+    {
+      "root": "NQ",
+      "path": "indices/NQ_v0_1m.parquet",
+      "resample": "day",
+      "resample_min_bars": 200
+    }
+  ],
+  "execution": {
+    "fees": {
+      "kind": "per_contract"
+    },
+    "slippage": {
+      "kind": "tick",
+      "ticks": 1.0
+    }
+  },
+  "risk": {
+    "sizing": {
+      "kind": "fixed",
+      "contracts": 1
+    }
+  }
+}

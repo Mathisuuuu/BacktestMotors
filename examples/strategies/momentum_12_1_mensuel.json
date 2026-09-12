@@ -1,0 +1,14 @@
+{
+  "format": "rsl-strategy@1",
+  "name": "momentum-12-1-dix-futures-mensuel",
+  "strategy": {
+    "ref": "cross_sectional_momentum@1",
+    "params": {
+      "lookback": 12,
+      "skip": 1,
+      "n_long": 3,
+      "n_short": 3,
+      "quantity": 1
+    }
+  }
+}

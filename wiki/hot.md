@@ -17,7 +17,7 @@ generated: true
 | Indicateur | Valeur |
 |---|---|
 | Pages de wiki | 23 |
-| Entrees de log | 111 |
+| Entrees de log | 117 |
 | Derniere activite | 2026-09-12 |
 | Idees ecartees (ledger) | 18 |
 | Idees en attente (ledger) | 3 |
@@ -27,7 +27,7 @@ generated: true
 | Pages `reference/` | 7 |
 | Pages `research/` | 1 |
 
-**Activite par type :** note × 55, fix × 23, feat × 14, decision × 13, experiment × 2, setup × 1, lint × 1, audit × 1, refactor × 1
+**Activite par type :** note × 58, fix × 23, feat × 16, decision × 14, experiment × 2, setup × 1, lint × 1, audit × 1, refactor × 1
 
 ## Experiences
 
@@ -42,14 +42,14 @@ Le total des essais alimente le Deflated Sharpe : un essai non enregistre gonfle
 
 ## Derniere activite — 8 entree(s)
 
+- **2026-09-12** — note | dette assumee et tenue par un test : la table des dossiers de `gui/montage.py` | elle recopie l'arborescence reelle (`ES` -> `indices`, `GC` -> `metaux`...), que la table d'instruments ne porte pas. Le vrai correctif serait de l'y ajouter, et il touche a la couche donnees. En attendant, `test_gui_montage.py` verifie qu'elle couvre EXACTEMENT les racines connues, donc qu'un instrument ajoute ne soit pas oublie
+- **2026-09-12** — note | deux details de la fenetre, corriges parce qu'un defaut arbitraire n'est pas neutre | (1) l'actif propose a l'ouverture etait `6A`, premier par ordre alphabetique, un contrat sur le dollar australien que personne ne teste en premier -- c'est `ES` desormais, choisi expres ; (2) `ttk.Notebook.select` n'etant pas annotee en amont, un `type: ignore` CIBLE sur une ligne plutot que l'elargissement de l'exception `disallow_untyped_calls` a sept cents lignes d'appels tkinter
+- **2026-09-12** — feat | onglet MONTAGE dans la fenetre : actif, agregation, capital, contrats, frais, glissement | six reglages, ceux qu'on change d'un essai a l'autre. Les autres (`lag_bars`, `intrabar_priority`, `margin_policy`...) gardent les defauts du socle, qui sont des choix de prudence : les rendre reglables d'un clic inviterait a les desactiver sans y penser. La logique vit dans `gui/montage.py`, SANS tkinter, donc testee -- meme separation que `gui/model.py`
+- **2026-09-12** — note | les 7 exemples se recomposent SANS UNE SEULE DIFFERENCE | chaque specification complete a ete coupee en `examples/strategies/` + `examples/reglages/`, et les recoller redonne exactement la forme canonique d'origine -- y compris pour les moules transversaux. Les 7 empreintes de resultat sont inchangees. Le test est parametre sur le repertoire : un exemple ajoute demain est couvert sans qu'une ligne soit ecrite
+- **2026-09-12** — decision | le `config_hash` continue de couvrir le TOUT, et c'est le point non negociable | `compose()` construit une `BacktestSpec` complete, qui reste ce qui est hache et archive. Verifie : changer l'actif, le capital ou le glissement change le hash. La separation est une commodite d'ECRITURE, jamais un relachement de la reproductibilite. `compose()` ne redeclare aucun champ non plus -- il fait valider le dictionnaire de reglages PAR `BacktestSpec`, donc rien ne peut diverger d'elle
+- **2026-09-12** — feat | la STRATEGIE est separee de son MONTAGE | une `BacktestSpec` melangeait la decision (`strategy`) et le montage (`data`, `initial_cash`, `execution`, `risk`) : la meme strategie sur ES et sur NQ demandait deux fichiers presque identiques, et rien ne disait lequel des deux mots avait change. Un fichier `"format": "rsl-strategy@1"` ne porte desormais que la decision ; le reste se choisit dans la fenetre ou par `rsl run --settings`. Le symbole est INJECTE a la composition, la detection se faisant sur le modele de parametres du moule et non sur une liste tenue a la main
 - **2026-09-12** — note | seul le `config_hash` de `_moule_universel` change, pas son empreinte de resultat | `190584bb` -> `d990888c`. C'est la signature exacte d'un changement de SPECIFICATION sans changement de resultat, et c'est precisement ce que `test_integration_reelle.py` a ete ecrit pour rendre lisible. Les 7 empreintes de resultat sont inchangees
 - **2026-09-12** — note | le moule universel exerce le noeud, et j'ai verifie qu'il n'etait pas INERTE | coupe-circuit a -12 % de drawdown ajoute a `exit_long` et `exit_short`. L'empreinte ne bouge pas -- exactement le piege de [[lessons]] L18. Verifie plutot que suppose : le drawdown maximum du run est de -9,65 %, le seuil n'est donc jamais atteint, et abaisser le seuil a -5 %, -2 % puis -1 % CHANGE bien l'empreinte a chaque fois. Le noeud est vivant
-- **2026-09-12** — note | defaut attrape avant d'etre commis : le compte etait ecrit par LIGNE et relu par index de BARRE | sur un panneau, la ligne `r` ne vaut pas l'index `r` d'un symbole donne. Un symbole aurait lu ce qui a ete ecrit pour un autre. Corrige en indexant sur l'horodatage de cloture -- le calendrier d'un panneau etant l'UNION des clotures, la cloture d'une barre est toujours une ligne de ce calendrier
-- **2026-09-12** — decision | trois differences deliberees avec `position`, chacune pour un motif | (1) METHODE `account_value` et non propriete -- elle leve hors runner, et `isinstance` sur un `Protocol` evalue les proprietes : une propriete qui leve rend `isinstance(ctx, Context)` impossible, constate en cours de route ; (2) hors runner elle LEVE au lieu de rendre un defaut -- une position est plate par deduction, une equity est INCONNUE, et rendre zero ferait d'un `drawdown` une division par zero silencieuse ; (3) UN compte par portefeuille, la ou les positions sont par instrument -- d'ou un historique indexe par INSTANT et non par index de barre, seule coordonnee que tous les symboles partagent
-- **2026-09-12** — feat | noeud `account@1` : la gestion du risque pilotee par la PERFORMANCE devient exprimable | c'etait le seul grand absent, identifie en repondant a « peut-on tout ecrire en JSON ». La couche risque voyait l'equity (`RiskManager.contracts` la recoit) mais la DECISION non. Six champs : equity, cash, peak_equity, initial_equity, drawdown (fraction negative), total_return. Verifie contre la courbe du moteur barre pour barre, pas contre une seconde implementation. 23 types de noeuds desormais
-- **2026-09-12** — note | fausse alerte de duree, tranchee par une seconde mesure | la suite complete a rendu 4 747 s (79 min) une fois, contre ~100 s d'habitude. Verifie plutot que suppose : suite rapide 41,7 s, partie `slow` normale, suite complete 67 s au passage suivant. Contention externe, pas une regression
-- **2026-09-12** — note | trouve par un test sur un exemple REEL, pas sur une fixture | les objets construits dans un test n'ont pas de region libre a exercer : mon test « une note ne change pas le config_hash » passait sur une specification minimale et ratait le cas des noeuds. Celui qui a trouve le defaut lisait `examples/paire_es_nq.json` apres l'avoir annote
-- **2026-09-12** — fix | ma premiere version de `note` cassait le `config_hash` la ou elle comptait le plus | `Field(exclude=True)` protege les blocs TYPES, et ne peut rien pour les noeuds, qui vivent dans `strategy.params.rules` -- un `dict[str, object]` que pydantic recopie tel quel. Annoter un seuil faisait passer le `config_hash` de `c686c31f` a `bf0f2f3f`. Corrige : `canonical()` retire les notes a toute profondeur, recursivement, pour qu'une region libre apparue demain soit couverte. `note` devient un mot RESERVE dans une specification -> [[lessons]] L19
 
 ## Next Actions
 
