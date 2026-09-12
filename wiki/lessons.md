@@ -673,3 +673,44 @@ A rapprocher de L18 : la ou un defaut de symetrie rendait une erreur invisible,
 c'est ici une declaration exacte qui rendait une hypothese invisible.
 
 Fonde sur [docs/execution-model.md](../docs/execution-model.md) §1.3 · [[log]] (2026-09-12)
+
+---
+
+## L23 -- Ajouter des essais CORRELES relache la correction censee les punir
+
+Le Deflated Sharpe compare un Sharpe observe au maximum attendu du meilleur de
+N tirages. L'intuition dit : plus d'essais, correction plus severe. Le balayage
+du 2026-09-12 montre l'inverse.
+
+Avant : 31 essais enregistres, variance des Sharpe 0,01203, maximum attendu
+sous H0 **0,1600**.
+Apres avoir ajoute 462 configurations : 493 essais, variance **0,000473**,
+maximum attendu **0,0663**.
+
+Le nombre d'essais a ete multiplie par seize et la correction a ete divisee par
+deux et demi.
+
+Le mecanisme est dans la formule, et il est evident une fois vu : le maximum
+attendu croit avec le nombre d'essais MAIS il est proportionnel a l'ecart-type
+des Sharpe essayes. Les 462 ajoutes sont des variantes du meme croisement de
+moyennes sur le meme instrument ; leurs Sharpe tiennent entre 0,02 et 0,06. Un
+ensemble grand et homogene a un maximum attendu plus faible qu'un petit
+ensemble heterogene.
+
+Ce que cela veut dire en pratique : **remplir le compteur d'essais quasi
+identiques affaiblit le DSR au lieu de le durcir.** Ce n'est pas une faille de
+l'implementation, c'est l'hypothese d'INDEPENDANCE des essais qui est violee -
+celle que la source du DSR reste a ingerer, et qui vient de gagner une raison
+concrete d'etre lue.
+
+Consequence immediate sur la facon de citer un chiffre : un DSR calcule depuis
+le registre depend de l'etat du registre. Le meme Sharpe de `sma_es_daily`
+rendait 0,0000 le matin et 0,0724 le soir, sans que la strategie bouge d'un
+bit. Un DSR ne se cite donc jamais seul - il se cite avec le nombre d'essais ET
+leur variance.
+
+Le garde existant ne suffit pas : `Registre.doublons` ne repere que les
+resultats BIT-IDENTIQUES. Quatre cent soixante-deux croisements voisins ont
+462 empreintes differentes et passent tous pour des essais independants.
+
+Fonde sur [[experiments/pbo-grille-large-462-sma]] · [[log]] (2026-09-12)

@@ -423,3 +423,57 @@ class TestUnWalkForwardEstUnSeulEssai:
             (registre.racine / essai.rapport).read_text(encoding="utf-8")
         )
         assert archive["walkforward"]["folds"]
+
+
+class TestArchiverUnBalayage:
+    """Une grille de centaines de configurations est des centaines d'essais.
+
+    Le compteur du Deflated Sharpe en a besoin - sous-compter gonfle le DSR de
+    tous les autres. Mais ecrire un rapport complet par configuration ajouterait
+    des centaines de fichiers au depot pour une information que le fichier de
+    grille contient deja.
+    """
+
+    ARTEFACT = "grilles/abc123.json"
+
+    def test_les_lignes_pointent_vers_l_artefact_partage(self, registre):
+        for i in range(3):
+            registre.archiver(
+                rapport(config=f"{i}" * 64, empreinte=f"{i}e" * 32),
+                artefact=self.ARTEFACT,
+            )
+        assert {e.rapport for e in registre.essais()} == {self.ARTEFACT}
+
+    def test_et_aucun_rapport_individuel_n_est_ecrit(self):
+        """C'est tout l'interet : trois cents essais, un fichier."""
+        import tempfile
+        from pathlib import Path
+
+        from rsl.essais import Registre
+
+        with tempfile.TemporaryDirectory() as dossier:
+            reg = Registre(racine=Path(dossier) / "essais")
+            reg.archiver(rapport(), artefact=self.ARTEFACT)
+            assert not reg.rapports.exists()
+
+    def test_mais_ils_comptent_tous_au_compteur(self, registre):
+        for i in range(5):
+            registre.archiver(
+                rapport(config=f"{i}" * 64, empreinte=f"{i}e" * 32, sharpe=0.01 * i),
+                artefact=self.ARTEFACT,
+            )
+        assert registre.journal().n_trials == 5
+
+    def test_un_essai_de_balayage_deja_connu_reste_refuse(self, registre):
+        """Relancer une grille est une VERIFICATION : elle ne doit pas monter
+        le compteur une seconde fois."""
+        registre.archiver(rapport(), artefact=self.ARTEFACT)
+        with pytest.raises(EssaiDejaArchiveError):
+            registre.archiver(rapport(), artefact=self.ARTEFACT)
+
+    def test_sans_artefact_le_rapport_individuel_revient(self, registre):
+        """Le defaut n'a pas change : un essai qu'on publie garde son rapport
+        complet, seul un balayage y renonce."""
+        essai = registre.archiver(rapport())
+        assert essai.rapport is not None
+        assert essai.rapport.startswith("rapports/")

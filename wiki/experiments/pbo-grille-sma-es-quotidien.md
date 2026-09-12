@@ -56,16 +56,24 @@ contente pas de perdre son avance, elle finit dans le dernier quart.
 C'est la seconde moitie du resultat, et elle etait invisible avant que le
 registre des essais existe (le meme jour).
 
-| | maximum attendu sous H0 | DSR de `sma_es_daily` |
-|---|---|---|
-| Compte comme 1 essai | 0,0000 | **0,9719 SIGNIFICATIF** |
-| Compte contre les 31 essais enregistres | 0,1600 | **0,0000** |
+| | essais | variance des Sharpe | maximum attendu sous H0 | DSR de `sma_es_daily` |
+|---|---|---|---|---|
+| Sans registre | 1 | 0 | 0,0000 | **0,9719 SIGNIFICATIF** |
+| Registre du 2026-09-12 | 31 | 0,01203 | 0,1600 | **0,0000** |
 
 Le Sharpe observe de l'exemple phare est de 0,0376 par periode. Le meilleur de
-31 tirages sous l'hypothese nulle en vaut 0,1600 : **quatre fois plus**.
+31 tirages sous l'hypothese nulle en valait 0,1600 : **quatre fois plus**.
 
 Ce chiffre n'a pas change parce que la strategie s'est degradee. Il a change
 parce qu'on a enfin compte les essais.
+
+> **La variance est indiquee pour une raison.** Un DSR calcule depuis le
+> registre n'est pas stable : il depend du nombre d'essais ET de leur
+> dispersion, et les deux bougent quand le registre grandit - parfois en sens
+> contraire. Le meme calcul refait apres le balayage de 462 configurations
+> ([[experiments/pbo-grille-large-462-sma]]) rend 0,3461 a 31 essais, parce que
+> la variance est tombee a 0,000473. Un DSR se cite donc avec l'etat du
+> registre qui l'a produit, jamais seul. Voir [[lessons]] L23.
 
 ## Ce que le calcul a revele en chemin
 

@@ -211,3 +211,66 @@ class TestDeLaGrilleAuChiffre:
     def test_le_rendu_montre_la_matrice(self, serie):
         rendu = construire_grille(grille_de(serie), 4).render()
         assert "sma-5-20" in rendu
+
+
+class TestUnRepertoireVautUneGrille:
+    """Decouvert en lancant la premiere grille large, le 2026-09-12.
+
+    462 chemins depassent la longueur de ligne de commande admise :
+    l'interpreteur rend « Argument list too long » sans que rien n'indique le
+    remede. Une grille de quelques centaines de configurations est precisement
+    ce que la CSCV demande - la rendre impossible a passer serait un defaut de
+    dessin, pas une limite du systeme.
+    """
+
+    def ecrire(self, dossier: Path, noms: list[str]) -> Path:
+        dossier.mkdir(parents=True, exist_ok=True)
+        for nom in noms:
+            (dossier / nom).write_text("{}", encoding="utf-8")
+        return dossier
+
+    def test_un_repertoire_est_developpe_en_ses_json(self, tmp_path):
+        from rsl.cli import _etendre
+
+        dossier = self.ecrire(tmp_path / "g", ["b.json", "a.json", "c.json"])
+        assert [p.name for p in _etendre([dossier])] == ["a.json", "b.json", "c.json"]
+
+    def test_l_ordre_est_trie_donc_reproductible(self, tmp_path):
+        """L'ordre des lignes de la matrice determine quelle configuration
+        `argmax` designe en cas d'egalite. Un ordre dependant du systeme de
+        fichiers rendrait la PBO non reproductible."""
+        from rsl.cli import _etendre
+
+        dossier = self.ecrire(tmp_path / "g", ["z.json", "a.json", "m.json"])
+        assert _etendre([dossier]) == sorted(dossier.glob("*.json"))
+
+    def test_les_fichiers_passes_directement_restent_intacts(self, tmp_path):
+        from rsl.cli import _etendre
+
+        fichier = tmp_path / "seul.json"
+        fichier.write_text("{}", encoding="utf-8")
+        assert _etendre([fichier]) == [fichier]
+
+    def test_les_deux_formes_se_melangent(self, tmp_path):
+        from rsl.cli import _etendre
+
+        dossier = self.ecrire(tmp_path / "g", ["a.json"])
+        seul = tmp_path / "seul.json"
+        seul.write_text("{}", encoding="utf-8")
+        assert len(_etendre([dossier, seul])) == 2
+
+    def test_un_repertoire_vide_est_nomme(self, tmp_path):
+        """« Aucune configuration » serait un message trop tardif : l'erreur
+        porte sur le repertoire, et il faut savoir lequel."""
+        from rsl.cli import _etendre
+
+        vide = tmp_path / "vide"
+        vide.mkdir()
+        with pytest.raises(ConfigurationError, match=r"aucun fichier .json"):
+            _etendre([vide])
+
+    def test_seuls_les_json_sont_pris(self, tmp_path):
+        from rsl.cli import _etendre
+
+        dossier = self.ecrire(tmp_path / "g", ["a.json", "notes.txt", "b.json"])
+        assert [p.name for p in _etendre([dossier])] == ["a.json", "b.json"]

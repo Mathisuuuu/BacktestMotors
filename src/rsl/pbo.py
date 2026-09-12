@@ -34,6 +34,28 @@ debut - et il est le prix de la comparabilite, pas un reglage a optimiser.
 L'alternative - refuser les grilles a fenetres inegales - reviendrait a
 interdire la seule grille que l'on veuille vraiment mesurer.
 
+Le retrait des inactives n'est PAS neutre a grande echelle
+-----------------------------------------------------------
+Mesure le 2026-09-12 sur une grille de 462 configurations, ES quotidien, S=8 :
+**357 retirees**, soit 77 %, toutes sur la sous-periode 0.
+
+Le motif n'a rien d'aleatoire. Une strategie de croisement entre en position
+sur un CROISEMENT ; si aucun ne se produit pendant un bloc, elle reste plate.
+Plus la fenetre lente est longue, plus les croisements sont rares - et la
+premiere sous-periode d'ES tombe sur 2017, une annee de tendance calme ou les
+longues moyennes ne se croisent pas.
+
+Le retrait elimine donc **systematiquement les fenetres longues**, et la PBO qui
+suit porte sur un sous-ensemble biaise vers les fenetres courtes. Ce n'est pas
+un defaut du retrait - donner zero a ces configurations serait pire - mais une
+raison de lire `n_configurations` du resultat plutot que la taille de la grille
+qu'on croit avoir soumise.
+
+L'arbitrage qui en decoule : moins de sous-periodes laissent survivre plus de
+configurations (les blocs sont plus longs, donc plus susceptibles de contenir un
+croisement) mais donnent moins de combinaisons. Les deux termes tirent en sens
+inverse, et aucune valeur de S ne les satisfait tous les deux.
+
 Le decoupage
 ------------
 `S` blocs CONTIGUS et de meme taille, dans l'ordre du temps. Les barres en trop
@@ -103,6 +125,14 @@ class Grille:
     barres_par_bloc: int
     barres_ecartees: int
     warnings: tuple[str, ...] = ()
+    rapports: tuple[SpecDict, ...] = ()
+    """Le rapport complet de chaque configuration RETENUE.
+
+    Hors de `describe` : quelques centaines de rapports feraient un fichier de
+    grille de plusieurs dizaines de Mo. Ils servent a l'archivage, qui en tire
+    une ligne de registre par configuration - le compteur du Deflated Sharpe en
+    a besoin."""
+
 
     def evaluer(self) -> ResultatPBO:
         return probability_of_backtest_overfitting(self.matrice, self.n_sous_periodes)
@@ -136,8 +166,8 @@ class Grille:
         return "\n".join(lignes)
 
 
-def rendements_du_run(spec: BacktestSpec) -> FloatArray:
-    """Les rendements quotidiens d'une specification.
+def rendements_du_run(spec: BacktestSpec) -> tuple[FloatArray, SpecDict]:
+    """Les rendements quotidiens d'une specification, et son rapport complet.
 
     Derives par LE MEME chemin que `compute_performance` : une seconde
     definition de « un rendement » finirait par diverger de la premiere.
@@ -147,7 +177,7 @@ def rendements_du_run(spec: BacktestSpec) -> FloatArray:
         np.asarray(artefacts.result.equity.ts_ns, dtype=np.int64),
         np.asarray(artefacts.result.equity.equity, dtype=np.float64),
     )
-    return simple_returns(equity)
+    return simple_returns(equity), artefacts.report.to_dict()
 
 
 def warmup_naturel(spec: BacktestSpec) -> int:
@@ -227,7 +257,9 @@ def construire_grille(
             f"que les autres n'ont pas, et la CSCV comparerait des epoques."
         )
 
-    series = [rendements_du_run(spec) for spec in specs]
+    executes = [rendements_du_run(spec) for spec in specs]
+    series = [serie for serie, _ in executes]
+    rapports = [rapport for _, rapport in executes]
     longueurs = {int(s.size) for s in series}
     if len(longueurs) > 1:
         detail = ", ".join(
@@ -257,8 +289,9 @@ def construire_grille(
 
     lignes: list[list[float]] = []
     retenues: list[BacktestSpec] = []
+    retenus: list[SpecDict] = []
     inactives: list[str] = []
-    for spec, serie in zip(specs, series, strict=True):
+    for spec, serie, rapport in zip(specs, series, rapports, strict=True):
         ligne: list[float] = []
         muette: int | None = None
         for bloc in range(n_sous_periodes):
@@ -281,6 +314,7 @@ def construire_grille(
             continue
         lignes.append(ligne)
         retenues.append(spec)
+        retenus.append(rapport)
 
     if len(retenues) < 2:
         raise ConfigurationError(
@@ -300,6 +334,7 @@ def construire_grille(
         matrice=np.asarray(lignes, dtype=np.float64),
         labels=tuple(spec.name for spec in retenues),
         config_hashes=tuple(canonical_hash(spec.canonical()) for spec in retenues),
+        rapports=tuple(retenus),
         n_sous_periodes=n_sous_periodes,
         barres_par_bloc=par_bloc,
         barres_ecartees=ecartees,

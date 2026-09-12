@@ -304,7 +304,9 @@ class Registre:
             for e in self.essais()
         )
 
-    def archiver(self, rapport: SpecDict, *, note: str = "") -> Essai:
+    def archiver(
+        self, rapport: SpecDict, *, note: str = "", artefact: str | None = None
+    ) -> Essai:
         """Ajoute un essai et ecrit son rapport complet.
 
         Refuse un essai deja present a l'identique - meme configuration ET meme
@@ -321,6 +323,19 @@ class Registre:
         Le cas « meme configuration, AUTRE resultat » n'est pas un doublon et
         passe sans rien forcer : c'est un changement de moteur, et il doit
         laisser une trace.
+
+        `artefact` sert aux BALAYAGES. Une grille de plusieurs centaines de
+        configurations est plusieurs centaines d'essais - le compteur du DSR en
+        a besoin, et sous-compter gonflerait le DSR de tous les autres. Mais
+        ecrire un rapport complet par configuration ajouterait des milliers de
+        fichiers au depot pour une information que le fichier de grille contient
+        deja. Les lignes pointent alors toutes vers ce seul artefact.
+
+        Ce qui est perdu en echange, et il faut le savoir : le detail par
+        configuration - fills, trades, manifeste - n'est pas conserve. Un essai
+        de balayage est donc RECOMPTE mais pas rejouable a l'identique sans
+        relancer la grille. C'est le bon arbitrage pour une grille systematique,
+        et le mauvais pour un essai qu'on publie.
         """
         essai = Essai.depuis_rapport(rapport, note=note)
         if self.contient(essai.config_hash, essai.result_fingerprint):
@@ -329,13 +344,20 @@ class Registre:
                 f"{essai.result_fingerprint[:12]}. Rejouer n'est pas essayer - "
                 f"le compteur du Deflated Sharpe ne doit pas monter."
             )
-        self.rapports.mkdir(parents=True, exist_ok=True)
-        chemin = self.rapports / f"{essai.cle}-{essai.result_fingerprint[:CLE]}.json"
-        chemin.write_text(
-            json.dumps(rapport, indent=2, sort_keys=True, ensure_ascii=False),
-            encoding="utf-8",
-        )
-        essai = essai.avec_rapport(chemin.relative_to(self.racine).as_posix())
+        # La racine est creee ICI, et non en effet de bord de l'ecriture d'un
+        # rapport : un balayage n'en ecrit aucun, et le premier appel sur un
+        # depot neuf echouait a ouvrir le registre. Constate le 2026-09-12, en
+        # ajoutant justement le chemin des balayages.
+        self.racine.mkdir(parents=True, exist_ok=True)
+        if artefact is None:
+            self.rapports.mkdir(parents=True, exist_ok=True)
+            chemin = self.rapports / f"{essai.cle}-{essai.result_fingerprint[:CLE]}.json"
+            chemin.write_text(
+                json.dumps(rapport, indent=2, sort_keys=True, ensure_ascii=False),
+                encoding="utf-8",
+            )
+            artefact = chemin.relative_to(self.racine).as_posix()
+        essai = essai.avec_rapport(artefact)
         with self.fichier.open("a", encoding="utf-8", newline="\n") as flux:
             flux.write(essai.ligne() + "\n")
         return essai

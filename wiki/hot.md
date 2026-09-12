@@ -16,18 +16,18 @@ generated: true
 
 | Indicateur | Valeur |
 |---|---|
-| Pages de wiki | 25 |
-| Entrees de log | 140 |
+| Pages de wiki | 26 |
+| Entrees de log | 145 |
 | Derniere activite | 2026-09-12 |
 | Idees ecartees (ledger) | 18 |
 | Idees en attente (ledger) | 4 |
 | Pages `Failed Ideas/` | 1 |
 | Pages `concepts/` | 6 |
-| Pages `experiments/` | 6 |
+| Pages `experiments/` | 7 |
 | Pages `reference/` | 7 |
 | Pages `research/` | 1 |
 
-**Activite par type :** note × 64, fix × 28, feat × 22, decision × 17, essai × 3, experiment × 2, setup × 1, lint × 1, audit × 1, refactor × 1
+**Activite par type :** note × 66, fix × 30, feat × 22, decision × 17, essai × 4, experiment × 2, setup × 1, lint × 1, audit × 1, refactor × 1
 
 ## Experiences
 
@@ -36,6 +36,7 @@ generated: true
 | [[experiments/allocation-momentum-12-1-trois-regles]] | `termine` | `non-conclusif` | 6 | 2026-09-12 |
 | [[experiments/dsr-grille-sma-8-essais]] | `termine` | `non-conclusif` | 8 | 2026-09-10 |
 | [[experiments/paire-es-nq-retour-a-la-moyenne]] | `termine` | `non-conclusif` | 1 | 2026-09-12 |
+| [[experiments/pbo-grille-large-462-sma]] | `termine` | `negatif` | 462 | 2026-09-12 |
 | [[experiments/pbo-grille-sma-es-quotidien]] | `termine` | `negatif` | 16 | 2026-09-12 |
 | [[experiments/rsi-survendu-hors-lundi]] | `termine` | `non-conclusif` | 1 | 2026-09-11 |
 | [[experiments/sma-es-daily-walkforward]] | `termine` | `fragile` | 1 | 2026-09-12 |
@@ -44,14 +45,14 @@ Le total des essais alimente le Deflated Sharpe : un essai non enregistre gonfle
 
 ## Derniere activite — 8 entree(s)
 
+- **2026-09-12** — note | Contre-intuitif et mesure : ajouter 462 essais CORRELES a fait BAISSER le maximum attendu sous H0, de 0,1600 a 0,0663 | le maximum attendu est proportionnel a l'ecart-type des Sharpe essayes, et 462 variantes du meme croisement sont homogenes. Remplir le compteur d'essais quasi identiques AFFAIBLIT le DSR au lieu de le durcir - l'hypothese d'independance des essais est violee. Lecon [[lessons]] L23
+- **2026-09-12** — fix | Le dossier `essais/` n'etait cree qu'en effet de bord de l'ecriture d'un rapport | un balayage n'en ecrit aucun (un seul artefact partage par N lignes), donc le premier archivage sur un depot neuf echouait a ouvrir le registre. Trouve par les tests du chemin de balayage, avant le premier usage reel
+- **2026-09-12** — fix | `rsl pbo` n'acceptait pas une grille de plusieurs centaines : 462 chemins depassent la ligne de commande admise (`Argument list too long`) | un REPERTOIRE est desormais developpe en ses fichiers .json, TRIES - l'ordre determine quelle configuration `argmax` designe en cas d'egalite
+- **2026-09-12** — note | Le retrait des inactives n'est pas neutre a grande echelle : 357 configurations sur 462 retirees a S=8, TOUTES sur la sous-periode 0 | une strategie de croisement entre sur un croisement, et les longues moyennes ne se croisent pas en 2017, annee calme. Le retrait elimine donc systematiquement les fenetres longues, et la PBO porte alors sur un sous-ensemble biaise. Arbitrage structurel : peu de blocs preservent la grille mais donnent peu de combinaisons ; beaucoup de blocs donnent des combinaisons mais decimant la grille
+- **2026-09-12** — essai | Grille SMA elargie a **462 configurations** (rapide 2-40 pas 2, lent 20-250 pas 10) : PBO **0,833** a S=4, ou la grille entiere survit | elargir a EMPIRE le chiffre - 0,80 sur seize configurations, 0,833 sur 462 - exactement comme la theorie l'annonce : le maximum d'un ensemble plus grand doit davantage a la chance. 462 backtests en 1021 s, tous archives. Voir [[experiments/pbo-grille-large-462-sma]]
 - **2026-09-12** — note | Deux problemes de METHODE trouves en lancant la premiere grille reelle | (1) une grille de fenetres inegales ne partage pas son echantillon - quatre longueurs pour seize configurations - donc la CSCV comparait des epoques ; le warmup est desormais aligne. (2) quatre configurations ne negocient pas du tout sur une sous-periode ; leur donner zero les classerait au-dessus des perdantes, elles sont retirees sur demande explicite
 - **2026-09-12** — essai | Grille SMA 4x4 sur ES quotidien, 16 configurations : PBO **0,70 a 0,80** | le processus de selection n'a pas montre de pouvoir predictif. Et une fois les 31 essais du registre comptes, le DSR de l'exemple phare `sma_es_daily` tombe de 0,9719 SIGNIFICATIF a **0,0000** - le maximum attendu sous H0 vaut 0,1600 contre un Sharpe observe de 0,0376. Voir [[experiments/pbo-grille-sma-es-quotidien]]
 - **2026-09-12** — feat | PBO par CSCV implementee (`rsl pbo`, `metrics/surapprentissage.py`) : le protocole fige le 2026-09-10 avait attendu deux ans de sessions | 45 tests, dont deux matrices dont la PBO se calcule de tete (1,0 et 0,0 exactement) plutot que des seuls tirages aleatoires
-- **2026-09-12** — note | A-P2 mesure enfin, apres avoir ete annonce « urgent » deux sessions de suite | la memoisation apporte 8x au segment memoisable et 1,07x au segment a pair - c'est-a-dire rien. Il ne reste donc qu'un seul cas, et il ne mord qu'a la granularite MINUTE : en quotidien, un signal a pair sur tout l'echantillon coute 3,7 secondes. L'entree hot.md decrivait un probleme deja resolu aux trois quarts
-- **2026-09-12** — feat | `rsl walkforward --archive` : un walk-forward compte pour UN essai, avec le Sharpe de la serie GROUPEE | la regle « un pli n'est pas un essai » etait un commentaire depuis la premiere version de `walkforward.py` ; elle devient executable. L'agregat groupe est publie au passage : 0,62 annualise contre 0,32 en moyenne des plis sur `sma_es_daily` - une moyenne par pli donne le meme poids a un pli qui a negocie une fois et a un pli qui a negocie tout du long
-- **2026-09-12** — feat | Registre des ESSAIS : `essais/registre.jsonl` versionne, `rsl run --archive`, `rsl essais` | le compteur du Deflated Sharpe survit enfin aux sessions. 14 essais archives avec leur rapport complet, dont les 7 exemples du depot et les 7 essais de la journee. Les DSR publies AVANT cette date sont des PSR deguises
-- **2026-09-12** — fix | P7 : `rsl <commande> > fichier` ecrivait dans l'encodage de la LOCALE (cp1252 sous Windows), pas en UTF-8 | corrige a l'entree de la CLI et non dans `schema` : trois commandes sur neuf saignaient (`schema --what all|spec|strategies`), les six autres passaient parce que leur sortie etait ASCII par hasard. 28 tests, valides en neutralisant le correctif
-- **2026-09-12** — fix | Trou ouvert et referme le meme jour : un panneau agrege en intra-journalier avec des seances differentes | ES + FDAX en 4 h donnaient 100 % de lignes a un seul instrument, en silence. `allow_mixed_granularity` est aveugle au cas (meme granularite, ancrage different). Refuse a la validation
 
 ## Next Actions
 
@@ -251,19 +252,38 @@ suivante, qui viennent de l'audit fonctionnel du 2026-09-10.
       inegales ne partage pas son echantillon (quatre longueurs pour seize
       configurations), et quatre configurations ne negocient pas du tout sur une
       sous-periode.
-- [ ] **Elargir la grille.** Le ledger le dit depuis le 2026-09-10 et c'est
-      desormais la SEULE chose qui manque au chiffre : a huit configurations
-      retenues, le rang hors echantillon ne prend que huit valeurs. L'article
-      travaille sur des centaines. Le programme emet lui-meme l'avertissement.
+- [x] **Grille elargie : FAIT (2026-09-12).** 462 configurations - rapide 2-40
+      pas 2, lent 20-250 pas 10 - 1021 s de calcul, toutes archivees.
+      **Elargir a EMPIRE le chiffre** : PBO 0,833 sur 462 contre 0,80 sur seize,
+      exactement comme la theorie l'annonce. La demande du ledger est satisfaite
+      et la reponse ne change pas de signe.
+      Le tableau par S est a lire avec precaution : a partir de S=6 le retrait
+      des inactives elimine SYSTEMATIQUEMENT les fenetres longues (357 sur 462 a
+      S=8), donc la PBO y porte sur un sous-ensemble biaise. Seuls S=2 et S=4
+      preservent la grille entiere.
+      Voir [[experiments/pbo-grille-large-462-sma]].
+- [ ] **Ce qui manque maintenant n'est plus une grille, c'est un ECHANTILLON.**
+      2501 rendements quotidiens, dix ans, un instrument. Une grille plus dense
+      sur les memes donnees ajoute des essais correles, pas de l'information.
+      Trois voies : d'autres instruments (dix sont sur le disque), une
+      granularite plus fine (les tranches intra-journalieres existent depuis ce
+      matin), ou un echantillon plus long qu'on n'a pas.
 - [ ] **Choisir une configuration pour une raison EXTERIEURE aux donnees.**
       C'est la conclusion de l'essai PBO, et ce n'est pas une tache de code : la
       CSCV qualifie le fait d'avoir pris le maximum d'une grille. Une
       configuration choisie sur une hypothese economique n'est pas concernee par
       ce chiffre - encore faut-il en formuler une.
-- [ ] Obtenir et ingerer la source du Deflated Sharpe (independance des essais).
-      **Devenu plus urgent** : le registre suppose que 31 essais sont 31 tirages
-      independants, et il vient de signaler lui-meme que deux d'entre eux sont
-      la meme strategie sous deux noms.
+- [ ] **Obtenir et ingerer la source du Deflated Sharpe (independance des
+      essais). C'est devenu le point le plus important de cette liste.**
+      Le balayage du 2026-09-12 a montre, en chiffres, que l'hypothese est
+      violee et que la violation va dans le mauvais sens : ajouter 462 essais
+      CORRELES a fait BAISSER le maximum attendu sous H0 de 0,1600 a 0,0663.
+      Remplir le compteur d'essais quasi identiques AFFAIBLIT la correction au
+      lieu de la durcir ([[lessons]] L23).
+      Le garde existant n'y peut rien : `Registre.doublons` ne repere que les
+      resultats bit-identiques, et 462 croisements voisins ont 462 empreintes.
+      Ce qu'il faudrait : une notion de distance entre essais, ou un nombre
+      d'essais EFFECTIF. Les deux demandent la source.
 <!-- NEXT-ACTIONS:END -->
 
 ---

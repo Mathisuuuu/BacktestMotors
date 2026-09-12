@@ -37,7 +37,8 @@ from rsl.errors import ConfigurationError, RslError
 from rsl.essais import EssaiDejaArchiveError, Registre, registre_par_defaut
 from rsl.manifest import canonical_hash
 from rsl.metrics.statistics import AnchoredWalkForward, RollingWalkForward
-from rsl.pbo import construire_grille
+from rsl.metrics.surapprentissage import ResultatPBO
+from rsl.pbo import Grille, construire_grille
 from rsl.primitives.registry import describe_registry
 from rsl.report import BacktestReport, run_backtest
 from rsl.skeleton import build_skeleton
@@ -261,8 +262,11 @@ def _build_parser() -> argparse.ArgumentParser:
         nargs="+",
         help=(
             "au moins DEUX specifications, evaluees sur le meme echantillon. "
-            "La PBO mesure le surapprentissage d'une SELECTION : sans choix a "
-            "faire, il n'y a rien a mesurer."
+            "Un REPERTOIRE est developpe en ses fichiers .json, tries - c'est "
+            "la forme a utiliser pour une grille de plusieurs centaines, que la "
+            "ligne de commande ne peut pas porter. La PBO mesure le "
+            "surapprentissage d'une SELECTION : sans choix a faire, il n'y a "
+            "rien a mesurer."
         ),
     )
     pbo.add_argument(
@@ -289,6 +293,19 @@ def _build_parser() -> argparse.ArgumentParser:
             "configurations ne sont pas neutres, et la PBO porte alors sur les "
             "restantes."
         ),
+    )
+    pbo.add_argument(
+        "--archive",
+        action="store_true",
+        help=(
+            "enregistre CHAQUE configuration de la grille comme un essai. Un "
+            "balayage de N configurations est N essais : sous-compter gonfle le "
+            "Deflated Sharpe de tous les autres. Un seul artefact est ecrit, "
+            "partage par les N lignes."
+        ),
+    )
+    pbo.add_argument(
+        "--note", default="", help="pourquoi cette grille a ete evaluee"
     )
     pbo.add_argument("--out", type=Path, help="ecrit le resultat JSON dans ce fichier")
     pbo.add_argument("--json", action="store_true", help="affiche le JSON")
@@ -617,7 +634,10 @@ def _cmd_pbo(args: argparse.Namespace) -> int:
     une verification qui echoue, pas une erreur d'usage - c'est la meme
     distinction que pour `verify`.
     """
-    specs = [_load_spec(chemin, args.settings, args.symbol) for chemin in args.configs]
+    specs = [
+        _load_spec(chemin, args.settings, args.symbol)
+        for chemin in _etendre(args.configs)
+    ]
     grille = construire_grille(
         specs, args.blocks, ignorer_inactives=args.drop_idle
     )
@@ -650,7 +670,82 @@ def _cmd_pbo(args: argparse.Namespace) -> int:
         if not args.json:
             print(f"\nResultat JSON ecrit dans {args.out}")
 
+    if args.archive:
+        _archiver_balayage(grille, resultat, note=args.note)
+
     return EXIT_CHECK_FAILED if resultat.est_surapprise else EXIT_OK
+
+
+def _etendre(chemins: Sequence[Path]) -> list[Path]:
+    """Developpe les REPERTOIRES en leurs fichiers `.json`, tries.
+
+    Necessaire, et decouvert en lancant la premiere grille large : 462 chemins
+    depassent la longueur de ligne de commande admise, et l'interpreteur rend
+    « Argument list too long » sans que rien n'indique le remede. Une grille de
+    quelques centaines de configurations est precisement ce que la CSCV demande
+    - la lui rendre impossible a passer serait un defaut de dessin.
+
+    Tries : l'ordre des lignes de la matrice determine quelle configuration
+    `argmax` designe en cas d'egalite. Un ordre dependant du systeme de
+    fichiers rendrait la PBO non reproductible.
+    """
+    etendus: list[Path] = []
+    for chemin in chemins:
+        if chemin.is_dir():
+            trouves = sorted(chemin.glob("*.json"))
+            if not trouves:
+                raise ConfigurationError(
+                    f"aucun fichier .json dans {chemin}"
+                )
+            etendus.extend(trouves)
+        else:
+            etendus.append(chemin)
+    return etendus
+
+
+def _archiver_balayage(
+    grille: Grille, resultat: ResultatPBO, *, note: str
+) -> None:
+    """Enregistre chaque configuration de la grille comme un essai.
+
+    Un seul fichier est ecrit - la grille entiere, avec sa matrice et sa PBO -
+    et les N lignes du registre pointent dessus. Ecrire un rapport complet par
+    configuration ajouterait des centaines de fichiers pour une information que
+    ce fichier contient deja.
+
+    Les doublons ne font pas echouer l'archivage : relancer une grille est une
+    VERIFICATION, et une configuration deja enregistree ne doit pas monter le
+    compteur une seconde fois. Le decompte final dit ce qui a ete ajoute.
+    """
+    registre = registre_par_defaut()
+    dossier = registre.racine / "grilles"
+    dossier.mkdir(parents=True, exist_ok=True)
+    cle = canonical_hash(
+        {"labels": list(grille.labels), "hashes": list(grille.config_hashes)}
+    )[:12]
+    chemin = dossier / f"{cle}.json"
+    chemin.write_text(
+        json.dumps(
+            {"grille": grille.describe(), "pbo": resultat.describe()},
+            indent=2, sort_keys=True, ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+    artefact = chemin.relative_to(registre.racine).as_posix()
+
+    ajoutes = 0
+    deja = 0
+    for rapport in grille.rapports:
+        try:
+            registre.archiver(rapport, note=note, artefact=artefact)
+            ajoutes += 1
+        except EssaiDejaArchiveError:
+            deja += 1
+
+    print(f"\nBalayage archive  {ajoutes} essai(s) ajoute(s), {deja} deja connu(s)")
+    print(f"artefact          {artefact}")
+    print(f"registre          {registre.fichier} "
+          f"({registre.journal().n_trials} configuration(s) distinctes)")
 
 
 def _cmd_squelette(args: argparse.Namespace) -> int:
