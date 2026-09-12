@@ -1,0 +1,739 @@
+{
+  "cross_sectional": true,
+  "deflated_sharpe": {
+    "deflated_sharpe": 0.8071760170511861,
+    "expected_max_sharpe": 0.1765644947843303,
+    "is_significant": false,
+    "kurtosis": 4.378545382136942,
+    "n_observations": 114,
+    "n_trials": 8,
+    "observed_sharpe_per_period": 0.2638264135985228,
+    "probabilistic_sharpe": 0.9956407324211303,
+    "skewness": -0.32024256725440153,
+    "variance_of_trial_sharpes": 0.014644946439037567,
+    "warnings": []
+  },
+  "manifest": {
+    "config_hash": "3b963f4fe33a3d6e158ac6868c7092e0ba6fcabd3f1f5f5abb63e0d8a75b9504",
+    "created_at": "2026-09-12T14:07:57+00:00",
+    "data_sources": [
+      {
+        "first_ts": "2016-02-01T00:00:00+00:00",
+        "granularity": "1M",
+        "last_ts": "2026-09-01T00:00:00+00:00",
+        "n_bars": 128,
+        "path": "C:\\Users\\Mathis\\Desktop\\Cotations\\indices\\NQ_v0_1m.parquet",
+        "source_hash": "a99a14c423c9a49f94f257da1ad1423538644a0c1439ed9eb7e0fd3a526d462a|resample:month",
+        "symbol": "NQ.v.0",
+        "transformations": [
+          "resample:month(128 periodes, 0 ecartee(s))"
+        ]
+      },
+      {
+        "first_ts": "2016-02-01T00:00:00+00:00",
+        "granularity": "1M",
+        "last_ts": "2026-09-01T00:00:00+00:00",
+        "n_bars": 128,
+        "path": "C:\\Users\\Mathis\\Desktop\\Cotations\\indices\\ES_v0_1m.parquet",
+        "source_hash": "17bdf284b5b8f01f37f7dc1a4209b6d442302c04a512919561af8f0fad1e1f53|resample:month",
+        "symbol": "ES.v.0",
+        "transformations": [
+          "resample:month(128 periodes, 0 ecartee(s))"
+        ]
+      },
+      {
+        "first_ts": "2016-02-01T00:00:00+00:00",
+        "granularity": "1M",
+        "last_ts": "2026-09-01T00:00:00+00:00",
+        "n_bars": 128,
+        "path": "C:\\Users\\Mathis\\Desktop\\Cotations\\indices\\YM_v0_1m.parquet",
+        "source_hash": "2f13254bd60cbf173eda5b0d3f393a0cfec8226b0d6b96c7b9bc217a27f56f2a|resample:month",
+        "symbol": "YM.v.0",
+        "transformations": [
+          "resample:month(128 periodes, 0 ecartee(s))"
+        ]
+      },
+      {
+        "first_ts": "2025-04-01T00:00:00+00:00",
+        "granularity": "1M",
+        "last_ts": "2026-09-01T00:00:00+00:00",
+        "n_bars": 18,
+        "path": "C:\\Users\\Mathis\\Desktop\\Cotations\\indices\\FDAX_v0_1m.parquet",
+        "source_hash": "ed6e836ac7407af13328dd6f73d78c371285037594f8a1a1982af57885f86343|resample:month",
+        "symbol": "FDAX.v.0",
+        "transformations": [
+          "resample:month(18 periodes, 0 ecartee(s))"
+        ]
+      },
+      {
+        "first_ts": "2016-02-01T00:00:00+00:00",
+        "granularity": "1M",
+        "last_ts": "2026-09-01T00:00:00+00:00",
+        "n_bars": 128,
+        "path": "C:\\Users\\Mathis\\Desktop\\Cotations\\metaux\\GC_v0_1m.parquet",
+        "source_hash": "a652f3fcc99e9b6043afab082cf0d02bcc3bd71468ff7e858b8ee0888e067ce0|resample:month",
+        "symbol": "GC.v.0",
+        "transformations": [
+          "resample:month(128 periodes, 0 ecartee(s))"
+        ]
+      },
+      {
+        "first_ts": "2016-02-01T00:00:00+00:00",
+        "granularity": "1M",
+        "last_ts": "2026-09-01T00:00:00+00:00",
+        "n_bars": 128,
+        "path": "C:\\Users\\Mathis\\Desktop\\Cotations\\energie\\CL_v0_1m.parquet",
+        "source_hash": "0408b519fa0cea30a9f18ef988ad096f59cc1f854399627dfa325826c83780bd|resample:month",
+        "symbol": "CL.v.0",
+        "transformations": [
+          "resample:month(128 periodes, 0 ecartee(s))"
+        ]
+      },
+      {
+        "first_ts": "2016-02-01T00:00:00+00:00",
+        "granularity": "1M",
+        "last_ts": "2026-09-01T00:00:00+00:00",
+        "n_bars": 128,
+        "path": "C:\\Users\\Mathis\\Desktop\\Cotations\\forex\\6E_v0_1m.parquet",
+        "source_hash": "feb5675cddf7467be724c0a55db9f882f7c9003e564d9ec5c5c296a4d4b961b2|resample:month",
+        "symbol": "6E.v.0",
+        "transformations": [
+          "resample:month(128 periodes, 0 ecartee(s))"
+        ]
+      },
+      {
+        "first_ts": "2016-02-01T00:00:00+00:00",
+        "granularity": "1M",
+        "last_ts": "2026-09-01T00:00:00+00:00",
+        "n_bars": 128,
+        "path": "C:\\Users\\Mathis\\Desktop\\Cotations\\forex\\6B_v0_1m.parquet",
+        "source_hash": "9a264db866acdaf61a2177aa2a09ba3b02dedba1ad3916dfd94657f0e0125e0b|resample:month",
+        "symbol": "6B.v.0",
+        "transformations": [
+          "resample:month(128 periodes, 0 ecartee(s))"
+        ]
+      },
+      {
+        "first_ts": "2016-02-01T00:00:00+00:00",
+        "granularity": "1M",
+        "last_ts": "2026-09-01T00:00:00+00:00",
+        "n_bars": 128,
+        "path": "C:\\Users\\Mathis\\Desktop\\Cotations\\forex\\6J_v0_1m.parquet",
+        "source_hash": "3c535df93add49f33fcca30fa24888ac5bc0c32f1a73b246bc1f1fbbb75326df|resample:month",
+        "symbol": "6J.v.0",
+        "transformations": [
+          "resample:month(128 periodes, 0 ecartee(s))"
+        ]
+      },
+      {
+        "first_ts": "2016-02-01T00:00:00+00:00",
+        "granularity": "1M",
+        "last_ts": "2026-09-01T00:00:00+00:00",
+        "n_bars": 128,
+        "path": "C:\\Users\\Mathis\\Desktop\\Cotations\\forex\\6A_v0_1m.parquet",
+        "source_hash": "5ed87a3d5998f1e349a7426bca34a3f903e516f5d7b547bfce26232a4fb4a341|resample:month",
+        "symbol": "6A.v.0",
+        "transformations": [
+          "resample:month(128 periodes, 0 ecartee(s))"
+        ]
+      }
+    ],
+    "dependencies": {
+      "numpy": "2.4.6",
+      "polars": "1.44.2",
+      "pyarrow": "25.0.1",
+      "pydantic": "2.13.5"
+    },
+    "git": {
+      "available": true,
+      "branch": "main",
+      "commit": "e294f494664caea28da685ab03ac8b79196d88f6",
+      "detail": "4 fichier(s) modifie(s)",
+      "dirty": true,
+      "is_reproducible": false
+    },
+    "is_reproducible": false,
+    "platform": "Windows 10 (AMD64)",
+    "primitives": [
+      "acceleration_bands@1",
+      "ad@1",
+      "adosc@1",
+      "adx@1",
+      "adxr@1",
+      "alma@1",
+      "apo@1",
+      "aroon@1",
+      "atr@1",
+      "atr_ratio@1",
+      "atr_wilder@1",
+      "atr_wilder_pct@1",
+      "autocorrelation@1",
+      "average_price@1",
+      "awesome@1",
+      "bar_range@1",
+      "bar_range_pct@1",
+      "beta@1",
+      "bias@1",
+      "body_ratio@1",
+      "bollinger@1",
+      "bop@1",
+      "cci@1",
+      "center_of_gravity@1",
+      "cfo@1",
+      "chaikin_volatility@1",
+      "chop@1",
+      "close_location@1",
+      "cmf@1",
+      "cmo@1",
+      "coppock@1",
+      "correlation@1",
+      "cti@1",
+      "dema@1",
+      "dollar_volume@1",
+      "donchian@1",
+      "downside_deviation@1",
+      "dpo@1",
+      "dx@1",
+      "efficiency_ratio@1",
+      "elder_ray@1",
+      "ema@1",
+      "entropy@1",
+      "envelope@1",
+      "eom@1",
+      "fisher@1",
+      "force_index@1",
+      "gap@1",
+      "garman_klass@1",
+      "heikin_ashi@1",
+      "hma@1",
+      "hurst@1",
+      "inertia@1",
+      "kama@1",
+      "keltner@1",
+      "klinger@1",
+      "kurtosis@1",
+      "linreg@1",
+      "linreg_angle@1",
+      "linreg_forecast@1",
+      "linreg_intercept@1",
+      "linreg_r2@1",
+      "macd@1",
+      "mad@1",
+      "mass_index@1",
+      "max_drawdown@1",
+      "median@1",
+      "median_price@1",
+      "mfi@1",
+      "midpoint@1",
+      "midprice@1",
+      "mom@1",
+      "natr@1",
+      "nvi@1",
+      "obv@1",
+      "parkinson@1",
+      "percentile_rank@1",
+      "pgo@1",
+      "pivot@1",
+      "pmo@1",
+      "ppo@1",
+      "psar@1",
+      "psl@1",
+      "pvi@1",
+      "pvo@1",
+      "pvt@1",
+      "pwma@1",
+      "qstick@1",
+      "quantile@1",
+      "returns@1",
+      "roc@1",
+      "rocr@1",
+      "rogers_satchell@1",
+      "rolling_high@1",
+      "rolling_low@1",
+      "rsi@1",
+      "rsi_wilder@1",
+      "rvgi@1",
+      "rvi_volatility@1",
+      "skew@1",
+      "slope@1",
+      "sma@1",
+      "smi@1",
+      "smma@1",
+      "squeeze@1",
+      "stderr@1",
+      "stdev@1",
+      "stoch@1",
+      "stoch_rsi@1",
+      "stochastic@1",
+      "supertrend@1",
+      "swma@1",
+      "t3@1",
+      "tema@1",
+      "trima@1",
+      "trix@1",
+      "true_range@1",
+      "tsi@1",
+      "ttm_trend@1",
+      "typical_price@1",
+      "ulcer_index@1",
+      "ultimate@1",
+      "upside_deviation@1",
+      "variance@1",
+      "vhf@1",
+      "volatility@1",
+      "volatility_ratio@1",
+      "volume_oscillator@1",
+      "vortex@1",
+      "vwap@1",
+      "vwma@1",
+      "weighted_close@1",
+      "williams_r@1",
+      "wma@1",
+      "zlema@1",
+      "zscore@1"
+    ],
+    "python_version": "3.11.9",
+    "seed": 0,
+    "warnings": [
+      "arbre de travail modifie (4 fichier(s) modifie(s)) : le commit e294f494 ne suffit PAS a rejouer ce run"
+    ]
+  },
+  "metrics": {
+    "activity": {
+      "average_gross_contracts": 5.947826086956522,
+      "average_loss": -6505.317213114757,
+      "average_win": 16104.659782608693,
+      "exposure": 0.991304347826087,
+      "fees_paid": 526.8999999999996,
+      "hit_rate": 0.42990654205607476,
+      "n_trades": 107,
+      "profit_factor": 1.8668570867689938,
+      "slippage_paid": 1688.7500000002215,
+      "turnover_annual": 2.518635471143364
+    },
+    "is_ruined": false,
+    "return": {
+      "cagr": 0.05947693445336322,
+      "final_equity": 1731615.600000003,
+      "initial_equity": 1000000.0,
+      "total_return": 0.7316156000000029
+    },
+    "risk": {
+      "downside_deviation_annual": 0.039257269227054484,
+      "drawdown_daily": {
+        "longest_underwater_days": 639.0,
+        "longest_underwater_periods": 21,
+        "max_drawdown": -0.06844098494669837,
+        "peak_index": 108,
+        "recovered": false,
+        "recovery_index": null,
+        "trough_index": 109
+      },
+      "drawdown_full": {
+        "longest_underwater_days": 639.0,
+        "longest_underwater_periods": 21,
+        "max_drawdown": -0.06844098494669837,
+        "peak_index": 108,
+        "recovered": false,
+        "recovery_index": null,
+        "trough_index": 109
+      },
+      "n_returns": 114,
+      "returns_kurtosis": 4.378545382136942,
+      "returns_skewness": -0.32024256725440153,
+      "sharpe": 0.9177629906392226,
+      "sharpe_per_period": 0.2638264135985228,
+      "sortino": 1.5431954973862898,
+      "volatility_annual": 0.06601011560585666
+    },
+    "sample": {
+      "annualisation_factor": 3.4786622693352687,
+      "n_bars": 115,
+      "n_daily_points": 115,
+      "periods_per_year": 12.1010911840968,
+      "risk_free_annual": 0.0,
+      "span_years": 9.50327522125711
+    },
+    "warnings": []
+  },
+  "name": "momentum-fixe",
+  "result_fingerprint": "5dd523b6f999bed43da2c98b7746f956bfc3057029440bd9dcc7b87bbe2305d9",
+  "run": {
+    "config": {
+      "check_invariant": true,
+      "execution": {
+        "execution_lag": 1,
+        "fees": {
+          "model": "per_contract_fee",
+          "source": "instrument_spec"
+        },
+        "intrabar_priority": "pessimistic",
+        "margin_policy": "reject",
+        "max_fill_gap_seconds": null,
+        "slippage": {
+          "model": "tick_slippage",
+          "ticks": 1.0
+        }
+      },
+      "initial_cash": 1000000.0,
+      "liquidate_at_end": false,
+      "min_warmup_bars": 0,
+      "stop": null
+    },
+    "counters": {
+      "n_forced_liquidations": 0,
+      "n_intrabar_ambiguous": 0,
+      "n_orders_cancelled_unfilled": 2,
+      "n_orders_dropped_absent": 0,
+      "n_orders_dropped_risk": 0,
+      "n_orders_expired_gap": 0,
+      "n_orders_submitted": 222,
+      "n_protection_fills": 0,
+      "n_rebalances": 115,
+      "n_rows": 115,
+      "warmup_rows": 13
+    },
+    "execution_stats": {
+      "n_fills": 220,
+      "n_limit_not_touched": 0,
+      "n_slippage_clamped": 0,
+      "n_stop_not_triggered": 0
+    },
+    "final_equity": 1731615.600000003,
+    "n_equity_points": 115,
+    "n_fills": 220,
+    "portfolio": {
+      "cash": 1343975.600000003,
+      "initial_cash": 1000000.0,
+      "n_closed_trades": 107,
+      "positions": {
+        "6B.v.0": -1,
+        "6E.v.0": -1,
+        "6J.v.0": -1,
+        "GC.v.0": 1,
+        "NQ.v.0": 1,
+        "YM.v.0": 1
+      },
+      "stats": {
+        "contracts_traded": 220,
+        "fees_paid": 526.8999999999996,
+        "max_margin_used": 88000.0,
+        "n_fills": 220,
+        "realized_pnl": 344502.4999999999,
+        "slippage_paid": 1688.7500000002215,
+        "turnover_notional": 29566923.75
+      }
+    },
+    "risk_stats": {
+      "n_dropped_sizing": 0,
+      "n_reduce_only_dropped": 0,
+      "n_rejected_gross_cap": 0,
+      "n_rejected_gross_exposure": 0,
+      "n_rejected_margin": 0,
+      "n_rejected_net_exposure": 0,
+      "n_rejected_per_category": 0,
+      "n_rejected_positions": 0,
+      "n_warned_margin": 0
+    },
+    "stale_bars": {
+      "6A.v.0": 0,
+      "6B.v.0": 0,
+      "6E.v.0": 0,
+      "6J.v.0": 0,
+      "CL.v.0": 0,
+      "ES.v.0": 0,
+      "FDAX.v.0": 0,
+      "GC.v.0": 0,
+      "NQ.v.0": 0,
+      "YM.v.0": 0
+    },
+    "strategy": {
+      "allocation": {
+        "n": 1,
+        "rule": "fixed_contracts",
+        "stats": {
+          "n_noms_sans_poids": 0,
+          "n_noms_tronques": 0,
+          "n_rebalances_vides": 0
+        }
+      },
+      "class": "RankingStrategy",
+      "extra_warmup": 0,
+      "long_short": true,
+      "n_long": 3,
+      "n_rebalances": 115,
+      "n_short": 3,
+      "n_skipped_rebalances": 0,
+      "quantity": 1,
+      "score": {
+        "left": {
+          "left": {
+            "field": "close",
+            "lag": 1,
+            "type": "price",
+            "version": 1
+          },
+          "op": "/",
+          "right": {
+            "field": "close",
+            "lag": 12,
+            "type": "price",
+            "version": 1
+          },
+          "type": "arith",
+          "version": 1
+        },
+        "op": "-",
+        "right": {
+          "type": "constant",
+          "value": 1.0,
+          "version": 1
+        },
+        "type": "arith",
+        "version": 1
+      }
+    },
+    "symbols": [
+      "6A.v.0",
+      "6B.v.0",
+      "6E.v.0",
+      "6J.v.0",
+      "CL.v.0",
+      "ES.v.0",
+      "FDAX.v.0",
+      "GC.v.0",
+      "NQ.v.0",
+      "YM.v.0"
+    ],
+    "total_return": 0.7316156000000029,
+    "warnings": []
+  },
+  "specification": {
+    "check_invariant": true,
+    "data": [
+      {
+        "alias": null,
+        "allow_non_positive_prices": true,
+        "close_stamp": "period_end",
+        "granularity_minutes": 1,
+        "max_gap_seconds": null,
+        "path": "indices/NQ_v0_1m.parquet",
+        "resample": "month",
+        "resample_min_bars": 5000,
+        "root": "NQ",
+        "session": null,
+        "timestamp_column": null
+      },
+      {
+        "alias": null,
+        "allow_non_positive_prices": true,
+        "close_stamp": "period_end",
+        "granularity_minutes": 1,
+        "max_gap_seconds": null,
+        "path": "indices/ES_v0_1m.parquet",
+        "resample": "month",
+        "resample_min_bars": 5000,
+        "root": "ES",
+        "session": null,
+        "timestamp_column": null
+      },
+      {
+        "alias": null,
+        "allow_non_positive_prices": true,
+        "close_stamp": "period_end",
+        "granularity_minutes": 1,
+        "max_gap_seconds": null,
+        "path": "indices/YM_v0_1m.parquet",
+        "resample": "month",
+        "resample_min_bars": 5000,
+        "root": "YM",
+        "session": null,
+        "timestamp_column": null
+      },
+      {
+        "alias": null,
+        "allow_non_positive_prices": true,
+        "close_stamp": "period_end",
+        "granularity_minutes": 1,
+        "max_gap_seconds": null,
+        "path": "indices/FDAX_v0_1m.parquet",
+        "resample": "month",
+        "resample_min_bars": 5000,
+        "root": "FDAX",
+        "session": null,
+        "timestamp_column": null
+      },
+      {
+        "alias": null,
+        "allow_non_positive_prices": true,
+        "close_stamp": "period_end",
+        "granularity_minutes": 1,
+        "max_gap_seconds": null,
+        "path": "metaux/GC_v0_1m.parquet",
+        "resample": "month",
+        "resample_min_bars": 5000,
+        "root": "GC",
+        "session": null,
+        "timestamp_column": null
+      },
+      {
+        "alias": null,
+        "allow_non_positive_prices": true,
+        "close_stamp": "period_end",
+        "granularity_minutes": 1,
+        "max_gap_seconds": null,
+        "path": "energie/CL_v0_1m.parquet",
+        "resample": "month",
+        "resample_min_bars": 5000,
+        "root": "CL",
+        "session": null,
+        "timestamp_column": null
+      },
+      {
+        "alias": null,
+        "allow_non_positive_prices": true,
+        "close_stamp": "period_end",
+        "granularity_minutes": 1,
+        "max_gap_seconds": null,
+        "path": "forex/6E_v0_1m.parquet",
+        "resample": "month",
+        "resample_min_bars": 5000,
+        "root": "6E",
+        "session": null,
+        "timestamp_column": null
+      },
+      {
+        "alias": null,
+        "allow_non_positive_prices": true,
+        "close_stamp": "period_end",
+        "granularity_minutes": 1,
+        "max_gap_seconds": null,
+        "path": "forex/6B_v0_1m.parquet",
+        "resample": "month",
+        "resample_min_bars": 5000,
+        "root": "6B",
+        "session": null,
+        "timestamp_column": null
+      },
+      {
+        "alias": null,
+        "allow_non_positive_prices": true,
+        "close_stamp": "period_end",
+        "granularity_minutes": 1,
+        "max_gap_seconds": null,
+        "path": "forex/6J_v0_1m.parquet",
+        "resample": "month",
+        "resample_min_bars": 5000,
+        "root": "6J",
+        "session": null,
+        "timestamp_column": null
+      },
+      {
+        "alias": null,
+        "allow_non_positive_prices": true,
+        "close_stamp": "period_end",
+        "granularity_minutes": 1,
+        "max_gap_seconds": null,
+        "path": "forex/6A_v0_1m.parquet",
+        "resample": "month",
+        "resample_min_bars": 5000,
+        "root": "6A",
+        "session": null,
+        "timestamp_column": null
+      }
+    ],
+    "execution": {
+      "fees": {
+        "kind": "per_contract",
+        "per_contract": null
+      },
+      "intrabar_priority": "pessimistic",
+      "lag_bars": 1,
+      "margin_policy": "reject",
+      "max_fill_gap_seconds": null,
+      "slippage": {
+        "bps": null,
+        "kind": "tick",
+        "ticks": 1.0
+      }
+    },
+    "initial_cash": 1000000.0,
+    "liquidate_at_end": false,
+    "min_warmup_bars": 0,
+    "name": "momentum-fixe",
+    "panel": {
+      "align_policy": "drop",
+      "allow_mixed_granularity": false,
+      "max_ffill_bars": null
+    },
+    "rebalance": {
+      "kind": "every_row",
+      "n": 1,
+      "offset": 0
+    },
+    "risk": {
+      "max_gross_contracts": null,
+      "sizing": {
+        "atr_multiple": 2.0,
+        "atr_window": 14,
+        "contracts": null,
+        "fraction": null,
+        "kind": "none",
+        "max_contracts": null,
+        "signal": null,
+        "vol_max_multiple": 4.0,
+        "vol_target": null,
+        "vol_window": 20
+      }
+    },
+    "risk_free_annual": 0.0,
+    "seed": 0,
+    "stop": null,
+    "strategy": {
+      "params": {
+        "allocation": {
+          "contracts": 1,
+          "kind": "fixed"
+        },
+        "n_long": 3,
+        "n_short": 3,
+        "score": {
+          "left": {
+            "left": {
+              "field": "close",
+              "lag": 1,
+              "type": "price"
+            },
+            "op": "/",
+            "right": {
+              "field": "close",
+              "lag": 12,
+              "type": "price"
+            },
+            "type": "arith"
+          },
+          "op": "-",
+          "right": {
+            "type": "constant",
+            "value": 1.0
+          },
+          "type": "arith"
+        }
+      },
+      "ref": "ranking@1"
+    },
+    "with_data_hash": true
+  },
+  "symbols": [
+    "6A.v.0",
+    "6B.v.0",
+    "6E.v.0",
+    "6J.v.0",
+    "CL.v.0",
+    "ES.v.0",
+    "FDAX.v.0",
+    "GC.v.0",
+    "NQ.v.0",
+    "YM.v.0"
+  ]
+}

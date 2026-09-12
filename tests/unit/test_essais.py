@@ -1,0 +1,332 @@
+"""Le registre des essais : la memoire du compteur, entre les sessions.
+
+Pourquoi ce registre existe
+----------------------------
+`TrialLog` compte les essais d'un PROCESSUS. Chaque `rsl run` en creait un
+neuf, donc chaque run se declarait « 1 essai » et son Deflated Sharpe se
+confondait avec son PSR. Le seul chiffre qui corrige la selection ne corrigeait
+jamais rien.
+
+Ce que ce fichier garde, par ordre d'importance
+------------------------------------------------
+1. **Rejouer n'est pas essayer.** Deux runs de la meme specification ne
+   comptent qu'une fois. Punir la reproductibilite serait exactement contraire
+   au but du socle.
+2. **Un essai perdu est pire qu'un essai en trop.** Sous-compter gonfle le DSR
+   de tous les autres, sans que rien ne le signale. Le registre refuse donc les
+   rapports dont il ne peut pas tirer un Sharpe, plutot que d'en inventer un.
+3. **Deux verites ne portent pas le meme nom.** Une specification qui rend un
+   autre resultat qu'avant signale un changement de MOTEUR ; le registre le
+   garde et le dit, au lieu de choisir laquelle croire.
+"""
+
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
+import pytest
+
+from rsl.errors import ConfigurationError
+from rsl.essais import EssaiDejaArchiveError, Registre
+
+
+def rapport(
+    *,
+    config: str = "c0ffee" * 10,
+    empreinte: str = "beef" * 16,
+    sharpe: float | None = 0.05,
+    nom: str = "essai-de-test",
+) -> dict[str, object]:
+    """Un rapport minimal, de la forme que produit `BacktestReport.to_dict`."""
+    risque: dict[str, object] = {
+        "n_returns": 2500,
+        "returns_skewness": -0.5,
+        "returns_kurtosis": 8.0,
+    }
+    if sharpe is not None:
+        risque["sharpe_per_period"] = sharpe
+    return {
+        "name": nom,
+        "symbols": ["ES.v.0"],
+        "result_fingerprint": empreinte,
+        "manifest": {"config_hash": config},
+        "metrics": {
+            "risk": risque,
+            "sample": {"n_bars": 2600, "span_years": 10.2},
+        },
+    }
+
+
+@pytest.fixture
+def registre(tmp_path: Path) -> Registre:
+    return Registre(racine=tmp_path / "essais")
+
+
+class TestUnRegistreVide:
+    """Un depot neuf n'a pas d'essais, et ce n'est pas une erreur."""
+
+    def test_il_ne_leve_pas(self, registre):
+        assert registre.essais() == []
+
+    def test_son_journal_ne_compte_rien(self, registre):
+        assert registre.journal().n_trials == 0
+
+    def test_sa_variance_est_nulle(self, registre):
+        """Sans selection, il n'y a rien a corriger - la regle de `TrialLog`."""
+        assert registre.journal().variance_of_sharpes == 0.0
+
+
+class TestArchiverUnEssai:
+    def test_la_ligne_est_ecrite(self, registre):
+        registre.archiver(rapport())
+        assert len(registre.essais()) == 1
+
+    def test_le_rapport_complet_est_ecrit_a_cote(self, registre):
+        """Une ligne de registre suffit au DSR ; elle ne suffit pas a VERIFIER
+        un chiffre publie. Le rapport archive est ce qui rend l'essai
+        rejouable."""
+        essai = registre.archiver(rapport())
+        assert essai.rapport is not None
+        assert (registre.racine / essai.rapport).exists()
+
+    def test_le_nom_du_rapport_porte_les_deux_cles(self, registre):
+        """Configuration ET resultat : une meme specification peut avoir
+        plusieurs rapports si le moteur a change, et ils ne doivent pas
+        s'ecraser."""
+        essai = registre.archiver(rapport())
+        assert essai.config_hash[:12] in str(essai.rapport)
+        assert essai.result_fingerprint[:12] in str(essai.rapport)
+
+    def test_le_journal_le_compte(self, registre):
+        registre.archiver(rapport())
+        assert registre.journal().n_trials == 1
+
+    def test_la_note_est_conservee(self, registre):
+        """Le « pourquoi » d'un essai ne se retrouve nulle part ailleurs : ni
+        la specification ni le resultat ne disent ce qu'on cherchait."""
+        essai = registre.archiver(rapport(), note="pour voir")
+        assert essai.note == "pour voir"
+        assert registre.essais()[0].note == "pour voir"
+
+    def test_le_fichier_est_du_jsonl(self, registre):
+        """Une ligne par essai : deux sessions qui archivent en parallele font
+        deux lignes, pas un conflit sur un tableau reindente."""
+        registre.archiver(rapport(config="a" * 64))
+        registre.archiver(rapport(config="b" * 64, empreinte="c" * 64))
+        lignes = registre.fichier.read_text(encoding="utf-8").strip().split("\n")
+        assert len(lignes) == 2
+        assert all(isinstance(json.loads(ligne), dict) for ligne in lignes)
+
+
+class TestRejouerNEstPasEssayer:
+    """La regle qui protege la reproductibilite."""
+
+    def test_le_meme_essai_deux_fois_est_refuse(self, registre):
+        registre.archiver(rapport())
+        with pytest.raises(EssaiDejaArchiveError, match="Rejouer n'est pas essayer"):
+            registre.archiver(rapport())
+
+    def test_et_le_compteur_ne_bouge_pas(self, registre):
+        registre.archiver(rapport())
+        with pytest.raises(EssaiDejaArchiveError):
+            registre.archiver(rapport())
+        assert registre.journal().n_trials == 1
+
+    def test_aucun_drapeau_ne_permet_de_passer_outre(self, registre):
+        """Une echappatoire finirait par transformer « j'ai relance pour
+        verifier » en un essai de plus, par inadvertance."""
+        registre.archiver(rapport())
+        with pytest.raises(TypeError):
+            registre.archiver(rapport(), forcer=True)  # type: ignore[call-arg]
+
+    def test_deux_configurations_distinctes_comptent_deux_fois(self, registre):
+        registre.archiver(rapport(config="a" * 64, empreinte="1" * 64))
+        registre.archiver(rapport(config="b" * 64, empreinte="2" * 64))
+        assert registre.journal().n_trials == 2
+
+
+class TestUneEmpreinteQuiChangeEstUnEvenement:
+    """Meme specification, autre resultat : le moteur a change."""
+
+    def deux_resultats(self, registre: Registre) -> None:
+        registre.archiver(rapport(config="a" * 64, empreinte="1" * 64))
+        registre.archiver(rapport(config="a" * 64, empreinte="2" * 64))
+
+    def test_le_second_n_est_pas_refuse(self, registre):
+        """Ce n'est pas un doublon : c'est une information qu'on perdrait."""
+        self.deux_resultats(registre)
+        assert len(registre.essais()) == 2
+
+    def test_mais_il_ne_compte_pas_pour_un_essai_de_plus(self, registre):
+        """Une seule configuration a ete essayee ; on en a deux mesures.
+        Gonfler le compteur ferait baisser le DSR pour une raison qui n'a rien
+        a voir avec la selection."""
+        self.deux_resultats(registre)
+        assert registre.journal().n_trials == 1
+
+    def test_et_la_divergence_est_signalee(self, registre):
+        self.deux_resultats(registre)
+        divergences = registre.divergences()
+        assert list(divergences) == ["a" * 64]
+        assert len(divergences["a" * 64]) == 2
+
+    def test_sans_divergence_rien_n_est_signale(self, registre):
+        registre.archiver(rapport(config="a" * 64, empreinte="1" * 64))
+        registre.archiver(rapport(config="b" * 64, empreinte="2" * 64))
+        assert registre.divergences() == {}
+
+
+class TestUnMemeResultatSousDeuxNoms:
+    """Le miroir, et le plus insidieux des deux.
+
+    Deux ecritures de la meme strategie ont deux `config_hash` et une seule
+    empreinte. Le compteur les voit comme deux essais alors qu'une seule idee a
+    ete essayee - et l'effet sur le DSR n'est pas lisible a l'oeil : le nombre
+    d'essais monte, la variance des Sharpe baisse.
+    """
+
+    def test_il_est_signale(self, registre):
+        registre.archiver(rapport(config="a" * 64, empreinte="1" * 64, nom="ecriture-A"))
+        registre.archiver(rapport(config="b" * 64, empreinte="1" * 64, nom="ecriture-B"))
+        doublons = registre.doublons()
+        assert list(doublons) == ["1" * 64]
+        assert {e.label for e in doublons["1" * 64]} == {"ecriture-A", "ecriture-B"}
+
+    def test_mais_il_n_est_pas_corrige_d_office(self, registre):
+        """Decider que deux specifications sont « la meme idee » est un
+        jugement. Le registre signale ; il ne tranche pas."""
+        registre.archiver(rapport(config="a" * 64, empreinte="1" * 64))
+        registre.archiver(rapport(config="b" * 64, empreinte="1" * 64))
+        assert registre.journal().n_trials == 2
+
+    def test_le_signal_est_suffisant_jamais_necessaire(self, registre):
+        """Deux ecritures economiquement equivalentes dont les fills portent
+        d'autres etiquettes ont deux empreintes, et passent inapercues -
+        constate le 2026-09-12 entre `cross_sectional_momentum@1` et
+        `ranking@1`, meme Sharpe et deux empreintes."""
+        registre.archiver(rapport(config="a" * 64, empreinte="1" * 64, sharpe=0.2638))
+        registre.archiver(rapport(config="b" * 64, empreinte="2" * 64, sharpe=0.2638))
+        assert registre.doublons() == {}
+
+
+class TestUnEssaiSansSharpeEstRefuse:
+    """Plutot que d'en inventer un.
+
+    Un zero ferait baisser la variance des Sharpe essayes, donc monter le DSR
+    de tous les autres essais. Une mesure inventee ne se contente pas d'etre
+    fausse : elle fausse le chiffre des voisins.
+    """
+
+    def test_il_leve(self, registre):
+        with pytest.raises(ConfigurationError, match="sharpe_per_period"):
+            registre.archiver(rapport(sharpe=None))
+
+    def test_le_message_dit_pourquoi(self, registre):
+        with pytest.raises(ConfigurationError, match="ferait monter le DSR"):
+            registre.archiver(rapport(sharpe=None))
+
+    def test_et_rien_n_est_ecrit(self, registre):
+        with pytest.raises(ConfigurationError):
+            registre.archiver(rapport(sharpe=None))
+        assert registre.essais() == []
+
+    @pytest.mark.parametrize("bloc", ["metrics", "manifest"])
+    def test_un_rapport_tronque_est_nomme(self, registre, bloc):
+        charge = rapport()
+        del charge[bloc]
+        with pytest.raises(ConfigurationError, match=bloc):
+            registre.archiver(charge)
+
+
+class TestLaLectureDuRegistre:
+    def test_une_ligne_fautive_est_nommee_avec_son_numero(self, registre):
+        """Un registre append-only se repare a la main : sans le numero de
+        ligne, « quelque chose ne va pas » n'est pas actionnable."""
+        registre.archiver(rapport())
+        with registre.fichier.open("a", encoding="utf-8") as flux:
+            flux.write("ceci n'est pas du JSON\n")
+        with pytest.raises(ConfigurationError, match=":2 :"):
+            registre.essais()
+
+    def test_les_lignes_vides_sont_ignorees(self, registre):
+        registre.archiver(rapport())
+        with registre.fichier.open("a", encoding="utf-8") as flux:
+            flux.write("\n\n")
+        assert len(registre.essais()) == 1
+
+    def test_une_ligne_fait_l_aller_retour(self, registre):
+        """Ce qui est ecrit doit se relire identique, sinon le registre perd de
+        l'information a chaque session."""
+        ecrit = registre.archiver(rapport(), note="aller-retour")
+        relu = registre.essais()[0]
+        assert relu == ecrit
+
+    def test_les_cles_sont_triees_dans_le_fichier(self, registre):
+        """Deux archivages du meme essai donnent le meme texte, et un
+        `git diff` reste lisible."""
+        registre.archiver(rapport())
+        cles = list(json.loads(registre.fichier.read_text(encoding="utf-8").strip()))
+        assert cles == sorted(cles)
+
+
+class TestCeQueLeJournalDonneAuDeflatedSharpe:
+    """Le registre doit suffire a recalculer un DSR, sans relire les rapports."""
+
+    def test_la_variance_des_sharpe_est_celle_des_essais(self, registre):
+        for i, sharpe in enumerate((0.01, 0.05, 0.09)):
+            registre.archiver(
+                rapport(config=f"{i}" * 64, empreinte=f"{i}e" * 32, sharpe=sharpe)
+            )
+        journal = registre.journal()
+        assert journal.n_trials == 3
+        assert journal.variance_of_sharpes == pytest.approx(0.0016)
+
+    def test_les_moments_sont_recopies_dans_la_ligne(self, registre):
+        """Asymetrie et kurtosis entrent dans le DSR. Les laisser dans le seul
+        rapport obligerait a relire quatorze fichiers pour un chiffre."""
+        essai = registre.archiver(rapport())
+        assert essai.skewness == -0.5
+        assert essai.kurtosis == 8.0
+        assert essai.n_returns == 2500
+
+    def test_describe_resume_l_etat(self, registre):
+        registre.archiver(rapport())
+        resume = registre.describe()
+        assert resume["n_lignes"] == 1
+        assert resume["n_trials"] == 1
+        assert resume["n_divergences"] == 0
+        assert resume["n_doublons"] == 0
+
+
+class TestLeRegistreDuDepot:
+    """Le vrai, celui qui est versionne."""
+
+    def test_il_existe_et_se_lit(self):
+        from rsl.essais import registre_par_defaut
+
+        essais = registre_par_defaut().essais()
+        assert essais, "le registre du depot est vide : les essais faits sont perdus"
+
+    def test_chaque_essai_pointe_vers_un_rapport_qui_existe(self):
+        """Une ligne sans rapport serait un chiffre inverifiable - exactement
+        ce que l'archivage doit empecher."""
+        from rsl.essais import registre_par_defaut
+
+        registre = registre_par_defaut()
+        for essai in registre.essais():
+            assert essai.rapport is not None, essai.label
+            assert (registre.racine / essai.rapport).exists(), essai.rapport
+
+    def test_aucune_divergence_non_expliquee(self):
+        """Une divergence est legitime apres un changement de moteur, mais elle
+        doit etre VUE. Ce test la fait remonter plutot que de la laisser dormir
+        dans un fichier que personne n'ouvre."""
+        from rsl.essais import registre_par_defaut
+
+        divergences = registre_par_defaut().divergences()
+        assert not divergences, (
+            f"{len(divergences)} specification(s) rendent plusieurs resultats : "
+            f"{sorted(k[:12] for k in divergences)}. Le moteur a change ; les "
+            f"chiffres d'avant et d'apres ne se comparent pas."
+        )

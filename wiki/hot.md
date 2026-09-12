@@ -17,7 +17,7 @@ generated: true
 | Indicateur | Valeur |
 |---|---|
 | Pages de wiki | 24 |
-| Entrees de log | 134 |
+| Entrees de log | 135 |
 | Derniere activite | 2026-09-12 |
 | Idees ecartees (ledger) | 18 |
 | Idees en attente (ledger) | 4 |
@@ -27,7 +27,7 @@ generated: true
 | Pages `reference/` | 7 |
 | Pages `research/` | 1 |
 
-**Activite par type :** note × 62, fix × 28, feat × 19, decision × 17, experiment × 2, essai × 2, setup × 1, lint × 1, audit × 1, refactor × 1
+**Activite par type :** note × 62, fix × 28, feat × 20, decision × 17, experiment × 2, essai × 2, setup × 1, lint × 1, audit × 1, refactor × 1
 
 ## Experiences
 
@@ -35,7 +35,7 @@ generated: true
 |---|---|---|---|---|
 | [[experiments/allocation-momentum-12-1-trois-regles]] | `termine` | `non-conclusif` | 6 | 2026-09-12 |
 | [[experiments/dsr-grille-sma-8-essais]] | `termine` | `non-conclusif` | 8 | 2026-09-10 |
-| [[experiments/paire-es-nq-retour-a-la-moyenne]] | `termine` | `non-conclusif` | 1 | 2026-09-11 |
+| [[experiments/paire-es-nq-retour-a-la-moyenne]] | `termine` | `non-conclusif` | 1 | 2026-09-12 |
 | [[experiments/rsi-survendu-hors-lundi]] | `termine` | `non-conclusif` | 1 | 2026-09-11 |
 | [[experiments/sma-es-daily-walkforward]] | `termine` | `fragile` | 1 | 2026-09-10 |
 
@@ -43,6 +43,7 @@ Le total des essais alimente le Deflated Sharpe : un essai non enregistre gonfle
 
 ## Derniere activite — 8 entree(s)
 
+- **2026-09-12** — feat | Registre des ESSAIS : `essais/registre.jsonl` versionne, `rsl run --archive`, `rsl essais` | le compteur du Deflated Sharpe survit enfin aux sessions. 14 essais archives avec leur rapport complet, dont les 7 exemples du depot et les 7 essais de la journee. Les DSR publies AVANT cette date sont des PSR deguises
 - **2026-09-12** — fix | P7 : `rsl <commande> > fichier` ecrivait dans l'encodage de la LOCALE (cp1252 sous Windows), pas en UTF-8 | corrige a l'entree de la CLI et non dans `schema` : trois commandes sur neuf saignaient (`schema --what all|spec|strategies`), les six autres passaient parce que leur sortie etait ASCII par hasard. 28 tests, valides en neutralisant le correctif
 - **2026-09-12** — fix | Trou ouvert et referme le meme jour : un panneau agrege en intra-journalier avec des seances differentes | ES + FDAX en 4 h donnaient 100 % de lignes a un seul instrument, en silence. `allow_mixed_granularity` est aveugle au cas (meme granularite, ancrage different). Refuse a la validation
 - **2026-09-12** — essai | Verification de bout en bout : `sma_crossover@1` sur ES en tranches de 1 h ancrees sur la seance CME | 62 785 barres, Sharpe 0,42, empreinte `f2f0e7e5`. Essai TECHNIQUE - la machinerie etait l'objet, pas la strategie - mais il compte au compteur du Deflated Sharpe, et aucun chiffre n'en a ete exploite pour choisir quoi que ce soit
@@ -50,7 +51,6 @@ Le total des essais alimente le Deflated Sharpe : un essai non enregistre gonfle
 - **2026-09-12** — feat | Granularites intra-journalieres : `5min` a `4h`, ancrees sur la SEANCE declaree (`Period`, `tranches_de_seance`, champ SEANCE du montage) | livre ; 3992 tests ; 7 empreintes et 7 config_hash inchanges ; `docs/execution-model.md` §1.3
 - **2026-09-12** — essai | Momentum 12-1, trois regles d'allocation, deux niveaux de capital -- SIX essais comptes | les trois premiers etaient inexploitables : la troncature en contrats entiers eliminait 28 a 43 % des noms, les GROS contrats d'abord. A 20 M$ : Sharpe 0,84 / 0,45 / 0,71. Verdict non-conclusif, lecon [[lessons]] L21
 - **2026-09-12** — feat | Allocation transversale : `ranking@1` sait repartir (`equal_weight`, `inverse_volatility`, `signal`), `MultiContext.contract_value` donne la taille d'un contrat | livre ; 3923 tests ; 7 empreintes et 7 config_hash inchanges ; la combinaison allocation-en-argent + sizing est refusee a la validation
-- **2026-09-12** — fix | Les plafonds etaient evalues ordre par ordre contre le portefeuille commite : un rebalancement transversal de dix ordres les franchissait tous ensemble | `max_positions=2` laissait detenir SIX instruments sur momentum_12_1 ; corrige par reservation de fournee, verifie en rejouant les fills. Lecon [[lessons]] L20
 
 ## Next Actions
 
@@ -167,11 +167,23 @@ suivante, qui viennent de l'audit fonctionnel du 2026-09-10.
       `FrozenPeers` rendait un contexte de pair sans historique de position,
       donc `peer(NQ, position(...))` valait zero depuis une vue reculee.
       `docs/no-lookahead.md` §2.5 mis a jour : il est normatif.
-- [ ] Relancer les deux experiences seminales **avec manifeste et empreinte
-      archives** -- l'audit a montre qu'elles se reproduisent
-      (`sma_es_daily` : Sharpe 0,60, empreinte `e96832fb121b91fb`,
-      `verify` identique ; walk-forward 9 plis, 57 % dans un pli), mais rien
-      n'a ete archive en `runs/` a cette occasion.
+- [x] **Archivage des essais : FAIT (2026-09-12).** `essais/registre.jsonl`,
+      versionne, une ligne par essai, plus le rapport complet a cote
+      ([essais.py](../src/rsl/essais.py)). `rsl run --archive` enregistre et
+      calcule le DSR contre TOUS les essais du depot ; `rsl essais` montre ce
+      que le compteur contient.
+      **14 essais archives** : les 7 exemples du depot et les 7 de la journee.
+      Ce que cela revele : `TrialLog` vivait dans un processus, donc chaque run
+      se declarait « 1 essai » et son DSR se confondait avec son PSR. **Tous
+      les DSR publies avant cette date sont des PSR deguises** - la paire ES/NQ
+      passe de 0,9722 a 0,9546 une fois comptee au troisieme rang.
+      `runs/` reste ignore : c'est la sortie de `--out`, un fichier qu'on
+      regarde et qu'on jette. `essais/` est ce qu'on garde.
+- [ ] **Les deux experiences seminales ne sont archivees qu'a MOITIE.** Leurs
+      runs simples le sont (`ac9bf24fc9f2`), mais le WALK-FORWARD ne l'est pas :
+      `rsl walkforward` n'a pas de `--archive`, et un resultat par plis n'est
+      pas un essai au sens du DSR - c'est N essais correles, ce qui est une
+      question ouverte du ledger. A trancher avant d'ecrire la commande.
 - [x] **Contraintes de portefeuille : FAIT (2026-09-12).** Quatre plafonds sous
       `risk.limits` ([limites.py](../src/rsl/engine/limites.py)), normes en
       `docs/execution-model.md` §6.3. Deux choix de conception qui n'etaient pas

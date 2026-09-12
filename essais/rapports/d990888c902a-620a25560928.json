@@ -1,0 +1,1525 @@
+{
+  "cross_sectional": true,
+  "deflated_sharpe": {
+    "deflated_sharpe": 0.0,
+    "expected_max_sharpe": 0.14007485164616246,
+    "is_significant": false,
+    "kurtosis": 162.8979619804288,
+    "n_observations": 2612,
+    "n_trials": 7,
+    "observed_sharpe_per_period": -0.021042514226986806,
+    "probabilistic_sharpe": 0.1347301748098899,
+    "skewness": -3.3213372848437155,
+    "variance_of_trial_sharpes": 0.0102025485960659,
+    "warnings": []
+  },
+  "manifest": {
+    "config_hash": "d990888c902a3d99198d1cc85adc46a2fd4d5d7ddb70ab841474bb91577a50ba",
+    "created_at": "2026-09-12T14:07:34+00:00",
+    "data_sources": [
+      {
+        "first_ts": "2016-01-05T00:00:00+00:00",
+        "granularity": "1d",
+        "last_ts": "2026-08-29T00:00:00+00:00",
+        "n_bars": 2753,
+        "path": "C:\\Users\\Mathis\\Desktop\\Cotations\\indices\\ES_v0_1m.parquet",
+        "source_hash": "17bdf284b5b8f01f37f7dc1a4209b6d442302c04a512919561af8f0fad1e1f53|resample:day",
+        "symbol": "ES.v.0",
+        "transformations": [
+          "resample:day(2753 periodes, 564 ecartee(s))",
+          "session:17:00-16:00@America/Chicago"
+        ]
+      },
+      {
+        "first_ts": "2016-01-05T00:00:00+00:00",
+        "granularity": "1d",
+        "last_ts": "2026-08-29T00:00:00+00:00",
+        "n_bars": 2753,
+        "path": "C:\\Users\\Mathis\\Desktop\\Cotations\\indices\\NQ_v0_1m.parquet",
+        "source_hash": "a99a14c423c9a49f94f257da1ad1423538644a0c1439ed9eb7e0fd3a526d462a|resample:day",
+        "symbol": "NQ.v.0",
+        "transformations": [
+          "resample:day(2753 periodes, 564 ecartee(s))"
+        ]
+      }
+    ],
+    "dependencies": {
+      "numpy": "2.4.6",
+      "polars": "1.44.2",
+      "pyarrow": "25.0.1",
+      "pydantic": "2.13.5"
+    },
+    "git": {
+      "available": true,
+      "branch": "main",
+      "commit": "e294f494664caea28da685ab03ac8b79196d88f6",
+      "detail": "4 fichier(s) modifie(s)",
+      "dirty": true,
+      "is_reproducible": false
+    },
+    "is_reproducible": false,
+    "platform": "Windows 10 (AMD64)",
+    "primitives": [
+      "acceleration_bands@1",
+      "ad@1",
+      "adosc@1",
+      "adx@1",
+      "adxr@1",
+      "alma@1",
+      "apo@1",
+      "aroon@1",
+      "atr@1",
+      "atr_ratio@1",
+      "atr_wilder@1",
+      "atr_wilder_pct@1",
+      "autocorrelation@1",
+      "average_price@1",
+      "awesome@1",
+      "bar_range@1",
+      "bar_range_pct@1",
+      "beta@1",
+      "bias@1",
+      "body_ratio@1",
+      "bollinger@1",
+      "bop@1",
+      "cci@1",
+      "center_of_gravity@1",
+      "cfo@1",
+      "chaikin_volatility@1",
+      "chop@1",
+      "close_location@1",
+      "cmf@1",
+      "cmo@1",
+      "coppock@1",
+      "correlation@1",
+      "cti@1",
+      "dema@1",
+      "dollar_volume@1",
+      "donchian@1",
+      "downside_deviation@1",
+      "dpo@1",
+      "dx@1",
+      "efficiency_ratio@1",
+      "elder_ray@1",
+      "ema@1",
+      "entropy@1",
+      "envelope@1",
+      "eom@1",
+      "fisher@1",
+      "force_index@1",
+      "gap@1",
+      "garman_klass@1",
+      "heikin_ashi@1",
+      "hma@1",
+      "hurst@1",
+      "inertia@1",
+      "kama@1",
+      "keltner@1",
+      "klinger@1",
+      "kurtosis@1",
+      "linreg@1",
+      "linreg_angle@1",
+      "linreg_forecast@1",
+      "linreg_intercept@1",
+      "linreg_r2@1",
+      "macd@1",
+      "mad@1",
+      "mass_index@1",
+      "max_drawdown@1",
+      "median@1",
+      "median_price@1",
+      "mfi@1",
+      "midpoint@1",
+      "midprice@1",
+      "mom@1",
+      "natr@1",
+      "nvi@1",
+      "obv@1",
+      "parkinson@1",
+      "percentile_rank@1",
+      "pgo@1",
+      "pivot@1",
+      "pmo@1",
+      "ppo@1",
+      "psar@1",
+      "psl@1",
+      "pvi@1",
+      "pvo@1",
+      "pvt@1",
+      "pwma@1",
+      "qstick@1",
+      "quantile@1",
+      "returns@1",
+      "roc@1",
+      "rocr@1",
+      "rogers_satchell@1",
+      "rolling_high@1",
+      "rolling_low@1",
+      "rsi@1",
+      "rsi_wilder@1",
+      "rvgi@1",
+      "rvi_volatility@1",
+      "skew@1",
+      "slope@1",
+      "sma@1",
+      "smi@1",
+      "smma@1",
+      "squeeze@1",
+      "stderr@1",
+      "stdev@1",
+      "stoch@1",
+      "stoch_rsi@1",
+      "stochastic@1",
+      "supertrend@1",
+      "swma@1",
+      "t3@1",
+      "tema@1",
+      "trima@1",
+      "trix@1",
+      "true_range@1",
+      "tsi@1",
+      "ttm_trend@1",
+      "typical_price@1",
+      "ulcer_index@1",
+      "ultimate@1",
+      "upside_deviation@1",
+      "variance@1",
+      "vhf@1",
+      "volatility@1",
+      "volatility_ratio@1",
+      "volume_oscillator@1",
+      "vortex@1",
+      "vwap@1",
+      "vwma@1",
+      "weighted_close@1",
+      "williams_r@1",
+      "wma@1",
+      "zlema@1",
+      "zscore@1"
+    ],
+    "python_version": "3.11.9",
+    "seed": 0,
+    "warnings": [
+      "arbre de travail modifie (4 fichier(s) modifie(s)) : le commit e294f494 ne suffit PAS a rejouer ce run"
+    ]
+  },
+  "metrics": {
+    "activity": {
+      "average_gross_contracts": 0.02104860313815538,
+      "average_loss": -1956.266666666666,
+      "average_win": 1583.4000000000003,
+      "exposure": 0.02104860313815538,
+      "fees_paid": 253.0000000000005,
+      "hit_rate": 0.45454545454545453,
+      "n_trades": 55,
+      "profit_factor": 0.6744990458015271,
+      "slippage_paid": 1350.0,
+      "turnover_annual": 12.313033298452698
+    },
+    "is_ruined": false,
+    "return": {
+      "cagr": -0.009882194033234426,
+      "final_equity": 180897.00000000128,
+      "initial_equity": 200000.0,
+      "total_return": -0.09551499999999358
+    },
+    "risk": {
+      "downside_deviation_annual": 0.022047660771386278,
+      "drawdown_daily": {
+        "longest_underwater_days": 3606.0,
+        "longest_underwater_periods": 2550,
+        "max_drawdown": -0.09646461568890463,
+        "peak_index": 62,
+        "recovered": false,
+        "recovery_index": null,
+        "trough_index": 2608
+      },
+      "drawdown_full": {
+        "longest_underwater_days": 3606.0,
+        "longest_underwater_periods": 2550,
+        "max_drawdown": -0.09646461568890463,
+        "peak_index": 62,
+        "recovered": false,
+        "recovery_index": null,
+        "trough_index": 2608
+      },
+      "n_returns": 2612,
+      "returns_kurtosis": 162.8979619804288,
+      "returns_skewness": -3.3213372848437155,
+      "sharpe": -0.3383195866628193,
+      "sharpe_per_period": -0.021042514226986806,
+      "sortino": -0.43252669307862673,
+      "volatility_annual": 0.0281869633905387
+    },
+    "sample": {
+      "annualisation_factor": 16.077906994066705,
+      "n_bars": 2613,
+      "n_daily_points": 2613,
+      "periods_per_year": 258.4990933098591,
+      "risk_free_annual": 0.0,
+      "span_years": 10.10835266980157
+    },
+    "warnings": []
+  },
+  "name": "moule-universel",
+  "result_fingerprint": "620a25560928be60142a0bdab80eb6381f525e59443f94070741569136a72561",
+  "run": {
+    "config": {
+      "check_invariant": true,
+      "execution": {
+        "execution_lag": 1,
+        "fees": {
+          "model": "per_contract_fee",
+          "source": "instrument_spec"
+        },
+        "intrabar_priority": "pessimistic",
+        "margin_policy": "reject",
+        "max_fill_gap_seconds": null,
+        "slippage": {
+          "model": "tick_slippage",
+          "ticks": 1.0
+        }
+      },
+      "initial_cash": 200000.0,
+      "liquidate_at_end": false,
+      "min_warmup_bars": 0,
+      "stop": null
+    },
+    "counters": {
+      "n_forced_liquidations": 0,
+      "n_intrabar_ambiguous": 53,
+      "n_orders_cancelled_unfilled": 0,
+      "n_orders_dropped_absent": 0,
+      "n_orders_dropped_risk": 9,
+      "n_orders_expired_gap": 0,
+      "n_orders_submitted": 64,
+      "n_protection_fills": 55,
+      "n_rebalances": 2613,
+      "n_rows": 2613,
+      "warmup_rows": 140
+    },
+    "execution_stats": {
+      "n_fills": 110,
+      "n_limit_not_touched": 0,
+      "n_slippage_clamped": 0,
+      "n_stop_not_triggered": 0
+    },
+    "final_equity": 180897.00000000128,
+    "n_equity_points": 2613,
+    "n_fills": 110,
+    "portfolio": {
+      "cash": 180897.00000000128,
+      "initial_cash": 200000.0,
+      "n_closed_trades": 55,
+      "positions": {},
+      "stats": {
+        "contracts_traded": 110,
+        "fees_paid": 253.0000000000005,
+        "max_margin_used": 17000.0,
+        "n_fills": 110,
+        "realized_pnl": -18850.0,
+        "slippage_paid": 1350.0,
+        "turnover_notional": 23564125.0
+      }
+    },
+    "risk_stats": {
+      "n_dropped_sizing": 0,
+      "n_reduce_only_dropped": 9,
+      "n_rejected_gross_cap": 0,
+      "n_rejected_gross_exposure": 0,
+      "n_rejected_margin": 0,
+      "n_rejected_net_exposure": 0,
+      "n_rejected_per_category": 0,
+      "n_rejected_positions": 0,
+      "n_warned_margin": 0
+    },
+    "stale_bars": {
+      "ES.v.0": 0,
+      "NQ.v.0": 0
+    },
+    "strategy": {
+      "class": "PanelRuleStrategy",
+      "inner": {
+        "allow_pyramiding": false,
+        "class": "RuleStrategy",
+        "extra_warmup": 0,
+        "quantity": 1,
+        "rules": {
+          "entry_limit": null,
+          "entry_long": {
+            "operands": [
+              {
+                "fast": {
+                  "params": {
+                    "fast": 12,
+                    "field": "close",
+                    "output": "line",
+                    "seed_multiplier": 5,
+                    "signal": 9,
+                    "slow": 26
+                  },
+                  "ref": "macd@1",
+                  "type": "primitive",
+                  "version": 1
+                },
+                "slow": {
+                  "params": {
+                    "fast": 12,
+                    "field": "close",
+                    "output": "signal",
+                    "seed_multiplier": 5,
+                    "signal": 9,
+                    "slow": 26
+                  },
+                  "ref": "macd@1",
+                  "type": "primitive",
+                  "version": 1
+                },
+                "type": "crosses_above",
+                "version": 1
+              },
+              {
+                "left": {
+                  "params": {
+                    "output": "adx",
+                    "seed_multiplier": 5,
+                    "window": 14
+                  },
+                  "ref": "adx@1",
+                  "type": "primitive",
+                  "version": 1
+                },
+                "op": ">",
+                "right": {
+                  "type": "constant",
+                  "value": 18.0,
+                  "version": 1
+                },
+                "type": "compare",
+                "version": 1
+              },
+              {
+                "left": {
+                  "inner": {
+                    "inner": {
+                      "left": {
+                        "field": "close",
+                        "lag": 0,
+                        "type": "price",
+                        "version": 1
+                      },
+                      "op": "/",
+                      "right": {
+                        "inner": {
+                          "field": "close",
+                          "lag": 0,
+                          "type": "price",
+                          "version": 1
+                        },
+                        "symbol": "NQ.v.0",
+                        "type": "peer",
+                        "version": 1
+                      },
+                      "type": "arith",
+                      "version": 1
+                    },
+                    "stat": "zscore",
+                    "stride": 1,
+                    "type": "rolling",
+                    "version": 1,
+                    "window": 120
+                  },
+                  "op": "abs",
+                  "type": "math",
+                  "version": 1
+                },
+                "op": "<",
+                "right": {
+                  "type": "constant",
+                  "value": 2.5,
+                  "version": 1
+                },
+                "type": "compare",
+                "version": 1
+              },
+              {
+                "inner": {
+                  "left": {
+                    "field": "weekday",
+                    "type": "time",
+                    "version": 1
+                  },
+                  "op": "==",
+                  "right": {
+                    "type": "constant",
+                    "value": 0.0,
+                    "version": 1
+                  },
+                  "type": "compare",
+                  "version": 1
+                },
+                "type": "not",
+                "version": 1
+              },
+              {
+                "left": {
+                  "inner": {
+                    "field": "close",
+                    "lag": 0,
+                    "type": "price",
+                    "version": 1
+                  },
+                  "stat": "ema",
+                  "stride": 1,
+                  "type": "rolling",
+                  "version": 1,
+                  "window": 10
+                },
+                "op": ">",
+                "right": {
+                  "bars": 5,
+                  "inner": {
+                    "inner": {
+                      "field": "close",
+                      "lag": 0,
+                      "type": "price",
+                      "version": 1
+                    },
+                    "stat": "ema",
+                    "stride": 1,
+                    "type": "rolling",
+                    "version": 1,
+                    "window": 10
+                  },
+                  "type": "lag",
+                  "version": 1
+                },
+                "type": "compare",
+                "version": 1
+              },
+              {
+                "left": {
+                  "field": "close",
+                  "lag": 0,
+                  "type": "price",
+                  "version": 1
+                },
+                "op": ">",
+                "right": {
+                  "field": "high",
+                  "lag": 1,
+                  "type": "session",
+                  "version": 1
+                },
+                "type": "compare",
+                "version": 1
+              },
+              {
+                "left": {
+                  "field": "close",
+                  "lag": 0,
+                  "type": "price",
+                  "version": 1
+                },
+                "op": ">",
+                "right": {
+                  "left": {
+                    "inner": {
+                      "left": {
+                        "field": "close",
+                        "lag": 0,
+                        "type": "price",
+                        "version": 1
+                      },
+                      "op": "*",
+                      "right": {
+                        "field": "volume",
+                        "lag": 0,
+                        "type": "price",
+                        "version": 1
+                      },
+                      "type": "arith",
+                      "version": 1
+                    },
+                    "stat": "sum",
+                    "type": "cumulative",
+                    "version": 1
+                  },
+                  "op": "/",
+                  "right": {
+                    "inner": {
+                      "field": "volume",
+                      "lag": 0,
+                      "type": "price",
+                      "version": 1
+                    },
+                    "stat": "sum",
+                    "type": "cumulative",
+                    "version": 1
+                  },
+                  "type": "arith",
+                  "version": 1
+                },
+                "type": "compare",
+                "version": 1
+              }
+            ],
+            "type": "all_of",
+            "version": 1
+          },
+          "entry_short": {
+            "operands": [
+              {
+                "fast": {
+                  "params": {
+                    "fast": 12,
+                    "field": "close",
+                    "output": "line",
+                    "seed_multiplier": 5,
+                    "signal": 9,
+                    "slow": 26
+                  },
+                  "ref": "macd@1",
+                  "type": "primitive",
+                  "version": 1
+                },
+                "slow": {
+                  "params": {
+                    "fast": 12,
+                    "field": "close",
+                    "output": "signal",
+                    "seed_multiplier": 5,
+                    "signal": 9,
+                    "slow": 26
+                  },
+                  "ref": "macd@1",
+                  "type": "primitive",
+                  "version": 1
+                },
+                "type": "crosses_below",
+                "version": 1
+              },
+              {
+                "left": {
+                  "params": {
+                    "output": "minus_di",
+                    "seed_multiplier": 5,
+                    "window": 14
+                  },
+                  "ref": "adx@1",
+                  "type": "primitive",
+                  "version": 1
+                },
+                "op": ">",
+                "right": {
+                  "params": {
+                    "output": "plus_di",
+                    "seed_multiplier": 5,
+                    "window": 14
+                  },
+                  "ref": "adx@1",
+                  "type": "primitive",
+                  "version": 1
+                },
+                "type": "compare",
+                "version": 1
+              },
+              {
+                "left": {
+                  "params": {
+                    "field": "close",
+                    "window": 20
+                  },
+                  "ref": "efficiency_ratio@1",
+                  "type": "primitive",
+                  "version": 1
+                },
+                "op": "<",
+                "right": {
+                  "type": "constant",
+                  "value": 0.9,
+                  "version": 1
+                },
+                "type": "compare",
+                "version": 1
+              }
+            ],
+            "type": "all_of",
+            "version": 1
+          },
+          "entry_stop": null,
+          "exit_long": {
+            "operands": [
+              {
+                "left": {
+                  "params": {
+                    "field": "close",
+                    "seed_multiplier": 5,
+                    "window": 14
+                  },
+                  "ref": "rsi_wilder@1",
+                  "type": "primitive",
+                  "version": 1
+                },
+                "op": ">",
+                "right": {
+                  "type": "constant",
+                  "value": 72.0,
+                  "version": 1
+                },
+                "type": "compare",
+                "version": 1
+              },
+              {
+                "left": {
+                  "field": "bars_held",
+                  "type": "position",
+                  "version": 1
+                },
+                "op": ">=",
+                "right": {
+                  "type": "constant",
+                  "value": 45.0,
+                  "version": 1
+                },
+                "type": "compare",
+                "version": 1
+              },
+              {
+                "left": {
+                  "inner": {
+                    "left": {
+                      "params": {
+                        "field": "close",
+                        "window": 20
+                      },
+                      "ref": "cci@1",
+                      "type": "primitive",
+                      "version": 1
+                    },
+                    "op": "<",
+                    "right": {
+                      "type": "constant",
+                      "value": -180.0,
+                      "version": 1
+                    },
+                    "type": "compare",
+                    "version": 1
+                  },
+                  "lookback": 15,
+                  "type": "bars_since",
+                  "version": 1
+                },
+                "op": "<=",
+                "right": {
+                  "type": "constant",
+                  "value": 1.0,
+                  "version": 1
+                },
+                "type": "compare",
+                "version": 1
+              },
+              {
+                "left": {
+                  "field": "drawdown",
+                  "type": "account",
+                  "version": 1
+                },
+                "op": "<",
+                "right": {
+                  "type": "constant",
+                  "value": -0.12,
+                  "version": 1
+                },
+                "type": "compare",
+                "version": 1
+              }
+            ],
+            "type": "any_of",
+            "version": 1
+          },
+          "exit_quantity": null,
+          "exit_short": {
+            "operands": [
+              {
+                "left": {
+                  "params": {
+                    "field": "close",
+                    "window": 14
+                  },
+                  "ref": "williams_r@1",
+                  "type": "primitive",
+                  "version": 1
+                },
+                "op": "<",
+                "right": {
+                  "type": "constant",
+                  "value": -88.0,
+                  "version": 1
+                },
+                "type": "compare",
+                "version": 1
+              },
+              {
+                "left": {
+                  "field": "bars_held",
+                  "type": "position",
+                  "version": 1
+                },
+                "op": ">=",
+                "right": {
+                  "type": "constant",
+                  "value": 30.0,
+                  "version": 1
+                },
+                "type": "compare",
+                "version": 1
+              },
+              {
+                "left": {
+                  "field": "drawdown",
+                  "type": "account",
+                  "version": 1
+                },
+                "op": "<",
+                "right": {
+                  "type": "constant",
+                  "value": -0.12,
+                  "version": 1
+                },
+                "type": "compare",
+                "version": 1
+              }
+            ],
+            "type": "any_of",
+            "version": 1
+          },
+          "stop_loss": {
+            "condition": {
+              "left": {
+                "params": {
+                  "field": "close",
+                  "window": 20
+                },
+                "ref": "efficiency_ratio@1",
+                "type": "primitive",
+                "version": 1
+              },
+              "op": ">",
+              "right": {
+                "type": "constant",
+                "value": 0.45,
+                "version": 1
+              },
+              "type": "compare",
+              "version": 1
+            },
+            "otherwise": {
+              "left": {
+                "field": "close",
+                "lag": 0,
+                "type": "price",
+                "version": 1
+              },
+              "op": "-",
+              "right": {
+                "left": {
+                  "type": "constant",
+                  "value": 1.5,
+                  "version": 1
+                },
+                "op": "*",
+                "right": {
+                  "params": {
+                    "seed_multiplier": 5,
+                    "window": 14
+                  },
+                  "ref": "atr_wilder@1",
+                  "type": "primitive",
+                  "version": 1
+                },
+                "type": "arith",
+                "version": 1
+              },
+              "type": "arith",
+              "version": 1
+            },
+            "then": {
+              "left": {
+                "field": "high_since_entry",
+                "type": "position",
+                "version": 1
+              },
+              "op": "-",
+              "right": {
+                "left": {
+                  "type": "constant",
+                  "value": 3.0,
+                  "version": 1
+                },
+                "op": "*",
+                "right": {
+                  "params": {
+                    "seed_multiplier": 5,
+                    "window": 14
+                  },
+                  "ref": "atr_wilder@1",
+                  "type": "primitive",
+                  "version": 1
+                },
+                "type": "arith",
+                "version": 1
+              },
+              "type": "arith",
+              "version": 1
+            },
+            "type": "if_then_else",
+            "version": 1
+          },
+          "take_profit": {
+            "operands": [
+              {
+                "operands": [
+                  {
+                    "left": {
+                      "field": "close",
+                      "lag": 0,
+                      "type": "price",
+                      "version": 1
+                    },
+                    "op": "+",
+                    "right": {
+                      "left": {
+                        "type": "constant",
+                        "value": 5.0,
+                        "version": 1
+                      },
+                      "op": "*",
+                      "right": {
+                        "params": {
+                          "seed_multiplier": 5,
+                          "window": 14
+                        },
+                        "ref": "atr_wilder@1",
+                        "type": "primitive",
+                        "version": 1
+                      },
+                      "type": "arith",
+                      "version": 1
+                    },
+                    "type": "arith",
+                    "version": 1
+                  },
+                  {
+                    "left": {
+                      "field": "entry_price",
+                      "type": "position",
+                      "version": 1
+                    },
+                    "op": "*",
+                    "right": {
+                      "type": "constant",
+                      "value": 1.04,
+                      "version": 1
+                    },
+                    "type": "arith",
+                    "version": 1
+                  }
+                ],
+                "type": "max_of",
+                "version": 1
+              },
+              {
+                "left": {
+                  "field": "close",
+                  "lag": 0,
+                  "type": "price",
+                  "version": 1
+                },
+                "op": "*",
+                "right": {
+                  "type": "constant",
+                  "value": 1.15,
+                  "version": 1
+                },
+                "type": "arith",
+                "version": 1
+              }
+            ],
+            "type": "min_of",
+            "version": 1
+          }
+        },
+        "symbol": "ES.v.0"
+      }
+    },
+    "symbols": [
+      "ES.v.0",
+      "NQ.v.0"
+    ],
+    "total_return": -0.09551499999999358,
+    "warnings": []
+  },
+  "specification": {
+    "check_invariant": true,
+    "data": [
+      {
+        "alias": null,
+        "allow_non_positive_prices": true,
+        "close_stamp": "period_end",
+        "granularity_minutes": 1,
+        "max_gap_seconds": null,
+        "path": "indices/ES_v0_1m.parquet",
+        "resample": "day",
+        "resample_min_bars": 200,
+        "root": "ES",
+        "session": {
+          "end": "16:00",
+          "start": "17:00",
+          "timezone": "America/Chicago"
+        },
+        "timestamp_column": null
+      },
+      {
+        "alias": null,
+        "allow_non_positive_prices": true,
+        "close_stamp": "period_end",
+        "granularity_minutes": 1,
+        "max_gap_seconds": null,
+        "path": "indices/NQ_v0_1m.parquet",
+        "resample": "day",
+        "resample_min_bars": 200,
+        "root": "NQ",
+        "session": null,
+        "timestamp_column": null
+      }
+    ],
+    "execution": {
+      "fees": {
+        "kind": "per_contract",
+        "per_contract": null
+      },
+      "intrabar_priority": "pessimistic",
+      "lag_bars": 1,
+      "margin_policy": "reject",
+      "max_fill_gap_seconds": null,
+      "slippage": {
+        "bps": null,
+        "kind": "tick",
+        "ticks": 1.0
+      }
+    },
+    "initial_cash": 200000.0,
+    "liquidate_at_end": false,
+    "min_warmup_bars": 0,
+    "name": "moule-universel",
+    "panel": {
+      "align_policy": "drop",
+      "allow_mixed_granularity": false,
+      "max_ffill_bars": null
+    },
+    "rebalance": {
+      "kind": "every_row",
+      "n": 1,
+      "offset": 0
+    },
+    "risk": {
+      "max_gross_contracts": null,
+      "sizing": {
+        "atr_multiple": 2.0,
+        "atr_window": 14,
+        "contracts": 1,
+        "fraction": null,
+        "kind": "fixed",
+        "max_contracts": null,
+        "signal": null,
+        "vol_max_multiple": 4.0,
+        "vol_target": null,
+        "vol_window": 20
+      }
+    },
+    "risk_free_annual": 0.0,
+    "seed": 0,
+    "stop": null,
+    "strategy": {
+      "params": {
+        "allow_pyramiding": false,
+        "extra_warmup": 0,
+        "quantity": 1,
+        "rules": {
+          "entry_long": {
+            "operands": [
+              {
+                "fast": {
+                  "params": {
+                    "fast": 12,
+                    "output": "line",
+                    "slow": 26
+                  },
+                  "ref": "macd@1",
+                  "type": "primitive"
+                },
+                "slow": {
+                  "params": {
+                    "fast": 12,
+                    "output": "signal",
+                    "signal": 9,
+                    "slow": 26
+                  },
+                  "ref": "macd@1",
+                  "type": "primitive"
+                },
+                "type": "crosses_above"
+              },
+              {
+                "left": {
+                  "params": {
+                    "output": "adx",
+                    "window": 14
+                  },
+                  "ref": "adx@1",
+                  "type": "primitive"
+                },
+                "op": ">",
+                "right": {
+                  "type": "constant",
+                  "value": 18.0
+                },
+                "type": "compare"
+              },
+              {
+                "left": {
+                  "inner": {
+                    "inner": {
+                      "left": {
+                        "field": "close",
+                        "type": "price"
+                      },
+                      "op": "/",
+                      "right": {
+                        "inner": {
+                          "field": "close",
+                          "type": "price"
+                        },
+                        "symbol": "NQ.v.0",
+                        "type": "peer"
+                      },
+                      "type": "arith"
+                    },
+                    "stat": "zscore",
+                    "type": "rolling",
+                    "window": 120
+                  },
+                  "op": "abs",
+                  "type": "math"
+                },
+                "op": "<",
+                "right": {
+                  "type": "constant",
+                  "value": 2.5
+                },
+                "type": "compare"
+              },
+              {
+                "inner": {
+                  "left": {
+                    "field": "weekday",
+                    "type": "time"
+                  },
+                  "op": "==",
+                  "right": {
+                    "type": "constant",
+                    "value": 0.0
+                  },
+                  "type": "compare"
+                },
+                "type": "not"
+              },
+              {
+                "left": {
+                  "inner": {
+                    "field": "close",
+                    "type": "price"
+                  },
+                  "stat": "ema",
+                  "type": "rolling",
+                  "window": 10
+                },
+                "op": ">",
+                "right": {
+                  "bars": 5,
+                  "inner": {
+                    "inner": {
+                      "field": "close",
+                      "type": "price"
+                    },
+                    "stat": "ema",
+                    "type": "rolling",
+                    "window": 10
+                  },
+                  "type": "lag"
+                },
+                "type": "compare"
+              },
+              {
+                "left": {
+                  "field": "close",
+                  "type": "price"
+                },
+                "op": ">",
+                "right": {
+                  "field": "high",
+                  "lag": 1,
+                  "type": "session"
+                },
+                "type": "compare"
+              },
+              {
+                "left": {
+                  "field": "close",
+                  "type": "price"
+                },
+                "op": ">",
+                "right": {
+                  "left": {
+                    "inner": {
+                      "left": {
+                        "field": "close",
+                        "type": "price"
+                      },
+                      "op": "*",
+                      "right": {
+                        "field": "volume",
+                        "type": "price"
+                      },
+                      "type": "arith"
+                    },
+                    "stat": "sum",
+                    "type": "cumulative"
+                  },
+                  "op": "/",
+                  "right": {
+                    "inner": {
+                      "field": "volume",
+                      "type": "price"
+                    },
+                    "stat": "sum",
+                    "type": "cumulative"
+                  },
+                  "type": "arith"
+                },
+                "type": "compare"
+              }
+            ],
+            "type": "all_of"
+          },
+          "entry_short": {
+            "operands": [
+              {
+                "fast": {
+                  "params": {
+                    "fast": 12,
+                    "output": "line",
+                    "slow": 26
+                  },
+                  "ref": "macd@1",
+                  "type": "primitive"
+                },
+                "slow": {
+                  "params": {
+                    "fast": 12,
+                    "output": "signal",
+                    "signal": 9,
+                    "slow": 26
+                  },
+                  "ref": "macd@1",
+                  "type": "primitive"
+                },
+                "type": "crosses_below"
+              },
+              {
+                "left": {
+                  "params": {
+                    "output": "minus_di",
+                    "window": 14
+                  },
+                  "ref": "adx@1",
+                  "type": "primitive"
+                },
+                "op": ">",
+                "right": {
+                  "params": {
+                    "output": "plus_di",
+                    "window": 14
+                  },
+                  "ref": "adx@1",
+                  "type": "primitive"
+                },
+                "type": "compare"
+              },
+              {
+                "left": {
+                  "params": {
+                    "window": 20
+                  },
+                  "ref": "efficiency_ratio@1",
+                  "type": "primitive"
+                },
+                "op": "<",
+                "right": {
+                  "type": "constant",
+                  "value": 0.9
+                },
+                "type": "compare"
+              }
+            ],
+            "type": "all_of"
+          },
+          "exit_long": {
+            "operands": [
+              {
+                "left": {
+                  "params": {
+                    "window": 14
+                  },
+                  "ref": "rsi_wilder@1",
+                  "type": "primitive"
+                },
+                "op": ">",
+                "right": {
+                  "type": "constant",
+                  "value": 72.0
+                },
+                "type": "compare"
+              },
+              {
+                "left": {
+                  "field": "bars_held",
+                  "type": "position"
+                },
+                "op": ">=",
+                "right": {
+                  "type": "constant",
+                  "value": 45.0
+                },
+                "type": "compare"
+              },
+              {
+                "left": {
+                  "inner": {
+                    "left": {
+                      "params": {
+                        "window": 20
+                      },
+                      "ref": "cci@1",
+                      "type": "primitive"
+                    },
+                    "op": "<",
+                    "right": {
+                      "type": "constant",
+                      "value": -180.0
+                    },
+                    "type": "compare"
+                  },
+                  "lookback": 15,
+                  "type": "bars_since"
+                },
+                "op": "<=",
+                "right": {
+                  "type": "constant",
+                  "value": 1.0
+                },
+                "type": "compare"
+              },
+              {
+                "left": {
+                  "field": "drawdown",
+                  "type": "account"
+                },
+                "op": "<",
+                "right": {
+                  "type": "constant",
+                  "value": -0.12
+                },
+                "type": "compare"
+              }
+            ],
+            "type": "any_of"
+          },
+          "exit_short": {
+            "operands": [
+              {
+                "left": {
+                  "params": {
+                    "window": 14
+                  },
+                  "ref": "williams_r@1",
+                  "type": "primitive"
+                },
+                "op": "<",
+                "right": {
+                  "type": "constant",
+                  "value": -88.0
+                },
+                "type": "compare"
+              },
+              {
+                "left": {
+                  "field": "bars_held",
+                  "type": "position"
+                },
+                "op": ">=",
+                "right": {
+                  "type": "constant",
+                  "value": 30.0
+                },
+                "type": "compare"
+              },
+              {
+                "left": {
+                  "field": "drawdown",
+                  "type": "account"
+                },
+                "op": "<",
+                "right": {
+                  "type": "constant",
+                  "value": -0.12
+                },
+                "type": "compare"
+              }
+            ],
+            "type": "any_of"
+          },
+          "stop_loss": {
+            "condition": {
+              "left": {
+                "params": {
+                  "window": 20
+                },
+                "ref": "efficiency_ratio@1",
+                "type": "primitive"
+              },
+              "op": ">",
+              "right": {
+                "type": "constant",
+                "value": 0.45
+              },
+              "type": "compare"
+            },
+            "otherwise": {
+              "left": {
+                "field": "close",
+                "type": "price"
+              },
+              "op": "-",
+              "right": {
+                "left": {
+                  "type": "constant",
+                  "value": 1.5
+                },
+                "op": "*",
+                "right": {
+                  "params": {
+                    "window": 14
+                  },
+                  "ref": "atr_wilder@1",
+                  "type": "primitive"
+                },
+                "type": "arith"
+              },
+              "type": "arith"
+            },
+            "then": {
+              "left": {
+                "field": "high_since_entry",
+                "type": "position"
+              },
+              "op": "-",
+              "right": {
+                "left": {
+                  "type": "constant",
+                  "value": 3.0
+                },
+                "op": "*",
+                "right": {
+                  "params": {
+                    "window": 14
+                  },
+                  "ref": "atr_wilder@1",
+                  "type": "primitive"
+                },
+                "type": "arith"
+              },
+              "type": "arith"
+            },
+            "type": "if_then_else"
+          },
+          "take_profit": {
+            "operands": [
+              {
+                "operands": [
+                  {
+                    "left": {
+                      "field": "close",
+                      "type": "price"
+                    },
+                    "op": "+",
+                    "right": {
+                      "left": {
+                        "type": "constant",
+                        "value": 5.0
+                      },
+                      "op": "*",
+                      "right": {
+                        "params": {
+                          "window": 14
+                        },
+                        "ref": "atr_wilder@1",
+                        "type": "primitive"
+                      },
+                      "type": "arith"
+                    },
+                    "type": "arith"
+                  },
+                  {
+                    "left": {
+                      "field": "entry_price",
+                      "type": "position"
+                    },
+                    "op": "*",
+                    "right": {
+                      "type": "constant",
+                      "value": 1.04
+                    },
+                    "type": "arith"
+                  }
+                ],
+                "type": "max_of"
+              },
+              {
+                "left": {
+                  "field": "close",
+                  "type": "price"
+                },
+                "op": "*",
+                "right": {
+                  "type": "constant",
+                  "value": 1.15
+                },
+                "type": "arith"
+              }
+            ],
+            "type": "min_of"
+          }
+        },
+        "symbol": "ES.v.0"
+      },
+      "ref": "panel_rules@1"
+    },
+    "with_data_hash": true
+  },
+  "symbols": [
+    "ES.v.0",
+    "NQ.v.0"
+  ]
+}

@@ -32,6 +32,7 @@ from rsl.config import BacktestSpec
 from rsl.data.instruments import INSTRUMENTS, get_instrument
 from rsl.data.loader import validate_file
 from rsl.errors import ConfigurationError, RslError
+from rsl.essais import EssaiDejaArchiveError, Registre, registre_par_defaut
 from rsl.metrics.statistics import AnchoredWalkForward, RollingWalkForward
 from rsl.primitives.registry import describe_registry
 from rsl.report import BacktestReport, run_backtest
@@ -220,7 +221,29 @@ def _build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="ouvre le tableau de bord a la fin du run",
     )
+    run.add_argument(
+        "--archive",
+        action="store_true",
+        help=(
+            "enregistre ce run comme un ESSAI dans essais/ et compte le "
+            "Deflated Sharpe contre tous les essais deja enregistres. Sans lui, "
+            "le run se declare seul et son DSR se confond avec son PSR."
+        ),
+    )
+    run.add_argument(
+        "--note",
+        default="",
+        help="pourquoi cet essai a ete fait. Archive avec lui ; ignore sans --archive.",
+    )
     run.set_defaults(handler=_cmd_run)
+
+    essais = sub.add_parser(
+        "essais", help="registre des essais : ce que le Deflated Sharpe compte"
+    )
+    essais.add_argument(
+        "--json", action="store_true", help="sortie JSON plutot que tableau"
+    )
+    essais.set_defaults(handler=_cmd_essais)
 
     squelette = sub.add_parser(
         "squelette",
@@ -418,15 +441,104 @@ def _cmd_example(args: argparse.Namespace) -> int:
 
 
 def _cmd_run(args: argparse.Namespace) -> int:
+    """Execute un backtest, et - avec `--archive` - le compte comme un essai.
+
+    Sans `--archive`, le comportement est celui d'avant : un `TrialLog` vide,
+    donc « 1 essai », donc un DSR qui se confond avec le PSR. Ce n'est pas un
+    defaut a corriger silencieusement - un run exploratoire n'est pas toujours
+    un essai qu'on revendique, et le rapport porte deja l'avertissement.
+
+    Avec `--archive`, le compteur devient celui du DEPOT : le registre est
+    charge avant le run, le Deflated Sharpe est calcule contre lui, et l'essai
+    y est ajoute ensuite. L'ordre compte - s'ajouter soi-meme avant de se
+    comparer ferait qu'un premier essai se trouverait deja un predecesseur.
+    """
     spec = _load_spec(args.config, args.settings, args.symbol)
-    report = run_backtest(spec)
+    registre = registre_par_defaut() if args.archive else None
+    report = run_backtest(
+        spec, trial_log=None if registre is None else registre.journal()
+    )
     _emit(report, as_json=args.json, out=args.out)
+    if registre is not None:
+        _archiver(registre, report, note=args.note)
     if args.gui:
         # Import tardif : tkinter peut manquer sur une machine sans interface,
         # et `rsl run` sans `--gui` doit continuer d'y fonctionner.
         from rsl.gui.app import launch
 
         launch(config=args.config)
+    return EXIT_OK
+
+
+def _archiver(registre: Registre, report: BacktestReport, *, note: str) -> None:
+    """Ajoute l'essai au registre, ou dit pourquoi il ne l'a pas ete.
+
+    Un doublon n'est PAS une erreur de l'utilisateur : relancer un backtest
+    pour verifier qu'il se reproduit est exactement ce que le socle encourage.
+    La commande le dit et rend `EXIT_OK`.
+    """
+    try:
+        essai = registre.archiver(report.to_dict(), note=note)
+    except EssaiDejaArchiveError as deja:
+        print(f"\nessai deja enregistre : {deja}")
+        return
+    print(f"\nessai archive     {essai.render()}")
+    print(f"rapport           {essai.rapport}")
+    print(f"registre          {registre.fichier} ({registre.journal().n_trials} essai(s))")
+
+
+def _cmd_essais(args: argparse.Namespace) -> int:
+    """Ce que le compteur du Deflated Sharpe contient reellement.
+
+    Une commande a part entiere, pour la meme raison que `verify` : un chiffre
+    qui gouverne l'interpretation de tous les resultats doit pouvoir etre
+    consulte sans relire un fichier a la main.
+    """
+    registre = registre_par_defaut()
+    essais = registre.essais()
+    if args.json:
+        print(json.dumps(
+            {"registre": registre.describe(), "essais": [e.describe() for e in essais]},
+            indent=2, ensure_ascii=False, sort_keys=True,
+        ))
+        return EXIT_OK
+
+    if not essais:
+        print(
+            f"Aucun essai enregistre dans {registre.fichier}.\n"
+            f"Archiver un run : rsl run CONFIG --archive"
+        )
+        return EXIT_OK
+
+    for essai in essais:
+        print(essai.render())
+    journal = registre.journal()
+    print(
+        f"\n{len(essais)} ligne(s), {journal.n_trials} configuration(s) distincte(s), "
+        f"variance des Sharpe {journal.variance_of_sharpes:.6f}"
+    )
+    doublons = registre.doublons()
+    if doublons:
+        print(
+            f"\nAVERTISSEMENT : {len(doublons)} resultat(s) obtenus par PLUSIEURS "
+            f"specifications. Le compteur les voit comme autant d'essais alors "
+            f"qu'une seule idee a peut-etre ete essayee - a trancher a la main, "
+            f"le registre ne juge pas."
+        )
+        for empreinte, lignes in sorted(doublons.items()):
+            noms = ", ".join(sorted({e.label for e in lignes}))
+            print(f"  {empreinte[:12]} <- {noms}")
+
+    divergences = registre.divergences()
+    if divergences:
+        print(
+            f"\nAVERTISSEMENT : {len(divergences)} specification(s) ont rendu "
+            f"PLUSIEURS resultats. Le moteur a change entre-temps ; les chiffres "
+            f"d'avant et d'apres ne se comparent pas."
+        )
+        for cle, lignes in sorted(divergences.items()):
+            empreintes = ", ".join(sorted({e.result_fingerprint[:12] for e in lignes}))
+            print(f"  {cle[:12]} -> {empreintes}")
     return EXIT_OK
 
 

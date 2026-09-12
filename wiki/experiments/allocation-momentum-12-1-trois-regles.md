@@ -32,9 +32,10 @@ chacun), `inverse_volatility` (poids en `1/vol`, normalises).
 - `risk.sizing.kind: "none"` — obligatoire : une allocation en argent combinee
   a un dimensionnement est refusee a la validation
   ([docs/execution-model.md](../../docs/execution-model.md) §6.4)
-- **Rapports non archives dans `runs/`** : ecrits dans un repertoire temporaire
-  de session, donc non rejouables en l'etat. Les empreintes ci-dessous
-  identifient les runs, elles ne les remplacent pas.
+- **Rapports ARCHIVES depuis le 2026-09-12** dans
+  [essais/](../../essais/registre.jsonl) : les six essais y figurent, avec leur
+  rapport complet. Ils ne l'etaient pas — ils vivaient dans un repertoire
+  temporaire de session, et auraient ete perdus.
 
 ## Ce que les trois premiers essais mesuraient reellement
 

@@ -8,6 +8,9 @@ __pycache__/
 .mypy_cache/
 .ruff_cache/
 runs/
+# `runs/` est la sortie de `--out` : un rapport qu'on regarde et qu'on jette.
+# `essais/` en est l'oppose et reste VERSIONNE - c'est le compteur du
+# Deflated Sharpe, et un essai perdu gonfle le DSR de tous les autres.
 *.egg-info/
 .hypothesis/
 

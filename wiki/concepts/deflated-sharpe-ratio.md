@@ -1,6 +1,6 @@
 ---
 type: concept
-updated: 2026-09-10
+updated: 2026-09-12
 statut: stable
 alias: [DSR, PSR, compteur d'essais, TrialLog]
 ---
@@ -27,8 +27,36 @@ Deux quantites a ne pas confondre :
 - `TrialLog` enregistre chaque essai **au moment ou il est fait**, et fournit au
   DSR les deux entrees qu'aucun backtest isole ne connait : le nombre d'essais
   et leur dispersion.
+- Registre DURABLE : [src/rsl/essais.py](../../src/rsl/essais.py) et
+  [essais/registre.jsonl](../../essais/registre.jsonl), versionne. `rsl run
+  --archive` y ajoute l'essai et calcule le DSR contre TOUS les precedents ;
+  `rsl essais` montre ce que le compteur contient.
+
+> **Jusqu'au 2026-09-12, ce compteur ne comptait rien.** `TrialLog` vivait dans
+> un processus, et `rsl run` en creait un neuf : chaque run se declarait « 1
+> essai », donc son DSR se confondait avec son PSR. Tous les DSR publies avant
+> cette date sont des PSR deguises, quel que soit le nombre d'essais reellement
+> faits. Le `SIGNIFICATIF` de la paire ES/NQ passe de 0,9722 a 0,9546 une fois
+> compte au troisieme rang ([[experiments/paire-es-nq-retour-a-la-moyenne]]).
 - Le pas d'annualisation est **mesure sur l'echantillon**, jamais suppose —
   voir la ligne correspondante du [[Failed Ideas/ledger]].
+
+## Ce que le registre refuse de faire a votre place
+
+Trois decisions lui sont deliberement interdites, parce que chacune est un
+jugement et qu'un compteur qui juge cesse d'etre un compteur :
+
+- **Rejouer n'est pas essayer.** Deux runs de la meme specification comptent
+  pour un. Punir la reproductibilite serait contraire au but du socle. La cle
+  est le `config_hash`.
+- **Une empreinte qui change a `config_hash` constant** n'est pas un doublon :
+  le moteur a change, et les chiffres d'avant et d'apres ne se comparent plus.
+  Le registre garde les deux lignes et le SIGNALE, au lieu de choisir.
+- **Un meme resultat sous deux specifications** gonfle le compteur d'un essai
+  qui n'en est peut-etre pas un. Signale aussi, jamais corrige d'office —
+  decider que deux ecritures sont « la meme idee » n'appartient pas a la
+  machine. Et le signal est SUFFISANT, jamais necessaire : il ne voit que les
+  resultats bit-identiques.
 
 ## Pourquoi ca compte
 

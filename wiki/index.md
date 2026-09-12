@@ -24,6 +24,12 @@ specification de strategie, la compiler en backtest.
 evaluee sur un echantillon avec une configuration = une ligne du compteur
 d'essais du Deflated Sharpe.
 
+Depuis le 2026-09-12, ce compteur a une source MACHINE et durable :
+[essais/registre.jsonl](../essais/registre.jsonl), alimente par
+`rsl run --archive`. Les pages d'`experiments/` portent le jugement - hypothese,
+verdict, ce qu'il ne faut pas conclure ; le registre porte les faits. Quand les
+deux se contredisent, le registre a raison sur les chiffres et la page sur le sens.
+
 ---
 
 ## Hubs

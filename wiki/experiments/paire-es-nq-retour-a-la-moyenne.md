@@ -1,6 +1,6 @@
 ---
 type: experiment
-updated: 2026-09-11
+updated: 2026-09-12
 statut: termine
 verdict: non-conclusif
 strategie: panel_rules@1
@@ -33,7 +33,9 @@ sur 120 jours descend sous -1,5 ; sortir au retour a zero, ou apres 40 barres.
   `position`, `compare`, `any_of`
 - Commande : `rsl run examples/strategies/paire_es_nq.json --settings examples/reglages/paire_es_nq.json --symbol ES.v.0`
 - Empreinte : `479348a0ff34b8e36d5ed79d26d9642573ea67d6890bf193fff2c1ca4bb86ac3`
-- **Rapport non archive** : aucun `--out`, donc pas rejouable en l'etat.
+- **Rapport ARCHIVE depuis le 2026-09-12** :
+  [essais/rapports/](../../essais/rapports/), cle `c686c31fa61e`. Il ne l'etait
+  pas — l'essai a ete refait par `rsl run --archive` pour le devenir.
 
 ## Resultat
 
@@ -55,10 +57,13 @@ pas de sens, et les presenter comme un avant/apres serait trompeur.
 
 Trois raisons de ne rien conclure de 0,61 :
 
-- **Un seul echantillon, aucun walk-forward.** Le DSR affiche
-  `SIGNIFICATIF` a 0,9722, mais il se confond avec le PSR a un seul essai
-  enregistre — le programme le dit lui-meme dans son avertissement. Voir
-  [[concepts/deflated-sharpe-ratio]].
+- **Un seul echantillon, aucun walk-forward.** Le DSR affichait
+  `SIGNIFICATIF` a 0,9722 — mais il se confondait avec le PSR, faute d'un
+  compteur d'essais qui survive a la session. **Corrige le 2026-09-12** :
+  reexecute contre le registre, l'essai rend 0,9546 au troisieme rang.
+  Toujours au-dessus du seuil, et toujours sans portee — un walk-forward reste
+  le prealable. Voir [[concepts/deflated-sharpe-ratio]] et
+  [essais/registre.jsonl](../../essais/registre.jsonl), cle `c686c31fa61e`.
 - **Les seuils n'ont pas ete choisis pour ces donnees, mais ils n'ont pas non
   plus ete choisis au hasard** : -1,5 et 120 jours viennent de l'exemple
   d'origine, ecrit quand le signal etait inerte. Ils n'ont donc jamais ete
