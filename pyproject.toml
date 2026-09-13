@@ -96,5 +96,5 @@ ignore_missing_imports = true
 # L'exception est confinee au SEUL module qui definit des strategies Nautilus ;
 # `pont.py` et `moteur.py`, ou vivent les conversions, gardent `strict` entier.
 [[tool.mypy.overrides]]
-module = "rsl.nautilus.strategies"
+module = ["rsl.nautilus.strategies", "rsl.nautilus.vocabulaire"]
 disallow_subclassing_any = false
