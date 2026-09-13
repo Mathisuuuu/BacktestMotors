@@ -5,7 +5,7 @@ statut: termine
 verdict: negatif
 strategie: rules@1
 instruments: [NQ.v.0]
-essais: 2
+essais: 3
 ---
 
 # Zarattini NQ intraday 60/30/1.5 — deux essais, dont un rate
@@ -89,7 +89,61 @@ largement des variantes correlees d'une grille SMA, et le DSR suppose des
 essais independants. La correction appliquee ici n'est donc pas la bonne
 correction — elle est seulement la seule qu'on sache calculer.
 
-## Defaut de configuration non corrige
+## Troisieme essai : `sigma` ancre sur la seance (2026-09-13)
+
+Le defaut decrit plus bas a ete corrige. `sigma[tau]` est reecrit avec
+`rolling.across: "sessions"` et `session_lag`, qui retrouvent le meme RANG par
+le calendrier declare au lieu de supposer 390 barres par seance.
+
+| | `stride: 390` | ancre sur la seance |
+|---|---|---|
+| rendement total | +111,53 % | **+256,80 %** |
+| CAGR | +7,33 % | **+13,00 %** |
+| Sharpe | 0,83 | **1,26** |
+| Sortino | 1,51 | 2,31 |
+| drawdown quotidien | -14,21 % | -16,98 % |
+| trades | 1 241 | **2 067** |
+| exposition | 4,51 % | **11,98 %** |
+| taux de reussite | 44,64 % | 38,17 % |
+| profit factor | 1,233 | 1,314 |
+| ordres / fills | 2 482 / 2 482 | 4 134 / 4 134 |
+
+### Pourquoi la strategie negocie deux fois plus
+
+Le nouveau `sigma` est **plus petit dans 82,5 % des cas**, de 25,4 % en
+mediane. Le mecanisme est direct : un pas de 390 barres dans une seance qui en
+compte 1 362 echantillonne surtout des barres de NUIT, dont le rendement depuis
+l'ouverture de seance a derive pendant des heures. L'ancien `sigma` mesurait
+donc une dispersion de fin de seance et l'appliquait a la 30e minute. Bandes
+trop larges, cassures trop rares.
+
+### Ce que le chiffre ne dit toujours pas
+
+| | `stride: 390` | ancre sur la seance |
+|---|---|---|
+| essais comptes | 495 | 496 |
+| Sharpe observe / periode | 0,0469 | 0,0715 |
+| maximum attendu sous H0 | 0,0667 | 0,0668 |
+| **DSR** | **0,1107** | **0,6148** |
+| significatif | non | **non** |
+
+Le Sharpe observe passe SOUS le maximum attendu par chance a AU-DESSUS - c'est
+un progres reel. Il reste que 0,6148 n'est pas 0,95 : apres 496 essais, ce
+resultat demeure compatible avec le meilleur tirage d'un jeu.
+
+### Reserve sur la comparaison
+
+**Les deux runs ne portent pas sur le meme echantillon.** Le warmup d'une
+fenetre comptee en seances ne se declare pas en barres (voir
+`docs/execution-model.md` §1.3), et `min_warmup_bars` a donc ete porte de
+23 790 a 85 000 : le run par seance couvre 3 643 989 barres contre 3 705 199,
+soit **45 seances de moins** - deux mois sur 10,6 ans. L'ecart de performance
+est trop large pour venir de la, mais il n'a pas ete mesure a echantillon egal.
+
+## Le defaut, tel qu'il a ete trouve
+
+**Corrige le jour meme** ; conserve ici parce que la maniere dont il a
+survecu compte autant que le defaut.
 
 Les cotations NQ portent la seance ELECTRONIQUE : **1 362 barres par jour, pas
 390**. Le `stride: 390` de `sigma`, cense echantillonner « au meme rang de
@@ -103,15 +157,23 @@ CELLE de Zarattini.
 
 ## Ce qu'on ne peut PAS en conclure
 
-- Que la strategie est bonne : DSR 0,1107.
-- Que la strategie est mauvaise : le `sigma` teste n'est pas celui du papier.
+- Que la strategie est bonne : DSR 0,6148, sous le seuil.
+- Que corriger `sigma` a « ameliore » la strategie. Cela a corrige une
+  ERREUR DE MESURE. Le gain de +111 % a +257 % dit ce que l'erreur coutait,
+  pas ce que la strategie vaut.
 - Que le capital est un parametre de la strategie : ce n'en est pas un. C'est
   une contrainte de financabilite qui a rendu le premier essai muet.
+- Que les trois essais se comparent entre eux sans reserve : le troisieme
+  porte sur 45 seances de moins.
 
 ## Suites
 
-- Reecrire `sigma` sur un ancrage de seance reel plutot que sur un `stride`
-  suppose constant, puis relancer. C'est alors le papier qu'on testera.
-- Afficher le taux de rejet a cote du rendement ([[hot]], action ouverte).
+- [x] Reecrire `sigma` sur un ancrage de seance reel — **fait 2026-09-13**.
+- [ ] Rejouer les deux configurations a echantillon EGAL, pour que l'ecart
+      de +145 points soit attribuable au seul `sigma`.
+- [ ] Walk-forward : un Sharpe de 1,26 sur un echantillon unique ne dit rien
+      de sa stabilite, et c'est la question que le DSR de 0,6148 laisse
+      ouverte.
+- [ ] Afficher le taux de rejet a cote du rendement ([[hot]], action ouverte).
 
 Fonde sur [[log]] (2026-09-13) · [[lessons]] L27, L28 · registre `essais/registre.jsonl`

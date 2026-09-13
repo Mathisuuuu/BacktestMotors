@@ -17,7 +17,7 @@ generated: true
 | Indicateur | Valeur |
 |---|---|
 | Pages de wiki | 27 |
-| Entrees de log | 172 |
+| Entrees de log | 175 |
 | Derniere activite | 2026-09-13 |
 | Idees ecartees (ledger) | 22 |
 | Idees en attente (ledger) | 4 |
@@ -27,7 +27,7 @@ generated: true
 | Pages `reference/` | 7 |
 | Pages `research/` | 1 |
 
-**Activite par type :** note × 76, fix × 36, feat × 26, decision × 20, essai × 4, mesure × 3, experiment × 2, setup × 1, lint × 1, audit × 1, refactor × 1, perf × 1
+**Activite par type :** note × 78, fix × 36, feat × 26, decision × 20, essai × 4, mesure × 4, experiment × 2, setup × 1, lint × 1, audit × 1, refactor × 1, perf × 1
 
 ## Experiences
 
@@ -40,20 +40,20 @@ generated: true
 | [[experiments/pbo-grille-sma-es-quotidien]] | `termine` | `negatif` | 16 | 2026-09-12 |
 | [[experiments/rsi-survendu-hors-lundi]] | `termine` | `non-conclusif` | 1 | 2026-09-11 |
 | [[experiments/sma-es-daily-walkforward]] | `termine` | `fragile` | 1 | 2026-09-12 |
-| [[experiments/zarattini-nq-intraday-60-30]] | `termine` | `negatif` | 2 | 2026-09-13 |
+| [[experiments/zarattini-nq-intraday-60-30]] | `termine` | `negatif` | 3 | 2026-09-13 |
 
 Le total des essais alimente le Deflated Sharpe : un essai non enregistre gonfle le DSR de tous les autres.
 
 ## Derniere activite — 8 entree(s)
 
+- **2026-09-13** — note | RESERVE sur la comparaison des deux runs : les echantillons ne sont pas identiques | `min_warmup_bars` passe de 23 790 a 85 000, le warmup en seances ne pouvant pas se declarer en barres. Le run par seance porte donc sur 3 643 989 barres contre 3 705 199, soit **45 seances de moins** - environ deux mois sur 10,6 ans. L'ecart de performance est trop grand pour venir de la, mais il n'est pas mesure a echantillon egal
+- **2026-09-13** — note | Le +256,80 % ne passe toujours PAS le compteur d'essais : DSR **0,6148** contre 496 essais, non significatif | le Sharpe par periode (0,0715) depasse desormais le maximum attendu sous H0 (0,0668), ce qui n'etait pas le cas avant - DSR 0,1107 pour la version a `stride`. Corriger sigma a donc rapproche la strategie du seuil sans le franchir. Essai archive, registre a 496
+- **2026-09-13** — mesure | Zarattini a sigma ancre sur la SEANCE : **+256,80 %** contre +111,53 % avec `stride: 390`, Sharpe 1,26 contre 0,83 | 2 067 trades contre 1 241, exposition 11,98 % contre 4,51 %, zero rejet des deux cotes. Mecanisme : le nouveau sigma est PLUS PETIT dans 82,5 % des cas (mediane -25,4 %), l'ancien echantillonnant des barres de NUIT dont le rendement depuis l'ouverture a derive toute la seance. Bandes plus etroites, donc plus de cassures
 - **2026-09-13** — note | `_moule_universel` change d'empreinte, et c'est VOULU : il doit montrer chaque type de noeud | verifie terme a terme avant d'accepter - `equity`, `cash`, `exposure`, `trades` et `portfolio` sont bit-identiques ; seuls bougent les `order_id` et deux compteurs, le nouveau terme d'`exit_short` emettant 12 ordres ecartes faute de position a fermer. Effet economique NUL. Les six autres empreintes sont inchangees
 - **2026-09-13** — note | Choix assume : une seance ECOURTEE fait rendre `None` a la fenetre, sans substitution de barre voisine | substituer comparerait 15 h 59 d'un jour plein a 13 h 00 d'un demi-jour - le desalignement silencieux que ces formes existent pour supprimer. Mesure : 33 % des barres gardent une fenetre complete sur NQ, **88 % aux douze points de controle**. Une politique DECLAREE de moyennage sur les seances disponibles reste ouverte, faute d'un cas ou les 12 % changent une conclusion
 - **2026-09-13** — fix | La note « 3,4 % d'approximation » de la specification Zarattini etait fausse sur ses TROIS affirmations | les cotations NQ portent 1 362 barres par jour et non 390, donc le `stride: 390` ne tombait JAMAIS sur le rang voulu ; les seances courtes ne sont pas 94 accidents mais **les vendredis** (435 barres), une semaine sur une sur dix ans. Reecrit, `sigma[tau]` differe de l'ancien a **100 %** des points de controle, de **28,3 % en mediane** et jusqu'a 94,7 %. Lecon [[lessons]] L29
 - **2026-09-13** — feat | Les fenetres savent compter en SEANCES : `rolling.across: "sessions"` et le noeud `session_lag` | adosses au calendrier DECLARE, ils retrouvent le meme RANG dans les seances precedentes la ou `stride` comptait des barres. Reprise de la ligne du [[Failed Ideas/ledger]] du 2026-09-11, dont les deux conditions etaient remplies. 24 types de noeuds, 4190 tests, `ruff` et `mypy --strict` propres
 - **2026-09-13** — note | Le +111,53 % n'est PAS significatif : DSR 0,9981 -> **0,1107** une fois compte contre les 495 essais du registre | le Sharpe observe par periode (0,0469) est INFERIEUR au maximum attendu sous H0 (0,0667). Le rapport publiait 0,9981 parce que le run avait ete lance sans `--archive`, donc contre un seul essai. Les deux runs sont desormais au registre, le rate y compris. Essai : [[experiments/zarattini-nq-intraday-60-30]]
-- **2026-09-13** — mesure | Zarattini relance a capital 500 000, MEME configuration : **+111,53 %** contre -25,62 % a 100 000 | 2 482 ordres, 2 482 fills, **zero rejet** - contre 5 080 rejets de marge sur 5 084 auparavant. Marge max 108 000, soit exactement les 4 x 27 000 que le compte de 100 000 ne pouvait pas couvrir. 1 241 trades, Sharpe 0,83, exposition 4,51 %
-- **2026-09-13** — note | Le +111,53 % n'est PAS significatif : DSR 0,9981 -> **0,1107** une fois compte contre les 495 essais du registre | le Sharpe observe par periode (0,0469) est INFERIEUR au maximum attendu sous H0 (0,0667). Le rapport publiait 0,9981 parce que le run avait ete lance sans `--archive`, donc contre un seul essai. Les deux runs sont desormais au registre, le rate y compris. Essai : [[experiments/zarattini-nq-intraday-60-30]]
-- **2026-09-13** — mesure | Zarattini relance a capital 500 000, MEME configuration : **+111,53 %** contre -25,62 % a 100 000 | 2 482 ordres, 2 482 fills, **zero rejet** - contre 5 080 rejets de marge sur 5 084 auparavant. Marge max 108 000, soit exactement les 4 x 27 000 que le compte de 100 000 ne pouvait pas couvrir. 1 241 trades, Sharpe 0,83, exposition 4,51 %
 
 ## Next Actions
 
