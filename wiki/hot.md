@@ -16,18 +16,18 @@ generated: true
 
 | Indicateur | Valeur |
 |---|---|
-| Pages de wiki | 26 |
-| Entrees de log | 164 |
+| Pages de wiki | 27 |
+| Entrees de log | 168 |
 | Derniere activite | 2026-09-13 |
 | Idees ecartees (ledger) | 21 |
 | Idees en attente (ledger) | 4 |
 | Pages `Failed Ideas/` | 1 |
 | Pages `concepts/` | 6 |
-| Pages `experiments/` | 7 |
+| Pages `experiments/` | 8 |
 | Pages `reference/` | 7 |
 | Pages `research/` | 1 |
 
-**Activite par type :** note × 72, fix × 35, feat × 25, decision × 20, essai × 4, experiment × 2, setup × 1, lint × 1, audit × 1, refactor × 1, perf × 1, mesure × 1
+**Activite par type :** note × 74, fix × 35, feat × 25, decision × 20, essai × 4, mesure × 3, experiment × 2, setup × 1, lint × 1, audit × 1, refactor × 1, perf × 1
 
 ## Experiences
 
@@ -40,19 +40,20 @@ generated: true
 | [[experiments/pbo-grille-sma-es-quotidien]] | `termine` | `negatif` | 16 | 2026-09-12 |
 | [[experiments/rsi-survendu-hors-lundi]] | `termine` | `non-conclusif` | 1 | 2026-09-11 |
 | [[experiments/sma-es-daily-walkforward]] | `termine` | `fragile` | 1 | 2026-09-12 |
+| [[experiments/zarattini-nq-intraday-60-30]] | `termine` | `negatif` | 2 | 2026-09-13 |
 
 Le total des essais alimente le Deflated Sharpe : un essai non enregistre gonfle le DSR de tous les autres.
 
 ## Derniere activite — 8 entree(s)
 
+- **2026-09-13** — note | Le +111,53 % n'est PAS significatif : DSR 0,9981 -> **0,1107** une fois compte contre les 495 essais du registre | le Sharpe observe par periode (0,0469) est INFERIEUR au maximum attendu sous H0 (0,0667). Le rapport publiait 0,9981 parce que le run avait ete lance sans `--archive`, donc contre un seul essai. Les deux runs sont desormais au registre, le rate y compris. Essai : [[experiments/zarattini-nq-intraday-60-30]]
+- **2026-09-13** — mesure | Zarattini relance a capital 500 000, MEME configuration : **+111,53 %** contre -25,62 % a 100 000 | 2 482 ordres, 2 482 fills, **zero rejet** - contre 5 080 rejets de marge sur 5 084 auparavant. Marge max 108 000, soit exactement les 4 x 27 000 que le compte de 100 000 ne pouvait pas couvrir. 1 241 trades, Sharpe 0,83, exposition 4,51 %
+- **2026-09-13** — note | Le +111,53 % n'est PAS significatif : DSR 0,9981 -> **0,1107** une fois compte contre les 495 essais du registre | le Sharpe observe par periode (0,0469) est INFERIEUR au maximum attendu sous H0 (0,0667). Le rapport publiait 0,9981 parce que le run avait ete lance sans `--archive`, donc contre un seul essai. Les deux runs sont desormais au registre, le rate y compris. Essai : [[experiments/zarattini-nq-intraday-60-30]]
+- **2026-09-13** — mesure | Zarattini relance a capital 500 000, MEME configuration : **+111,53 %** contre -25,62 % a 100 000 | 2 482 ordres, 2 482 fills, **zero rejet** - contre 5 080 rejets de marge sur 5 084 auparavant. Marge max 108 000, soit exactement les 4 x 27 000 que le compte de 100 000 ne pouvait pas couvrir. 1 241 trades, Sharpe 0,83, exposition 4,51 %
 - **2026-09-13** — note | Les cotations NQ portent la seance ELECTRONIQUE complete : 1 362 barres par jour, pas 390 | le `stride: 390` de sigma, qui se veut « au meme rang de seance », echantillonne donc a des heures arbitraires. Defaut distinct de celui de la marge, et non corrige a ce jour
 - **2026-09-13** — fix | Le -25,62 % de Zarattini ne mesure pas la strategie, il mesure DEUX trades : 5 080 ordres sur 5 084 refuses pour MARGE | `vol_target` sature a `vol_max_multiple`=4, donc 4 contrats NQ a 27 000 de marge = 108 000 sur un compte de 100 000. `entry_long` est pourtant vraie 94 fois sur 120 000 barres contigues, soit ~1 par seance. Lecon [[lessons]] L28
 - **2026-09-13** — decision | La reecriture en C# n'est pas retenue : le programme prend 16 min, pas 3 h | le calcul lourd est deja en C (numpy) ; ce qui restait en Python etait le parcours d'arbre, divise par 34 par [[lessons]] L26. Une reecriture voulait dire 24 343 lignes, 136 primitives, 4 168 tests et les 7 empreintes abandonnes. Motif chiffre au [[Failed Ideas/ledger]]
 - **2026-09-13** — mesure | Run Zarattini MESURE de bout en bout : **15 min 55 s** sur 3 705 199 barres minute | mes trois estimations disaient 6,7 h, 3,05 h puis 22 min. Meme cause les trois fois : microbenchmark sur une memoisation VIDE. `rolling` strie coute 655,6 us a froid et 52,1 us a chaud - douze fois. Une duree de run se mesure en lancant le run. Lecon [[lessons]] L27
-- **2026-09-13** — note | Effet sur la strategie Zarattini qui avait revele le defaut : 6,7 h estimees -> 3,05 h | le reste est le `rolling(stride=390)`, structurel : avec un pas de 390, les positions lues a deux barres consecutives sont DISJOINTES, donc rien ne se reutilise
-- **2026-09-13** — note | Le diagnostic de depart etait FAUX : j'attribuais le cout a la somme recalculee, il venait de 400 creations de `BarContext` par barre | un accumulateur courant aurait ete plus rapide encore et aurait change les derniers bits - `np.sum` somme par paires, l'addition sequentielle non. Le tampon garde les valeurs et laisse numpy reduire. Lecon [[lessons]] L26
-- **2026-09-13** — perf | `cumulative` : **1249 -> 36,5 us par barre**, soit 34 fois, et les 7 empreintes INCHANGEES | en deux etapes. (1) La memoire etait consultee APRES `ctx.shifted(lag)`, donc elle payait le cout qu'elle evitait ; sa cle se calcule pourtant sans reculer (`n_bars_seen - lag`). Gain profitant aussi a `rolling` et `bars_since` : 1249 -> 429. (2) Un tampon numpy par seance qui n'ajoute qu'une valeur par barre : 429 -> 36,5
-- **2026-09-13** — fix | Ma garde contre un `risk.limits` ignore ne gardait rien : elle lisait `actives` sur la SPECIFICATION, ou il n'existe pas | chaine de `getattr` rendant `False` en silence. Remplacee par un acces type. Trouve par le test qui l'exerce
 
 ## Next Actions
 

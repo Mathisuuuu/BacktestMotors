@@ -51,6 +51,7 @@ deux se contredisent, le registre a raison sur les chiffres et la page sur le se
 - [[experiments/pbo-grille-sma-es-quotidien|PBO d'une grille SMA 4x4 — ES quotidien]] — **le resultat le plus defavorable du depot, et le plus utile.** PBO 0,70-0,80 : le processus qui choisit la meilleure configuration n'a pas montre de pouvoir predictif. Le DSR de l'exemple phare tombe de 0,9719 a 0,0000 une fois les 31 essais comptes. Verdict : `negatif`.
 - [[experiments/allocation-momentum-12-1-trois-regles|Momentum 12-1, trois regles d'allocation]] — la repartition change le Sharpe de 0,45 a 0,84 sur les MEMES decisions. **Trois des six essais mesuraient autre chose qu'eux-memes** : la troncature en contrats eliminait les gros contrats d'abord. Verdict : `non-conclusif`.
 - [[experiments/rsi-survendu-hors-lundi|RSI survendu hors lundi — ES quotidien]] — Sharpe 0,46 ; 54 % du resultat dans un pli sur neuf. Sert de preuve qu'une strategie neuve s'ecrit en JSON seul. Verdict : `non-conclusif`.
+- [[experiments/zarattini-nq-intraday-60-30|Zarattini NQ intraday 60/30/1.5]] — **-25,62 % puis +111,53 % sur la MEME strategie**, seul le capital changeant : 5 080 ordres sur 5 084 etaient refuses pour marge. Le second chiffre ne survit pas non plus au compteur d'essais — DSR 0,1107, le Sharpe observe etant sous le maximum attendu par chance. Verdict : `negatif`.
 
 ## Concepts — `concepts/`
 
