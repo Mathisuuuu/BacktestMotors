@@ -17,9 +17,9 @@ generated: true
 | Indicateur | Valeur |
 |---|---|
 | Pages de wiki | 26 |
-| Entrees de log | 160 |
+| Entrees de log | 164 |
 | Derniere activite | 2026-09-13 |
-| Idees ecartees (ledger) | 20 |
+| Idees ecartees (ledger) | 21 |
 | Idees en attente (ledger) | 4 |
 | Pages `Failed Ideas/` | 1 |
 | Pages `concepts/` | 6 |
@@ -27,7 +27,7 @@ generated: true
 | Pages `reference/` | 7 |
 | Pages `research/` | 1 |
 
-**Activite par type :** note × 71, fix × 34, feat × 25, decision × 19, essai × 4, experiment × 2, setup × 1, lint × 1, audit × 1, refactor × 1, perf × 1
+**Activite par type :** note × 72, fix × 35, feat × 25, decision × 20, essai × 4, experiment × 2, setup × 1, lint × 1, audit × 1, refactor × 1, perf × 1, mesure × 1
 
 ## Experiences
 
@@ -45,14 +45,14 @@ Le total des essais alimente le Deflated Sharpe : un essai non enregistre gonfle
 
 ## Derniere activite — 8 entree(s)
 
+- **2026-09-13** — note | Les cotations NQ portent la seance ELECTRONIQUE complete : 1 362 barres par jour, pas 390 | le `stride: 390` de sigma, qui se veut « au meme rang de seance », echantillonne donc a des heures arbitraires. Defaut distinct de celui de la marge, et non corrige a ce jour
+- **2026-09-13** — fix | Le -25,62 % de Zarattini ne mesure pas la strategie, il mesure DEUX trades : 5 080 ordres sur 5 084 refuses pour MARGE | `vol_target` sature a `vol_max_multiple`=4, donc 4 contrats NQ a 27 000 de marge = 108 000 sur un compte de 100 000. `entry_long` est pourtant vraie 94 fois sur 120 000 barres contigues, soit ~1 par seance. Lecon [[lessons]] L28
+- **2026-09-13** — decision | La reecriture en C# n'est pas retenue : le programme prend 16 min, pas 3 h | le calcul lourd est deja en C (numpy) ; ce qui restait en Python etait le parcours d'arbre, divise par 34 par [[lessons]] L26. Une reecriture voulait dire 24 343 lignes, 136 primitives, 4 168 tests et les 7 empreintes abandonnes. Motif chiffre au [[Failed Ideas/ledger]]
+- **2026-09-13** — mesure | Run Zarattini MESURE de bout en bout : **15 min 55 s** sur 3 705 199 barres minute | mes trois estimations disaient 6,7 h, 3,05 h puis 22 min. Meme cause les trois fois : microbenchmark sur une memoisation VIDE. `rolling` strie coute 655,6 us a froid et 52,1 us a chaud - douze fois. Une duree de run se mesure en lancant le run. Lecon [[lessons]] L27
 - **2026-09-13** — note | Effet sur la strategie Zarattini qui avait revele le defaut : 6,7 h estimees -> 3,05 h | le reste est le `rolling(stride=390)`, structurel : avec un pas de 390, les positions lues a deux barres consecutives sont DISJOINTES, donc rien ne se reutilise
 - **2026-09-13** — note | Le diagnostic de depart etait FAUX : j'attribuais le cout a la somme recalculee, il venait de 400 creations de `BarContext` par barre | un accumulateur courant aurait ete plus rapide encore et aurait change les derniers bits - `np.sum` somme par paires, l'addition sequentielle non. Le tampon garde les valeurs et laisse numpy reduire. Lecon [[lessons]] L26
 - **2026-09-13** — perf | `cumulative` : **1249 -> 36,5 us par barre**, soit 34 fois, et les 7 empreintes INCHANGEES | en deux etapes. (1) La memoire etait consultee APRES `ctx.shifted(lag)`, donc elle payait le cout qu'elle evitait ; sa cle se calcule pourtant sans reculer (`n_bars_seen - lag`). Gain profitant aussi a `rolling` et `bars_since` : 1249 -> 429. (2) Un tampon numpy par seance qui n'ajoute qu'une valeur par barre : 429 -> 36,5
 - **2026-09-13** — fix | Ma garde contre un `risk.limits` ignore ne gardait rien : elle lisait `actives` sur la SPECIFICATION, ou il n'existe pas | chaine de `getattr` rendant `False` en silence. Remplacee par un acces type. Trouve par le test qui l'exerce
-- **2026-09-13** — note | Mesure des agregations que le simulateur Nautilus EXECUTE : MINUTE, HOUR, DAY, WEEK oui ; MONTH non | fige dans `pont.AGREGATIONS_EXECUTABLES`, avec un reetiquetage du mensuel en quotidien. Les barres restent mensuelles - leurs horodatages le disent - et Nautilus ne les reagrege jamais puisqu'elles arrivent deja agregees
-- **2026-09-13** — fix | Deux defauts SILENCIEUX dans le portage transversal, tous deux rendant capital intact et zero position | (1) declencher a la premiere barre d'un instant : les neuf autres instruments n'avaient pas de marche, 684 ordres emis et 684 rejetes ; (2) Nautilus ne remplit AUCUN ordre sur des barres etiquetees `MONTH` - mesure a la chaine de caracteres pres. Lecon [[lessons]] L25
-- **2026-09-13** — feat | Le vocabulaire TRANSVERSAL tourne sur Nautilus : `panel_rules@1` et `ranking@1` par reconstitution de la coupe | la ligne de panneau est reconstituee en COMPTANT les barres attendues (`present_symbols`), et traitee a la derniere. `momentum_12_1` donne 97 positions et 273 fills la ou notre moteur fait 107 trades
-- **2026-09-13** — fix | Mon test de concordance passait POUR LA MAUVAISE RAISON : il tolerait 0,5 % et portait sur le seul exemple qui negocie dix fois | remplace par `test_nautilus_coexistence.py`, qui NOMME l'ecart et le borne par le BAS. Et son temoin ne neutralisait rien - il remplacait une file que `on_bar` reassigne des la premiere barre
 
 ## Next Actions
 
@@ -103,12 +103,30 @@ coexistence, et `tests/test_nautilus_coexistence.py` la garde.
       profite aussi a `rolling` et `bars_since`.
       Et l'accumulateur courant envisage aurait CHANGE les derniers bits :
       `np.sum` somme par paires ([[lessons]] L26).
-- [ ] **`rolling` a `stride` : le dernier segment lent.** 539 us/barre sur le
-      z-score strie de la strategie Zarattini, et c'est STRUCTUREL - avec un pas
-      de 390, les positions lues a deux barres consecutives sont disjointes,
-      donc aucune reutilisation n'est possible. Zarattini passe de 6,7 h a
-      3,05 h ; le reste est la. A trancher : un cas mesure justifie-t-il une
-      primitive dediee, ou ce regime (minute + stride) est-il hors perimetre ?
+- [x] **`rolling` a `stride` : le probleme n'existait pas (2026-09-13).**
+      Les 539 us/barre etaient un artefact - mesure sur un noeud fraichement
+      construit, donc une memoisation VIDE. A chaud : **52,1 us**, douze fois
+      moins. Le run Zarattini a ete MESURE de bout en bout : **15 min 55 s**,
+      contre 6,7 h puis 3,05 h puis 22 min estimees. Les trois se trompaient par
+      la meme faute ([[lessons]] L27).
+      Consequence : la question « ce regime est-il hors perimetre » ne se pose
+      plus, et la reecriture en C# envisagee sur la foi des 3 h est ECARTEE,
+      motif chiffre au [[Failed Ideas/ledger]].
+- [ ] **Afficher le taux de REJET a cote du rendement.** Le run Zarattini rend
+      -25,62 % avec 2 trades parce que **5 080 ordres sur 5 084 sont refuses
+      pour marge** - `vol_target` sature a 4 contrats NQ, soit 108 000 de marge
+      sur un compte de 100 000. Le chiffre est dans le JSON
+      (`risk_stats.n_rejected_margin`) et NULLE PART dans le resume imprime, si
+      bien qu'un backtest empeche se lit comme une strategie perdante
+      ([[lessons]] L28, troisieme occurrence apres L18 et L25).
+      A trancher : seuil d'alerte, ou affichage systematique du ratio
+      `n_fills / n_orders_submitted` ?
+- [ ] **Le `stride: 390` de Zarattini repose sur une premisse fausse.** Les
+      cotations NQ portent la seance ELECTRONIQUE : **1 362 barres par jour, pas
+      390**. Le `stride` cense echantillonner « au meme rang de seance » tombe
+      donc a des heures arbitraires. Defaut de la CONFIGURATION, pas du socle,
+      et distinct de celui de la marge. Le `note` du JSON qui annonce « 3,4 %
+      d'approximation » est a reecrire.
 - [ ] **Decider du sort de la branche.** Fusionner `migration-nautilus` dans
       `main` maintenant, ou attendre que le transversal passe ? Rien n'est
       supprime, donc la fusion est sans risque ; c'est une question de lisibilite

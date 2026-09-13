@@ -852,3 +852,77 @@ rien, et j'aurais ecrit un accumulateur qui aurait change les resultats pour un
 gain nul.
 
 Fonde sur [[log]] (2026-09-13) · `tests/unit/test_cumulative_tampon.py`
+
+---
+
+## L27 -- Une estimation de duree extrapolee d'un microbenchmark s'est trompee trois fois de suite
+
+Le run Zarattini sur 3 705 199 barres minute a ete MESURE de bout en bout le
+2026-09-13 : **15 min 55 s**. Mes trois estimations successives disaient 6,7 h,
+puis 3,05 h, puis 22 min. La derniere n'etait pas juste non plus, elle etait
+seulement moins fausse.
+
+La cause etait la meme les trois fois, et elle n'a rien a voir avec
+l'optimisation : **je mesurais un noeud fraichement construit**, donc une
+memoisation VIDE. Dans un run reel, chaque valeur intermediaire est calculee une
+fois puis relue soixante fois par le `stride`. L'ecart est mesure :
+
+| | a froid | a chaud (24 000 barres) |
+|---|---|---|
+| `rolling` strie | 655,6 us | **52,1 us** |
+
+Douze fois. Un microbenchmark de N barres sur un etat neuf ne mesure pas le cout
+marginal d'une barre, il mesure le cout d'amorcage divise par N.
+
+**La regle : une duree de run se mesure en lancant le run.** Un microbenchmark
+sert a comparer deux implementations du MEME noeud dans le MEME etat ; il ne sert
+pas a predire un temps total. Quand la question posee est « combien de temps »,
+la reponse s'obtient avec `time`, pas avec une multiplication.
+
+Ce que cela a failli couter
+----------------------------
+Sur la foi des 3 h, la question posee etait de tout reecrire en C#. Cela aurait
+voulu dire 24 343 lignes, 136 primitives, 23 noeuds, le moteur, le registre
+d'essais et la PBO - et l'abandon de 4 168 tests et des 7 empreintes - pour un
+programme qui prend seize minutes. Le travail lourd est deja en C : numpy fait
+les reductions. Ce qui restait en Python etait le parcours d'arbre, c'est-a-dire
+exactement ce que [[lessons]] L26 a divise par 34 en deux heures.
+
+Fonde sur [[log]] (2026-09-13)
+
+---
+
+## L28 -- 5 080 rejets de marge se lisent comme une strategie perdante
+
+Le meme run rend **-25,62 %** sur 10,59 ans, avec 2 trades et une exposition de
+5,7 x 10^-6. Lu comme un resultat, c'est une strategie qui perd. Ce n'en est pas
+un : les compteurs disent autre chose.
+
+```
+n_orders_submitted     5084
+n_orders_dropped_risk  5080
+n_rejected_margin      5080
+n_fills                   4
+```
+
+**Quatre ordres sur 5 084 ont ete executes.** La regle d'entree, elle, fonctionne :
+mesuree sur 120 000 barres contigues, `entry_long` est vraie 94 fois, soit environ
+une par seance - l'ordre de grandeur du papier.
+
+Le blocage est arithmetique. Le facteur `vol_target` sature a `vol_max_multiple`
+= 4, la strategie demande donc 4 contrats NQ. La marge initiale de NQ est
+27 000 : **4 x 27 000 = 108 000 sur un compte de 100 000**. Chaque entree est
+refusee. Les deux seules qui sont passees l'ont ete a 3 contrats, et leur perte -
+12 808 chacune - EST le -25,62 % affiche.
+
+Le -25,62 % ne mesure donc pas la strategie. Il mesure deux trades.
+
+C'est la troisieme occurrence de la meme famille apres [[lessons]] L18 et L25 :
+**un backtest empeche produit un nombre lisible**. Ici le diagnostic etait
+pourtant a portee de main - le rapport publie `n_rejected_margin` - mais rien
+dans le resume imprime ne le signale. Un taux de rejet de 99,9 % devrait
+s'afficher a cote du rendement, pas seulement dans le JSON.
+
+<!-- NOTE: action ouverte, pas encore faite. -->
+
+Fonde sur [[log]] (2026-09-13) · rapport `zarattini_rapport.json`
