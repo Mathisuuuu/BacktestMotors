@@ -766,3 +766,45 @@ temoin doit etre VERIFIE comme le reste - c'est ce que fait desormais
 `test_le_temoin_reproduit_bien_la_fuite`.
 
 Fonde sur [[log]] (2026-09-13) · `tests/test_nautilus_coexistence.py`
+
+---
+
+## L25 -- Un backtest qui ne negocie pas ressemble a un backtest qui perd
+
+Le portage du vocabulaire TRANSVERSAL sur Nautilus a rencontre deux defauts
+distincts. Ni l'un ni l'autre n'a leve d'exception. Tous deux rendaient le meme
+resultat : capital intact, zero position, aucun avertissement.
+
+**Le premier.** Une coupe transversale se reconstitue a partir de barres
+livrees une par une. Ma premiere version decidait a l'arrivee de la premiere
+barre d'un nouvel instant - la ligne precedente etait bien finie. Mais le
+simulateur, lui, n'avait traite qu'UNE barre du nouvel instant : les neuf
+autres instruments n'avaient pas de prix, et Nautilus rejetait chaque ordre avec
+`no market`. **684 ordres emis, 684 rejetes.**
+
+**Le second.** Meme symptome, autre cause, trouve juste apres. Nautilus ne
+remplit AUCUN ordre sur des barres etiquetees `MONTH`. Mesure en ne changeant
+qu'une chaine de caracteres, tout le reste identique : `1-DAY-LAST` donne 14
+fills, `1-MONTH-LAST` 14 rejets.
+
+Ce que les deux ont en commun est plus important que leurs causes. Un backtest
+qui n'aboutit a rien PRODUIT UN CHIFFRE - le capital initial - et ce chiffre se
+lit comme une performance nulle. Rien ne distingue « la strategie n'a pas gagne »
+de « la strategie n'a jamais joue ».
+
+C'est le meme mecanisme que [[lessons]] L18, ou un terme de signal inerte
+donnait un resultat parfaitement plausible. La famille entiere se resume ainsi :
+**les defauts dangereux ne sont pas ceux qui font echouer, ce sont ceux qui font
+aboutir a quelque chose de lisible.**
+
+Consequence sur les tests : compter les ORDRES ne suffit pas, il faut compter
+les FILLS. Le piege des 684 rejets avait 684 ordres. `test_nautilus_transversal`
+assert donc `n_remplis > n_rejetes`, et separement que le capital a bouge.
+
+Troisieme defaut, trouve par ces tests eux-memes : la garde censee refuser un
+`risk.limits` declare interrogeait `risque.limits.actives` via une chaine de
+`getattr`. `actives` appartient a l'objet CONSTRUIT, pas a la specification ; la
+chaine rendait `False` en silence et la garde ne gardait rien. Un acces TYPE
+l'aurait refuse a la compilation - c'est ce qu'il fait desormais.
+
+Fonde sur [[log]] (2026-09-13) · `src/rsl/nautilus/transversal.py`

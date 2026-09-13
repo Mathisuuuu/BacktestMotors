@@ -17,7 +17,7 @@ generated: true
 | Indicateur | Valeur |
 |---|---|
 | Pages de wiki | 26 |
-| Entrees de log | 153 |
+| Entrees de log | 157 |
 | Derniere activite | 2026-09-13 |
 | Idees ecartees (ledger) | 20 |
 | Idees en attente (ledger) | 4 |
@@ -27,7 +27,7 @@ generated: true
 | Pages `reference/` | 7 |
 | Pages `research/` | 1 |
 
-**Activite par type :** note × 68, fix × 32, feat × 24, decision × 19, essai × 4, experiment × 2, setup × 1, lint × 1, audit × 1, refactor × 1
+**Activite par type :** note × 69, fix × 34, feat × 25, decision × 19, essai × 4, experiment × 2, setup × 1, lint × 1, audit × 1, refactor × 1
 
 ## Experiences
 
@@ -45,14 +45,14 @@ Le total des essais alimente le Deflated Sharpe : un essai non enregistre gonfle
 
 ## Derniere activite — 8 entree(s)
 
+- **2026-09-13** — fix | Ma garde contre un `risk.limits` ignore ne gardait rien : elle lisait `actives` sur la SPECIFICATION, ou il n'existe pas | chaine de `getattr` rendant `False` en silence. Remplacee par un acces type. Trouve par le test qui l'exerce
+- **2026-09-13** — note | Mesure des agregations que le simulateur Nautilus EXECUTE : MINUTE, HOUR, DAY, WEEK oui ; MONTH non | fige dans `pont.AGREGATIONS_EXECUTABLES`, avec un reetiquetage du mensuel en quotidien. Les barres restent mensuelles - leurs horodatages le disent - et Nautilus ne les reagrege jamais puisqu'elles arrivent deja agregees
+- **2026-09-13** — fix | Deux defauts SILENCIEUX dans le portage transversal, tous deux rendant capital intact et zero position | (1) declencher a la premiere barre d'un instant : les neuf autres instruments n'avaient pas de marche, 684 ordres emis et 684 rejetes ; (2) Nautilus ne remplit AUCUN ordre sur des barres etiquetees `MONTH` - mesure a la chaine de caracteres pres. Lecon [[lessons]] L25
+- **2026-09-13** — feat | Le vocabulaire TRANSVERSAL tourne sur Nautilus : `panel_rules@1` et `ranking@1` par reconstitution de la coupe | la ligne de panneau est reconstituee en COMPTANT les barres attendues (`present_symbols`), et traitee a la derniere. `momentum_12_1` donne 97 positions et 273 fills la ou notre moteur fait 107 trades
 - **2026-09-13** — fix | Mon test de concordance passait POUR LA MAUVAISE RAISON : il tolerait 0,5 % et portait sur le seul exemple qui negocie dix fois | remplace par `test_nautilus_coexistence.py`, qui NOMME l'ecart et le borne par le BAS. Et son temoin ne neutralisait rien - il remplacait une file que `on_bar` reassigne des la premiere barre
 - **2026-09-13** — decision | **Les deux moteurs sont GARDES**, la suppression de `rsl.engine` est abandonnee | apres correction de la fuite, les conventions de remplissage restent differentes - `open[t+1]` chez nous, `close[t+1]` chez Nautilus - et l'ecart se compose : 23,84 % sur 18 trades, 0,47 % sur 10. Supprimer notre moteur rendrait incomparables les 7 empreintes, les 493 essais, la PBO et le DSR. Lecon [[lessons]] L24
 - **2026-09-13** — fix | **Fuite trouvee chez Nautilus** : un ordre au marche se remplit a la cloture de la barre qui a DECLENCHE la decision | +19,43 % d'equity sur `_moule`. Corrige par un differe dans le pont plutot que par un `LatencyModel` - une latence se regle en nanosecondes, pas en barres
 - **2026-09-13** — feat | Le vocabulaire JSON tourne sur Nautilus sans qu'une ligne de son code change | l'idee courte : ne pas le porter. Il parle a un `Context`, pas a un moteur - Nautilus mene l'horloge, notre `BarContext` sert le vocabulaire, et la synchronisation est VERIFIEE barre par barre. `rules@1` reutilise entier, ses neuf cles comprises
-- **2026-09-13** — note | Premier cout visible de la migration : `mypy --strict` ne voit RIEN de Nautilus (Cython compile, sans stubs) | exception declaree dans `pyproject.toml`, confinee a la bibliotheque et au seul module qui herite de `Strategy`. Le precedent existait : `rsl.gui.charts` et matplotlib
-- **2026-09-13** — note | pip installe `nautilus_trader 1.221.0`, la ligne v1 hybride (modele Rust via PyO3, moteur Cython) et non la v2 pure annoncee | la v2 n'est pas encore le defaut sur PyPI pour Python 3.11. Le coeur `nautilus_pyo3` est bien present
-- **2026-09-13** — feat | Pont vers Nautilus : `rsl.nautilus` (pont, strategies, moteur) — instruments, barres, venue, frais | `sma_crossover@1` porte et confronte a notre moteur sur ES quotidien : **627 312,41 contre 627 822,40, soit 0,081 % d'ecart**, dont 262,50 de slippage que nous seuls payons. 6 tests de concordance, marques `slow`
-- **2026-09-13** — decision | **Migration vers `nautilus_trader`** : l'execution est deleguee, le depot garde le vocabulaire declaratif, le registre des essais et la PBO | branche `migration-nautilus`. Declencheur : aucune alternative n'avait JAMAIS ete evaluee — zero occurrence de backtrader/vectorbt/zipline/nautilus dans tout le wiki
 
 ## Next Actions
 
@@ -84,9 +84,17 @@ coexistence, et `tests/test_nautilus_coexistence.py` la garde.
       comparables : les fills retrouveraient un sens physique au lieu de tomber
       sur une cloture de barre. Cout a mesurer - 33 M de barres minute
       deviendraient des quotes.
-- [ ] **Porter le transversal.** `panel_rules@1` et `ranking@1` demandent un
-      `MultiContext` ; le pont ne porte que le mono-instrument et le REFUSE
-      explicitement. C'est la moitie du vocabulaire qui ne traverse pas encore.
+- [x] **Transversal porte (2026-09-13).** `panel_rules@1` et `ranking@1`
+      tournent sur Nautilus : la coupe est reconstituee en COMPTANT les barres
+      attendues, et traitee a la derniere. `momentum_12_1` rend 97 positions et
+      273 fills la ou notre moteur fait 107 trades.
+      **Deux defauts silencieux trouves en chemin**, tous deux rendant capital
+      intact et zero position : declencher a la premiere barre d'un instant
+      (684 ordres, 684 rejets) et l'agregation `MONTH` que le simulateur
+      n'execute pas. Un troisieme, dans ma propre garde, lisait `actives` sur la
+      specification ou il n'existe pas. Lecon [[lessons]] L25.
+      Ce que le pont transversal ne porte PAS, et qu'il refuse : le
+      `RiskManager` - dimensionnement, plafonds de portefeuille, allocation.
 - [ ] **Corriger `cumulative`, en O(n^2) par seance.** 25 777x plus lent que
       l'equivalent vectorise, trouve en lancant la strategie Zarattini. Le
       correctif est borne - un accumulateur incremental - et les 7 empreintes

@@ -149,6 +149,59 @@ def frais_par_contrat(root: str) -> float:
     return spec.commission_per_contract + spec.exchange_fee_per_contract
 
 
+AGREGATIONS_EXECUTABLES: frozenset[str] = frozenset(
+    {"MILLISECOND", "SECOND", "MINUTE", "HOUR", "DAY", "WEEK"}
+)
+"""Les agregations sur lesquelles le simulateur de Nautilus REMPLIT des ordres.
+
+`MONTH` en est absente, et c'est mesure, pas suppose. Meme strategie, memes
+donnees, seule l'etiquette change (2026-09-13, `nautilus_trader` 1.221) :
+
+    1-MINUTE-LAST   14 remplis, 0 rejete
+    5-MINUTE-LAST   14 remplis, 0 rejete
+    1-HOUR-LAST     14 remplis, 0 rejete
+    1-DAY-LAST      14 remplis, 0 rejete
+    1-WEEK-LAST     14 remplis, 0 rejete
+    1-MONTH-LAST     0 rempli, 14 REJETES  -> `no market for ES.v.0.SIM`
+
+Le symptome est trompeur : les barres arrivent bien a la strategie, son cache
+les contient, ses signaux se declenchent et ses ordres partent. C'est le moteur
+de CORRESPONDANCE qui n'a pas de marche. Un backtest mensuel rendait donc un
+capital intact et zero position, sans la moindre erreur - 684 ordres emis, 684
+rejetes.
+
+`MILLISECOND` et `SECOND` sont listees par analogie avec les autres unites de
+duree fixe ; elles n'ont pas ete mesurees, faute de donnees a ce pas. `MONTH`,
+elle, l'a ete."""
+
+
+def etiquette_executable(agregation: str) -> str:
+    """L'etiquette a poser sur les barres pour que le simulateur les execute.
+
+    Une agregation mensuelle est REETIQUETEE en `DAY`. C'est un mensonge, et il
+    faut savoir lequel : le `BarType` de Nautilus sert ici d'ETIQUETTE DE
+    ROUTAGE, pas de description des donnees. Les barres restent mensuelles -
+    leurs horodatages le disent - et Nautilus ne les reagrege jamais puisqu'on
+    les fournit deja agregees (`EXTERNAL`).
+
+    Le mensonge est donc sans effet sur les prix, les dates ou les quantites. Il
+    ne se verrait que si quelqu'un lisait le `BarType` pour en deduire une
+    duree, ce que rien ne fait dans ce pont.
+
+    L'alternative etait de refuser le mensuel, c'est-a-dire d'exclure
+    `momentum_12_1_mensuel` - le seul exemple transversal du depot.
+    """
+    unite = agregation.split("-")[1] if "-" in agregation else ""
+    if unite in AGREGATIONS_EXECUTABLES:
+        return agregation
+    if unite == "MONTH":
+        return "1-DAY-LAST"
+    raise ConfigurationError(
+        f"agregation '{agregation}' : unite '{unite}' inconnue. Connues et "
+        f"executables : {', '.join(sorted(AGREGATIONS_EXECUTABLES))}."
+    )
+
+
 def type_de_barre(root: str, agregation: str) -> BarType:
     """`BarType` Nautilus pour cet instrument.
 
@@ -159,7 +212,9 @@ def type_de_barre(root: str, agregation: str) -> BarType:
     approximative serait pire qu'une declaration explicite.
     """
     spec = get_instrument(root)
-    return BarType.from_str(f"{spec.symbol}.{VENUE}-{agregation}-EXTERNAL")
+    return BarType.from_str(
+        f"{spec.symbol}.{VENUE}-{etiquette_executable(agregation)}-EXTERNAL"
+    )
 
 
 def barres_nautilus(

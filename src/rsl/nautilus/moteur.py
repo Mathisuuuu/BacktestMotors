@@ -32,7 +32,8 @@ from nautilus_trader.model.currencies import USD
 from nautilus_trader.model.enums import AccountType, OmsType
 from nautilus_trader.model.objects import Money
 
-from rsl.data.schema import BarStore
+from rsl.config import RiskSpec
+from rsl.data.schema import BarStore, InstrumentSpec
 from rsl.errors import ConfigurationError
 from rsl.nautilus.pont import (
     VENUE,
@@ -135,3 +136,83 @@ def resume(moteur: BacktestEngine) -> SpecDict:
 def decimal_ou_zero(valeur: float) -> Decimal:
     """Conversion explicite, pour que les arrondis restent visibles."""
     return Decimal(str(valeur))
+
+
+def monter_transversal(
+    stores: dict[str, BarStore],
+    instruments: dict[str, InstrumentSpec],
+    *,
+    capital: float,
+    agregation: str = "1-DAY-LAST",
+    risque: RiskSpec | None = None,
+) -> BacktestEngine:
+    """Un moteur charge de PLUSIEURS instruments, pour une strategie transversale.
+
+    Refuse une specification qui declare un dimensionnement ou des plafonds de
+    portefeuille. Ce pont ne porte pas le `RiskManager` : les ordres vont
+    directement au `RiskEngine` de Nautilus, qui a ses propres regles. Laisser
+    passer un `risk.sizing` qui ne s'appliquerait pas donnerait des tailles
+    silencieusement fausses - exactement ce que l'allocation du 2026-09-12
+    refuse deja de son cote.
+    """
+    # TYPE plutot que `getattr` : une premiere version interrogeait
+    # `risque.limits.actives`, qui n'existe pas sur la SPECIFICATION - `actives`
+    # appartient a l'objet construit. La chaine de `getattr` rendait `False` en
+    # silence, et la garde ne gardait rien. Constate le 2026-09-13 par le test
+    # qui l'exerce.
+    if risque is not None:
+        sizing = risque.sizing.kind
+        if sizing != "none":
+            raise ConfigurationError(
+                f"risk.sizing='{sizing}' : ce pont ne porte pas le RiskManager. "
+                f"Les tailles seraient celles emises par la strategie, pas celles "
+                f"que le dimensionnement calcule. Mettre `sizing.kind = \"none\"` "
+                f"pour executer sur Nautilus."
+            )
+        if risque.limits.build().actives:
+            raise ConfigurationError(
+                "risk.limits declares : ce pont ne porte pas les plafonds de "
+                "portefeuille. Ils seraient IGNORES."
+            )
+
+    moteur = BacktestEngine(
+        config=BacktestEngineConfig(
+            trader_id="RSL-002",
+            logging=LoggingConfig(bypass_logging=True),
+        )
+    )
+    moteur.add_venue(
+        venue=VENUE,
+        oms_type=OmsType.NETTING,
+        account_type=AccountType.MARGIN,
+        base_currency=USD,
+        starting_balances=[Money(capital, USD)],
+        fill_model=FillModel(
+            prob_fill_on_limit=1.0, prob_fill_on_stop=1.0, prob_slippage=0.0
+        ),
+        # AUCUN `fee_model` : sur un panneau, `FixedFeeModel` facturerait le
+        # meme montant par ordre pour tous les instruments, alors que nos frais
+        # vont de 0,85 a 2,45 dollars le contrat. Un montant unique serait faux
+        # pour presque tout le monde.
+        #
+        # Zero n'est pas passable non plus - `FixedFeeModel` exige une
+        # commission STRICTEMENT positive. On omet donc le modele : Nautilus
+        # retombe alors sur les `maker_fee` / `taker_fee` de l'instrument, que
+        # `pont.instrument_nautilus` laisse volontairement vides. Les frais sont
+        # donc nuls, et c'est DECLARE ici plutot que subi.
+    )
+    for symbole, store in sorted(stores.items()):
+        spec = instruments[symbole]
+        contrat = instrument_nautilus(
+            spec.root, prix_reference=float(store.close[-1])
+        )
+        moteur.add_instrument(contrat)
+        bar_type = type_de_barre(spec.root, agregation)
+        moteur.add_data(
+            barres_nautilus(
+                store,
+                bar_type,
+                precision=precision_de(float(contrat.price_increment)),
+            )
+        )
+    return moteur
