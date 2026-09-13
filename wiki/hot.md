@@ -17,7 +17,7 @@ generated: true
 | Indicateur | Valeur |
 |---|---|
 | Pages de wiki | 26 |
-| Entrees de log | 157 |
+| Entrees de log | 160 |
 | Derniere activite | 2026-09-13 |
 | Idees ecartees (ledger) | 20 |
 | Idees en attente (ledger) | 4 |
@@ -27,7 +27,7 @@ generated: true
 | Pages `reference/` | 7 |
 | Pages `research/` | 1 |
 
-**Activite par type :** note × 69, fix × 34, feat × 25, decision × 19, essai × 4, experiment × 2, setup × 1, lint × 1, audit × 1, refactor × 1
+**Activite par type :** note × 71, fix × 34, feat × 25, decision × 19, essai × 4, experiment × 2, setup × 1, lint × 1, audit × 1, refactor × 1, perf × 1
 
 ## Experiences
 
@@ -45,14 +45,14 @@ Le total des essais alimente le Deflated Sharpe : un essai non enregistre gonfle
 
 ## Derniere activite — 8 entree(s)
 
+- **2026-09-13** — note | Effet sur la strategie Zarattini qui avait revele le defaut : 6,7 h estimees -> 3,05 h | le reste est le `rolling(stride=390)`, structurel : avec un pas de 390, les positions lues a deux barres consecutives sont DISJOINTES, donc rien ne se reutilise
+- **2026-09-13** — note | Le diagnostic de depart etait FAUX : j'attribuais le cout a la somme recalculee, il venait de 400 creations de `BarContext` par barre | un accumulateur courant aurait ete plus rapide encore et aurait change les derniers bits - `np.sum` somme par paires, l'addition sequentielle non. Le tampon garde les valeurs et laisse numpy reduire. Lecon [[lessons]] L26
+- **2026-09-13** — perf | `cumulative` : **1249 -> 36,5 us par barre**, soit 34 fois, et les 7 empreintes INCHANGEES | en deux etapes. (1) La memoire etait consultee APRES `ctx.shifted(lag)`, donc elle payait le cout qu'elle evitait ; sa cle se calcule pourtant sans reculer (`n_bars_seen - lag`). Gain profitant aussi a `rolling` et `bars_since` : 1249 -> 429. (2) Un tampon numpy par seance qui n'ajoute qu'une valeur par barre : 429 -> 36,5
 - **2026-09-13** — fix | Ma garde contre un `risk.limits` ignore ne gardait rien : elle lisait `actives` sur la SPECIFICATION, ou il n'existe pas | chaine de `getattr` rendant `False` en silence. Remplacee par un acces type. Trouve par le test qui l'exerce
 - **2026-09-13** — note | Mesure des agregations que le simulateur Nautilus EXECUTE : MINUTE, HOUR, DAY, WEEK oui ; MONTH non | fige dans `pont.AGREGATIONS_EXECUTABLES`, avec un reetiquetage du mensuel en quotidien. Les barres restent mensuelles - leurs horodatages le disent - et Nautilus ne les reagrege jamais puisqu'elles arrivent deja agregees
 - **2026-09-13** — fix | Deux defauts SILENCIEUX dans le portage transversal, tous deux rendant capital intact et zero position | (1) declencher a la premiere barre d'un instant : les neuf autres instruments n'avaient pas de marche, 684 ordres emis et 684 rejetes ; (2) Nautilus ne remplit AUCUN ordre sur des barres etiquetees `MONTH` - mesure a la chaine de caracteres pres. Lecon [[lessons]] L25
 - **2026-09-13** — feat | Le vocabulaire TRANSVERSAL tourne sur Nautilus : `panel_rules@1` et `ranking@1` par reconstitution de la coupe | la ligne de panneau est reconstituee en COMPTANT les barres attendues (`present_symbols`), et traitee a la derniere. `momentum_12_1` donne 97 positions et 273 fills la ou notre moteur fait 107 trades
 - **2026-09-13** — fix | Mon test de concordance passait POUR LA MAUVAISE RAISON : il tolerait 0,5 % et portait sur le seul exemple qui negocie dix fois | remplace par `test_nautilus_coexistence.py`, qui NOMME l'ecart et le borne par le BAS. Et son temoin ne neutralisait rien - il remplacait une file que `on_bar` reassigne des la premiere barre
-- **2026-09-13** — decision | **Les deux moteurs sont GARDES**, la suppression de `rsl.engine` est abandonnee | apres correction de la fuite, les conventions de remplissage restent differentes - `open[t+1]` chez nous, `close[t+1]` chez Nautilus - et l'ecart se compose : 23,84 % sur 18 trades, 0,47 % sur 10. Supprimer notre moteur rendrait incomparables les 7 empreintes, les 493 essais, la PBO et le DSR. Lecon [[lessons]] L24
-- **2026-09-13** — fix | **Fuite trouvee chez Nautilus** : un ordre au marche se remplit a la cloture de la barre qui a DECLENCHE la decision | +19,43 % d'equity sur `_moule`. Corrige par un differe dans le pont plutot que par un `LatencyModel` - une latence se regle en nanosecondes, pas en barres
-- **2026-09-13** — feat | Le vocabulaire JSON tourne sur Nautilus sans qu'une ligne de son code change | l'idee courte : ne pas le porter. Il parle a un `Context`, pas a un moteur - Nautilus mene l'horloge, notre `BarContext` sert le vocabulaire, et la synchronisation est VERIFIEE barre par barre. `rules@1` reutilise entier, ses neuf cles comprises
 
 ## Next Actions
 
@@ -95,10 +95,20 @@ coexistence, et `tests/test_nautilus_coexistence.py` la garde.
       specification ou il n'existe pas. Lecon [[lessons]] L25.
       Ce que le pont transversal ne porte PAS, et qu'il refuse : le
       `RiskManager` - dimensionnement, plafonds de portefeuille, allocation.
-- [ ] **Corriger `cumulative`, en O(n^2) par seance.** 25 777x plus lent que
-      l'equivalent vectorise, trouve en lancant la strategie Zarattini. Le
-      correctif est borne - un accumulateur incremental - et les 7 empreintes
-      permettent de verifier qu'aucun bit ne bouge. Independant de Nautilus.
+- [x] **`cumulative` corrige (2026-09-13) : 1249 -> 36,5 us par barre, 34x.**
+      Les 7 empreintes sont INCHANGEES, ce qui etait la condition.
+      Le diagnostic de depart etait faux : le cout ne venait pas de la somme
+      recalculee mais de 400 creations de `BarContext` par barre - la memoire
+      etait consultee APRES la vue qu'elle devait eviter. Consulter d'abord
+      profite aussi a `rolling` et `bars_since`.
+      Et l'accumulateur courant envisage aurait CHANGE les derniers bits :
+      `np.sum` somme par paires ([[lessons]] L26).
+- [ ] **`rolling` a `stride` : le dernier segment lent.** 539 us/barre sur le
+      z-score strie de la strategie Zarattini, et c'est STRUCTUREL - avec un pas
+      de 390, les positions lues a deux barres consecutives sont disjointes,
+      donc aucune reutilisation n'est possible. Zarattini passe de 6,7 h a
+      3,05 h ; le reste est la. A trancher : un cas mesure justifie-t-il une
+      primitive dediee, ou ce regime (minute + stride) est-il hors perimetre ?
 - [ ] **Decider du sort de la branche.** Fusionner `migration-nautilus` dans
       `main` maintenant, ou attendre que le transversal passe ? Rien n'est
       supprime, donc la fusion est sans risque ; c'est une question de lisibilite

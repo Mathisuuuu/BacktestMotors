@@ -17,6 +17,7 @@ from enum import StrEnum
 from typing import ClassVar
 
 import numpy as np
+import numpy.typing as npt
 
 from rsl.data.feed import Context
 from rsl.data.session import SessionField
@@ -38,6 +39,8 @@ from rsl.strategies.noeuds.contrat import (
     _child,
     signal_node,
 )
+
+FloatArray = npt.NDArray[np.float64]
 
 
 class RollingStat(StrEnum):
@@ -402,6 +405,79 @@ class CumulativeStat(StrEnum):
     COUNT_TRUE = "count_true"
 
 
+class _TamponDeSeance:
+    """Les valeurs de `inner` depuis l'ouverture, gardees en NUMPY.
+
+    Pourquoi ce tampon existe
+    --------------------------
+    `Cumulative` demandait a `valeurs_de_fenetre` de rassembler `rang + 1`
+    valeurs a chaque barre, par une boucle PYTHON. Meme une fois la memoire
+    consultee avant la vue reculee - correctif du 2026-09-13 qui a deja divise
+    le cout par trois - il restait quatre operations Python par lag : lecture du
+    jeton, recherche dans un dictionnaire, test de type, ajout a une liste.
+
+    Sur une seance de 400 barres, cela fait 1 600 operations par barre et par
+    noeud. Un VWAP ancre en compte deux : 428 us/barre mesures, contre 0,05 us
+    pour l'equivalent vectorise.
+
+    Le tampon garde la serie CHRONOLOGIQUE dans un tableau numpy qui grandit, et
+    n'y ajoute qu'UNE valeur par barre nouvelle. La fenetre devient une vue, pas
+    une reconstruction.
+
+    L'ordre est preserve, et ce n'est pas un detail
+    -----------------------------------------------
+    `valeurs_de_fenetre` rend le PRESENT EN TETE. `np.sum` somme par paires, et
+    le groupement depend de l'ordre : sommer a l'endroit ou a l'envers ne donne
+    pas les memes bits. Le tampon rend donc une vue RENVERSEE
+    (`tableau[:n][::-1]`), qui presente exactement la meme sequence que la liste
+    d'avant. Les sept empreintes archivees le verifient.
+
+    Ce qu'il ne fait pas
+    ---------------------
+    Il ne cumule rien lui-meme. Un accumulateur courant - ajouter la nouvelle
+    valeur a un total - serait plus rapide encore, et donnerait d'AUTRES bits
+    que `np.sum` : l'addition sequentielle n'est pas la sommation par paires.
+    Le tampon garde donc les valeurs et laisse numpy reduire, ce qui preserve le
+    resultat au bit pres.
+    """
+
+    __slots__ = ("_ancre", "_debut", "_n", "_valeurs")
+
+    CAPACITE_INITIALE: ClassVar[int] = 64
+
+    def __init__(self) -> None:
+        self._ancre: object = None
+        self._debut: int = -1
+        self._n: int = 0
+        self._valeurs: FloatArray = np.empty(self.CAPACITE_INITIALE, dtype=np.float64)
+
+    def _reinitialiser(self, jeton: object, debut: int) -> None:
+        self._ancre = jeton
+        self._debut = debut
+        self._n = 0
+
+    def _ajouter(self, valeur: float) -> None:
+        if self._n == self._valeurs.shape[0]:
+            # Croissance geometrique : une reallocation par doublement, pas une
+            # par barre.
+            self._valeurs = np.resize(self._valeurs, self._n * 2)
+        self._valeurs[self._n] = valeur
+        self._n += 1
+
+    def fenetre(self, jeton: object, debut: int, rang: int) -> FloatArray | None:
+        """La fenetre PRESENT EN TETE, ou `None` s'il faut la reconstruire.
+
+        Rend `None` dans les trois cas ou le tampon ne sait pas repondre : une
+        autre serie, une autre seance, ou un rang qu'il n'a pas encore atteint.
+        L'appelant retombe alors sur le chemin general, qui est juste et lent.
+        """
+        if jeton is not self._ancre or debut != self._debut:
+            return None
+        if rang + 1 > self._n:
+            return None
+        return self._valeurs[: rang + 1][::-1]
+
+
 @signal_node(
     "cumulative",
     summary="Cumul d'un sous-signal DEPUIS l'ouverture de la seance courante.",
@@ -451,6 +527,9 @@ class Cumulative:
     stat: CumulativeStat
     inner: Signal
     _memoire: Memoire | None = field(default=None, compare=False, repr=False)
+    _tampon: _TamponDeSeance = field(
+        default_factory=_TamponDeSeance, compare=False, repr=False
+    )
 
     def __post_init__(self) -> None:
         # Portee : une seance de barres d'une minute en compte ~1 380. Le
@@ -465,16 +544,10 @@ class Cumulative:
         return self.inner.warmup_bars
 
     def __call__(self, ctx: Context) -> float | None:
-        rang = ctx.session_value(SessionField.BAR_INDEX, 0)
-        values = valeurs_de_fenetre(
-            self._memoire, self.inner, ctx, range(int(rang) + 1)
-        )
-        if values is None:
+        rang = int(ctx.session_value(SessionField.BAR_INDEX, 0))
+        fenetre = self._fenetre(ctx, rang)
+        if fenetre is None:
             return None
-
-        # `values[0]` est le PRESENT, les lags croissants remontent le temps :
-        # `first` est donc le dernier element, `last` le premier.
-        fenetre = np.array(values, dtype=np.float64)
         match self.stat:
             case CumulativeStat.SUM:
                 return float(np.sum(fenetre))
@@ -485,11 +558,57 @@ class Cumulative:
             case CumulativeStat.MAX:
                 return float(np.max(fenetre))
             case CumulativeStat.FIRST:
-                return values[-1]
+                # La fenetre est PRESENT EN TETE : la premiere barre de la
+                # seance est donc en queue.
+                return float(fenetre[-1])
             case CumulativeStat.LAST:
-                return values[0]
+                return float(fenetre[0])
             case CumulativeStat.COUNT_TRUE:
                 return float(np.count_nonzero(fenetre > 0.0))
+
+    def _fenetre(self, ctx: Context, rang: int) -> FloatArray | None:
+        """La fenetre depuis l'ouverture, PRESENT EN TETE.
+
+        Trois chemins, du moins cher au plus cher :
+
+        1. le tampon la connait deja - une vue, rien a calculer ;
+        2. il lui manque exactement la barre courante - une evaluation ;
+        3. il ne sait pas repondre - reconstruction par le chemin general.
+
+        Le troisieme arrive a chaque nouvelle seance, et sur toute vue reculee
+        qui saute en arriere. Il est juste et lent ; les deux premiers sont
+        justes et rapides.
+        """
+        jeton = ctx.data_token
+        debut = ctx.n_bars_seen - 1 - rang
+
+        connue = self._tampon.fenetre(jeton, debut, rang)
+        if connue is not None:
+            return connue
+
+        # Cas 2 : la seance est la bonne et il ne manque que le present.
+        if (
+            jeton is self._tampon._ancre
+            and debut == self._tampon._debut
+            and rang == self._tampon._n
+        ):
+            valeur = valeur_a(self._memoire, self.inner, ctx, 0)
+            if valeur is None or isinstance(valeur, Leve):
+                return None
+            self._tampon._ajouter(float(valeur))
+            return self._tampon.fenetre(jeton, debut, rang)
+
+        # Cas 3 : tout reconstruire, et repartir le tampon de la.
+        values = valeurs_de_fenetre(
+            self._memoire, self.inner, ctx, range(rang + 1)
+        )
+        if values is None:
+            return None
+        self._tampon._reinitialiser(jeton, debut)
+        # `values[0]` est le PRESENT : le tampon garde l'ordre CHRONOLOGIQUE.
+        for valeur in reversed(values):
+            self._tampon._ajouter(valeur)
+        return self._tampon.fenetre(jeton, debut, rang)
 
     def describe(self) -> SpecDict:
         return {

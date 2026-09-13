@@ -808,3 +808,47 @@ chaine rendait `False` en silence et la garde ne gardait rien. Un acces TYPE
 l'aurait refuse a la compilation - c'est ce qu'il fait desormais.
 
 Fonde sur [[log]] (2026-09-13) · `src/rsl/nautilus/transversal.py`
+
+---
+
+## L26 -- Une memoire consultee APRES avoir paye ce qu'elle evite n'evite rien
+
+`cumulative` coutait 1249 us par barre sur un VWAP ancre a la seance, contre
+0,05 us pour l'equivalent vectorise en numpy. Vingt-cinq mille fois. J'ai
+d'abord attribue cet ecart a la somme recalculee depuis l'ouverture - un
+O(n^2) par seance - et c'etait faux.
+
+**Le vrai cout etait la creation de contextes.** Pour rassembler ses valeurs,
+le noeud appelait `ctx.shifted(lag)` une fois par lag, soit 400 allocations de
+`BarContext` par barre. La memoisation existait pourtant et rangeait bien les
+valeurs - mais `_vue_et_valeur` construisait la vue AVANT de la consulter.
+Elle payait exactement le cout qu'elle etait censee supprimer.
+
+La cle de la memoire est `n_bars_seen`, qui se calcule depuis le contexte
+courant : `ctx.n_bars_seen - lag`. Il n'y avait aucune raison de reculer pour
+savoir si la reponse etait deja connue. Consulter d'abord : **1249 -> 429 us**,
+et le gain profite a `rolling` et `bars_since` par la meme voie.
+
+Restait une boucle Python par lag - lecture du jeton, recherche, test de type,
+ajout a une liste - soit quatre operations fois quatre cents. Un tampon numpy
+par seance, qui n'ajoute qu'UNE valeur par barre nouvelle : **429 -> 36,5 us**.
+Au total **34 fois**, et les sept empreintes archivees sont inchangees.
+
+Ce qui a failli mal tourner
+----------------------------
+La premiere idee etait un accumulateur courant : garder un total et y ajouter
+la valeur nouvelle. Plus rapide encore, et **faux** - `np.sum` somme par paires,
+l'addition sequentielle non, et les derniers bits different. Les sept empreintes
+auraient bouge, et il aurait fallu decider si c'etait une correction ou une
+regression alors que les deux calculs sont legitimes.
+
+Le tampon garde donc les VALEURS et laisse numpy reduire. Il rend meme une vue
+RENVERSEE, pour que la sequence presentee a `np.sum` soit identique a celle de
+la liste d'avant - le groupement de la sommation par paires depend de l'ordre.
+
+La regle generale : **quand on remplace un calcul par un plus rapide, verifier
+d'abord ce qui coute**. J'ai failli optimiser la sommation, qui ne representait
+rien, et j'aurais ecrit un accumulateur qui aurait change les resultats pour un
+gain nul.
+
+Fonde sur [[log]] (2026-09-13) · `tests/unit/test_cumulative_tampon.py`

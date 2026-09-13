@@ -181,8 +181,54 @@ class Memoire:
         """Nombre d'entrees retenues. Existe pour les tests de bornage."""
         return len(self._valeurs)
 
+    def lire_au_lag(self, inner: Evaluable, ctx: Context, lag: int) -> Resultat:
+        """La valeur de `inner` a `lag` barres en arriere, SANS reculer si elle
+        est deja connue.
+
+        C'est la variante qui fait le gain, et la raison en est bete : la cle de
+        la memoire est `n_bars_seen`, qui se calcule depuis le contexte COURANT
+        - `ctx.n_bars_seen - lag` - sans avoir besoin de la vue reculee.
+
+        `lire` construisait la vue d'abord et consultait la memoire ensuite,
+        c'est-a-dire qu'elle payait exactement le cout qu'elle etait censee
+        eviter. Sur un `cumulative` ancre a la seance, cela faisait une creation
+        de `BarContext` par barre depuis l'ouverture, a chaque barre : 1249
+        us/barre mesures le 2026-09-13 sur un VWAP ancre, soit 25 777 fois le
+        cout de l'equivalent vectorise.
+
+        Le resultat est IDENTIQUE au bit pres : memes valeurs, meme ordre, meme
+        reduction. Seules les vues inutiles disparaissent.
+        """
+        jeton = ctx.data_token
+        if jeton is not self._ancre:
+            self._ancre = jeton
+            self._valeurs.clear()
+
+        cle = ctx.n_bars_seen - lag
+        rangee = self._valeurs.get(cle, ABSENT)
+        if not isinstance(rangee, Absent):
+            return rangee
+
+        # Defaut de memoire : il faut la vue, donc on la paie - une fois.
+        try:
+            vue = ctx.shifted(lag) if lag else ctx
+        except InsufficientHistoryError:
+            # NON rangee : un bord de warmup n'est pas une valeur, et le
+            # comportement d'avant ne la rangeait pas non plus.
+            return LEVE
+
+        calculee = _calculer(inner, vue)
+        if len(self._valeurs) >= 2 * self._portee:
+            self._elaguer(cle)
+        self._valeurs[cle] = calculee
+        return calculee
+
     def lire(self, inner: Evaluable, vue: Context) -> Resultat:
-        """La valeur de `inner` a la barre de `vue`, retrouvee ou calculee."""
+        """La valeur de `inner` a la barre de `vue`, retrouvee ou calculee.
+
+        Conservee pour les appelants qui tiennent DEJA la vue reculee. Quand ce
+        n'est pas le cas, `lire_au_lag` evite de la construire.
+        """
         jeton = vue.data_token
         if jeton is not self._ancre:
             # Changement de serie : tout ce qui est range vient d'ailleurs.
@@ -224,13 +270,13 @@ def _vue_et_valeur(
     c'est frequent. Le sortir de la garde faisait remonter l'exception jusqu'a
     la strategie au lieu de rendre `None` : neuf tests l'ont dit aussitot.
     """
+    if memoire is not None:
+        return memoire.lire_au_lag(inner, ctx, lag)
     try:
         vue = ctx.shifted(lag) if lag else ctx
     except InsufficientHistoryError:
         return LEVE
-    if memoire is None:
-        return _calculer(inner, vue)
-    return memoire.lire(inner, vue)
+    return _calculer(inner, vue)
 
 
 def _calculer(inner: Evaluable, vue: Context) -> Resultat:
