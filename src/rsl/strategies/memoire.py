@@ -100,6 +100,7 @@ tiendrait tout l'historique des valeurs intermediaires.
 from __future__ import annotations
 
 import os
+from collections.abc import Sequence
 from typing import Final, Protocol
 
 from rsl.data.feed import Context
@@ -339,7 +340,7 @@ def memoire_pour(portee: int, inner: object = None) -> Memoire | None:
 
 
 def valeurs_de_fenetre(
-    memoire: Memoire | None, inner: Evaluable, ctx: Context, lags: range
+    memoire: Memoire | None, inner: Evaluable, ctx: Context, lags: Sequence[int]
 ) -> list[float] | None:
     """Les valeurs de `inner` aux decalages demandes, le PRESENT en tete.
 

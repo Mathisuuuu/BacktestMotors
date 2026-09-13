@@ -1,6 +1,6 @@
 ---
 type: reference
-updated: 2026-09-11
+updated: 2026-09-13
 autorite: schemas/signals.schema.json (engendre, ne pas editer a la main)
 ---
 
@@ -23,6 +23,8 @@ autorite: schemas/signals.schema.json (engendre, ne pas editer a la main)
 | A quoi ressemble CHAQUE type de noeud en JSON ? | [examples/strategies/_moule_universel.json](../../examples/strategies/_moule_universel.json) — les 20, dans un fichier qui tourne |
 | Comment lire une grandeur de SEANCE ? | `session` et `cumulative` — exigent un calendrier declare, voir [[reference/seances]] |
 | Comment lisser une EXPRESSION (pas un champ de prix) ? | `rolling` avec `stat: "ema"`. `primitive` est une feuille : elle ne lit que des champs de prix |
+| Comment comparer une barre a celle de MEME RANG les jours precedents ? | `rolling` avec `across: "sessions"`, pas `stride`. Un pas fixe suppose des seances de longueur egale ; sur NQ elles font 1 362 barres, 435 le vendredi. Voir [[reference/seances]] |
+| Comment reculer d'UNE SEANCE plutot que de N barres ? | `session_lag`. `lag` compte des barres et ne peut pas suivre une longueur de seance qui change |
 | Wilder ou moyenne simple ? | `atr@1` / `rsi@1` sont des moyennes ARITHMETIQUES ; `atr_wilder@1` / `rsi_wilder@1` sont les variantes de Wilder. Des noms distincts, jamais des versions — voir [[lessons]] L10 |
 | Ou sont les moules de strategie descriptibles ? | [rules.py](../../src/rsl/strategies/rules.py) · [ranking.py](../../src/rsl/strategies/ranking.py) |
 | Ou branchera le futur compilateur de specifications ? | [src/rsl/pipeline.py](../../src/rsl/pipeline.py) — decrit, sans implementation |
@@ -386,7 +388,7 @@ famille.
 |---|---|
 | `contrat` | ce qu'EST un noeud : protocole `Signal`, `NodeField`, registre, `build_signal` |
 | `feuilles` | ce qui lit le monde : `price`, `primitive`, `position`, `time`, `session`, `peer`, `constant` |
-| `fenetres` | ce qui regarde plusieurs barres : `rolling`, `lag`, `bars_since`, `cumulative` |
+| `fenetres` | ce qui regarde plusieurs barres : `rolling`, `lag`, `session_lag`, `bars_since`, `cumulative` |
 | `operateurs` | ce qui combine : `compare`, `arith`, `all_of`, `not`, `crosses_*`, `if_then_else`, `math`, `min_of`, `max_of` |
 | `raccourcis` | abreviations Python (`prim`, `const`, `price`) - pas utilisees par le chemin declaratif |
 

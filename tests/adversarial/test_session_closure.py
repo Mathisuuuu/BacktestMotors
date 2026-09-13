@@ -150,6 +150,11 @@ class TestSurfacePublique:
             # possible est `token is autre_token`. Les trois tests qui suivent
             # l'attaquent explicitement.
             "data_token",
+            # `lags_de_seance` a rejoint la surface le 2026-09-13, pour les
+            # fenetres comptees en SEANCES. Elle ne rend que des DECALAGES
+            # vers le passe et refuse la seance en cours, dont la longueur
+            # est un fait futur tant qu'elle n'est pas close.
+            "lags_de_seance",
         }
 
     def test_sans_calendrier_le_noeud_leve_au_lieu_de_deviner(self):

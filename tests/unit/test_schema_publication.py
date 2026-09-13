@@ -117,6 +117,7 @@ class TestSchemaAcceptsRealSpecifications:
             "bars_since": {"type": "bars_since", "lookback": 10, "inner": leaf},
             "session": {"type": "session", "field": "high", "lag": 1},
             "cumulative": {"type": "cumulative", "stat": "sum", "inner": leaf},
+            "session_lag": {"type": "session_lag", "sessions": 1, "inner": leaf},
         }
         assert set(instances) == {node.name for node in list_node_types()}
         for name, instance in instances.items():

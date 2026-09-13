@@ -17,9 +17,9 @@ generated: true
 | Indicateur | Valeur |
 |---|---|
 | Pages de wiki | 27 |
-| Entrees de log | 168 |
+| Entrees de log | 172 |
 | Derniere activite | 2026-09-13 |
-| Idees ecartees (ledger) | 21 |
+| Idees ecartees (ledger) | 22 |
 | Idees en attente (ledger) | 4 |
 | Pages `Failed Ideas/` | 1 |
 | Pages `concepts/` | 6 |
@@ -27,7 +27,7 @@ generated: true
 | Pages `reference/` | 7 |
 | Pages `research/` | 1 |
 
-**Activite par type :** note × 74, fix × 35, feat × 25, decision × 20, essai × 4, mesure × 3, experiment × 2, setup × 1, lint × 1, audit × 1, refactor × 1, perf × 1
+**Activite par type :** note × 76, fix × 36, feat × 26, decision × 20, essai × 4, mesure × 3, experiment × 2, setup × 1, lint × 1, audit × 1, refactor × 1, perf × 1
 
 ## Experiences
 
@@ -46,14 +46,14 @@ Le total des essais alimente le Deflated Sharpe : un essai non enregistre gonfle
 
 ## Derniere activite — 8 entree(s)
 
+- **2026-09-13** — note | `_moule_universel` change d'empreinte, et c'est VOULU : il doit montrer chaque type de noeud | verifie terme a terme avant d'accepter - `equity`, `cash`, `exposure`, `trades` et `portfolio` sont bit-identiques ; seuls bougent les `order_id` et deux compteurs, le nouveau terme d'`exit_short` emettant 12 ordres ecartes faute de position a fermer. Effet economique NUL. Les six autres empreintes sont inchangees
+- **2026-09-13** — note | Choix assume : une seance ECOURTEE fait rendre `None` a la fenetre, sans substitution de barre voisine | substituer comparerait 15 h 59 d'un jour plein a 13 h 00 d'un demi-jour - le desalignement silencieux que ces formes existent pour supprimer. Mesure : 33 % des barres gardent une fenetre complete sur NQ, **88 % aux douze points de controle**. Une politique DECLAREE de moyennage sur les seances disponibles reste ouverte, faute d'un cas ou les 12 % changent une conclusion
+- **2026-09-13** — fix | La note « 3,4 % d'approximation » de la specification Zarattini etait fausse sur ses TROIS affirmations | les cotations NQ portent 1 362 barres par jour et non 390, donc le `stride: 390` ne tombait JAMAIS sur le rang voulu ; les seances courtes ne sont pas 94 accidents mais **les vendredis** (435 barres), une semaine sur une sur dix ans. Reecrit, `sigma[tau]` differe de l'ancien a **100 %** des points de controle, de **28,3 % en mediane** et jusqu'a 94,7 %. Lecon [[lessons]] L29
+- **2026-09-13** — feat | Les fenetres savent compter en SEANCES : `rolling.across: "sessions"` et le noeud `session_lag` | adosses au calendrier DECLARE, ils retrouvent le meme RANG dans les seances precedentes la ou `stride` comptait des barres. Reprise de la ligne du [[Failed Ideas/ledger]] du 2026-09-11, dont les deux conditions etaient remplies. 24 types de noeuds, 4190 tests, `ruff` et `mypy --strict` propres
 - **2026-09-13** — note | Le +111,53 % n'est PAS significatif : DSR 0,9981 -> **0,1107** une fois compte contre les 495 essais du registre | le Sharpe observe par periode (0,0469) est INFERIEUR au maximum attendu sous H0 (0,0667). Le rapport publiait 0,9981 parce que le run avait ete lance sans `--archive`, donc contre un seul essai. Les deux runs sont desormais au registre, le rate y compris. Essai : [[experiments/zarattini-nq-intraday-60-30]]
 - **2026-09-13** — mesure | Zarattini relance a capital 500 000, MEME configuration : **+111,53 %** contre -25,62 % a 100 000 | 2 482 ordres, 2 482 fills, **zero rejet** - contre 5 080 rejets de marge sur 5 084 auparavant. Marge max 108 000, soit exactement les 4 x 27 000 que le compte de 100 000 ne pouvait pas couvrir. 1 241 trades, Sharpe 0,83, exposition 4,51 %
 - **2026-09-13** — note | Le +111,53 % n'est PAS significatif : DSR 0,9981 -> **0,1107** une fois compte contre les 495 essais du registre | le Sharpe observe par periode (0,0469) est INFERIEUR au maximum attendu sous H0 (0,0667). Le rapport publiait 0,9981 parce que le run avait ete lance sans `--archive`, donc contre un seul essai. Les deux runs sont desormais au registre, le rate y compris. Essai : [[experiments/zarattini-nq-intraday-60-30]]
 - **2026-09-13** — mesure | Zarattini relance a capital 500 000, MEME configuration : **+111,53 %** contre -25,62 % a 100 000 | 2 482 ordres, 2 482 fills, **zero rejet** - contre 5 080 rejets de marge sur 5 084 auparavant. Marge max 108 000, soit exactement les 4 x 27 000 que le compte de 100 000 ne pouvait pas couvrir. 1 241 trades, Sharpe 0,83, exposition 4,51 %
-- **2026-09-13** — note | Les cotations NQ portent la seance ELECTRONIQUE complete : 1 362 barres par jour, pas 390 | le `stride: 390` de sigma, qui se veut « au meme rang de seance », echantillonne donc a des heures arbitraires. Defaut distinct de celui de la marge, et non corrige a ce jour
-- **2026-09-13** — fix | Le -25,62 % de Zarattini ne mesure pas la strategie, il mesure DEUX trades : 5 080 ordres sur 5 084 refuses pour MARGE | `vol_target` sature a `vol_max_multiple`=4, donc 4 contrats NQ a 27 000 de marge = 108 000 sur un compte de 100 000. `entry_long` est pourtant vraie 94 fois sur 120 000 barres contigues, soit ~1 par seance. Lecon [[lessons]] L28
-- **2026-09-13** — decision | La reecriture en C# n'est pas retenue : le programme prend 16 min, pas 3 h | le calcul lourd est deja en C (numpy) ; ce qui restait en Python etait le parcours d'arbre, divise par 34 par [[lessons]] L26. Une reecriture voulait dire 24 343 lignes, 136 primitives, 4 168 tests et les 7 empreintes abandonnes. Motif chiffre au [[Failed Ideas/ledger]]
-- **2026-09-13** — mesure | Run Zarattini MESURE de bout en bout : **15 min 55 s** sur 3 705 199 barres minute | mes trois estimations disaient 6,7 h, 3,05 h puis 22 min. Meme cause les trois fois : microbenchmark sur une memoisation VIDE. `rolling` strie coute 655,6 us a froid et 52,1 us a chaud - douze fois. Une duree de run se mesure en lancant le run. Lecon [[lessons]] L27
 
 ## Next Actions
 
@@ -122,12 +122,34 @@ coexistence, et `tests/test_nautilus_coexistence.py` la garde.
       ([[lessons]] L28, troisieme occurrence apres L18 et L25).
       A trancher : seuil d'alerte, ou affichage systematique du ratio
       `n_fills / n_orders_submitted` ?
-- [ ] **Le `stride: 390` de Zarattini repose sur une premisse fausse.** Les
-      cotations NQ portent la seance ELECTRONIQUE : **1 362 barres par jour, pas
-      390**. Le `stride` cense echantillonner « au meme rang de seance » tombe
-      donc a des heures arbitraires. Defaut de la CONFIGURATION, pas du socle,
-      et distinct de celui de la marge. Le `note` du JSON qui annonce « 3,4 %
-      d'approximation » est a reecrire.
+- [x] **`sigma` reecrit sur un ancrage de seance REEL (2026-09-13).**
+      Deux formes neuves, adossees au calendrier declare :
+      `rolling.across: "sessions"` compte `window` en SEANCES au meme rang, et
+      le noeud `session_lag` recule d'une seance. Reprise de la ligne du
+      [[Failed Ideas/ledger]] du 2026-09-11, dont les deux conditions etaient
+      remplies. 24 types de noeuds, 4190 tests, les 7 empreintes verifiees sur
+      donnees reelles.
+      **Ce n'etait pas une approximation** : reecrit, `sigma[tau]` differe de
+      l'ancien a **100 %** des points de controle ou tous deux sont definis, de
+      **28,3 % en mediane**. La note « 3,4 % » de la specification etait fausse
+      sur ses trois affirmations - les seances courtes ne sont pas 94 accidents
+      mais LES VENDREDIS, une semaine sur une ([[lessons]] L29).
+      Empreinte de `_moule_universel` changee A DESSEIN : il doit montrer chaque
+      type de noeud. Verifie terme a terme - equity, trades et portefeuille
+      bit-identiques, seuls les `order_id` et deux compteurs bougent.
+- [ ] **Rangs manquants : une politique DECLAREE plutot que `None`.**
+      Aujourd'hui une seance ecourtee fait tomber toute la fenetre : 88 % des
+      points de controle restent servis sur NQ, 12 % ne declenchent pas. Le
+      papier, lui, moyennerait sur les seances disponibles. Non fait faute d'un
+      cas ou ces 12 % changent une conclusion - et parce qu'un moyennage
+      silencieux sur un nombre variable d'observations est exactement ce que le
+      socle refuse. A trancher si un essai le rend genant.
+- [x] **Aucune autre specification du depot n'est touchee (verifie 2026-09-13).**
+      `grep stride examples/**/*.json` ne rend aucune declaration de pas : les
+      sept exemples utilisent tous le defaut `stride: 1`. La premisse fausse
+      etait propre a la specification Zarattini, qui vit hors du depot. Toute
+      spec EXTERIEURE qui declare un `stride` cense valoir « une seance » porte
+      la meme erreur.
 - [ ] **Decider du sort de la branche.** Fusionner `migration-nautilus` dans
       `main` maintenant, ou attendre que le transversal passe ? Rien n'est
       supprime, donc la fusion est sans risque ; c'est une question de lisibilite

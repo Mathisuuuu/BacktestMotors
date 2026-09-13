@@ -926,3 +926,60 @@ s'afficher a cote du rendement, pas seulement dans le JSON.
 <!-- NOTE: action ouverte, pas encore faite. -->
 
 Fonde sur [[log]] (2026-09-13) · rapport `zarattini_rapport.json`
+
+---
+
+## L29 -- Une approximation annoncee a 3,4 % en valait 100 %
+
+La specification Zarattini portait cette note, ecrite de bonne foi :
+
+> « Le stride suppose 390 barres par seance. Sur les seances ECOURTEES
+> l'alignement derive - 94 seances sur 2748 dans notre historique, soit 3,4 %.
+> C'est la seule approximation qui subsiste. »
+
+Trois affirmations, et **les trois etaient fausses**.
+
+Les cotations NQ portent la seance ELECTRONIQUE, pas le RTH : **1 362 barres
+par jour**, pas 390. Le pas de 390 ne tombait donc jamais sur le rang voulu -
+pas « rarement », jamais. Et les seances courtes ne sont pas 94 accidents de
+calendrier : ce sont **les vendredis**, la seance ouverte le vendredi a 9 h 30
+se fermant avant le week-end, soit 435 barres. Une semaine sur une, sur dix
+ans. Enfin, ce n'etait pas la seule approximation : c'etait la seule qui avait
+ete ECRITE.
+
+Le chiffre qui tranche : reecrit sur un ancrage de seance reel, `sigma[tau]`
+differe de l'ancien a **100 % des points de controle** ou tous deux sont
+definis, de **28,3 % en mediane** et jusqu'a 94,7 %. Le seuil de la strategie
+etant `1,5 x sigma`, c'est la decision entiere qui portait sur autre chose que
+ce que le papier decrit.
+
+Pourquoi la note n'a rien protege
+----------------------------------
+Elle chiffrait l'erreur **dans l'hypothese ou l'hypothese etait vraie**. « 94
+seances sur 2748 » compte les seances plus courtes que 390 barres ; il fallait
+compter les seances differentes de 390 barres, c'est-a-dire toutes. Une
+approximation documentee reste une approximation non mesuree tant que personne
+n'a compte la grandeur reelle.
+
+Le cout d'une minute de verification : `len(barres) / len(seances)` rend 1 362.
+
+La regle : **une note qui chiffre une approximation doit nommer la mesure qui
+la produit**, sinon elle donne a une supposition l'apparence d'un fait verifie.
+Celle-ci a survecu a la redaction de la strategie, a un run de sept heures
+estimees, a deux backtests complets et a trois seances de travail.
+
+Ce que la correction a coute, et ce qu'elle refuse
+---------------------------------------------------
+`rolling.across: "sessions"` et le noeud `session_lag`, tous deux adosses au
+calendrier DECLARE. Ils reprennent une idee du [[Failed Ideas/ledger]] ecartee
+le 2026-09-11 - la condition de reprise etait « un calendrier existe ET le
+desalignement devient genant » : il ne l'est pas devenu, il l'etait deja.
+
+Ils refusent de substituer une barre voisine quand une seance ecourtee n'a pas
+le rang demande. Consequence assumee et mesuree : 33 % des barres gardent une
+fenetre complete sur NQ, **88 % aux douze points de controle**. Les 67 % perdus
+sont des barres de nuit dont le rang n'existe pas un vendredi - refuser de les
+comparer a un marche ferme n'est pas une perte d'information.
+
+Fonde sur [[log]] (2026-09-13) · `tests/unit/test_fenetre_par_seance.py` ·
+`docs/execution-model.md` §1.3

@@ -364,6 +364,44 @@
                 "type": "constant",
                 "value": -0.12
               }
+            },
+            {
+              "type": "compare",
+              "op": ">",
+              "note": [
+                "Les deux formes ajoutees le 2026-09-13, montrees ensemble parce",
+                "qu'elles se composent : `rolling` dont la fenetre compte des SEANCES,",
+                "et `session_lag` qui recule d'une seance au MEME RANG.",
+                "",
+                "Ce qu'elles remplacent : `stride`, qui comptait des barres et ne",
+                "retrouvait le meme rang que si toutes les seances avaient la meme",
+                "longueur. Mesure du 2026-09-13 sur NQ a la minute : 1 362 barres les",
+                "jours pleins, 435 le vendredi. Ici, sur du QUOTIDIEN, une seance ne",
+                "compte qu'une barre - les deux formes coincident donc, et c'est",
+                "justement ce qui en fait un bon exemple de reference : elles se",
+                "lisent sans que le resultat depende de la granularite.",
+                "",
+                "Sens de la regle : couvrir le short des que le cours repasse au-dessus",
+                "de la moyenne des cinq CLOTURES DE SEANCE precedentes."
+              ],
+              "left": {
+                "type": "price",
+                "field": "close"
+              },
+              "right": {
+                "type": "rolling",
+                "stat": "mean",
+                "window": 5,
+                "across": "sessions",
+                "inner": {
+                  "type": "session_lag",
+                  "sessions": 1,
+                  "inner": {
+                    "type": "price",
+                    "field": "close"
+                  }
+                }
+              }
             }
           ]
         },

@@ -1,6 +1,6 @@
 ---
 type: reference
-updated: 2026-09-12
+updated: 2026-09-13
 autorite: src/rsl/data/session.py
 ---
 
@@ -14,6 +14,37 @@ Le socle a longtemps refuse toute notion de seance, et il avait raison : les
 series continues `.v.0` sont trouees, et inferer une frontiere d'un trou est une
 supposition. Ce qui a change au 2026-09-11 n'est pas ce refus — c'est qu'une
 seance peut desormais etre **declaree**. Une declaration ne devine rien.
+
+
+## Depuis le 2026-09-13 : la seance ancre aussi les FENETRES
+
+`rolling.across: "sessions"` compte `window` en seances, au meme rang ;
+`session_lag` recule de N seances, au meme rang. Norme en
+[docs/execution-model.md](../../docs/execution-model.md) §1.3, sous « Fenetres
+comptees en seances ».
+
+Ce qu'elles remplacent : `rolling.stride`, qui comptait des BARRES et supposait
+donc des seances de longueur egale. **Les donnees ne le verifient pas** — sur
+NQ, 1 362 barres les jours pleins et 435 le vendredi, la seance ouverte le
+vendredi a 9 h 30 se fermant avant le week-end. Une semaine sur une, sur dix
+ans.
+
+Le chiffre qui a tranche : sur la strategie Zarattini, les deux ecritures de
+`sigma[tau]` different a **100 %** des points de controle ou toutes deux sont
+definies, de **28,3 % en mediane**. Ce n'etait donc pas une approximation.
+
+Deux choses a savoir avant de s'en servir :
+
+- une seance ECOURTEE n'a pas de barre au rang demande, et la fenetre rend
+  `None` plutot qu'une barre voisine. Sur NQ avec `window: 60`, 33 % des barres
+  ont une fenetre complete, **88 % aux douze points de controle** ;
+- le `warmup_bars` de ces noeuds ne compte pas les seances : nul ne sait
+  combien de barres elles font avant d'avoir lu les donnees. Declarer
+  `min_warmup_bars` au niveau du run.
+
+Reprend la ligne du [[Failed Ideas/ledger]] du 2026-09-11
+(`rolling.across: sessions_same_offset`), dont les deux conditions de reprise
+etaient remplies.
 
 
 ## Depuis le 2026-09-12 : la seance ancre aussi le DECOUPAGE
