@@ -714,3 +714,55 @@ resultats BIT-IDENTIQUES. Quatre cent soixante-deux croisements voisins ont
 462 empreintes differentes et passent tous pour des essais independants.
 
 Fonde sur [[experiments/pbo-grille-large-462-sma]] · [[log]] (2026-09-12)
+
+---
+
+## L24 -- Deux moteurs sans fuite ne donnent pas le meme chiffre pour autant
+
+Le vocabulaire JSON a ete porte sur Nautilus en une seule idee : ne pas le
+porter. Il ne parle pas a un moteur, il parle a un `Context` - un curseur sur
+des barres closes. Il suffisait que Nautilus mene l'horloge et que notre
+`BarContext` serve le vocabulaire. Les 136 primitives et les 23 noeuds
+fonctionnent sans qu'une ligne de leur code change.
+
+Puis la comparaison a donne 0,081 % d'ecart sur `sma_es_daily`, et j'ai failli
+conclure que les deux moteurs concordaient.
+
+Ils ne concordent pas. Deux mesures l'ont montre, dans cet ordre.
+
+**D'abord une fuite, chez Nautilus.** Son moteur de correspondance remplit un
+ordre au marche a la cloture de la barre qu'il traite. Soumettre pendant
+`on_bar(t)` donne donc un fill a `close[t]` : le prix meme que la strategie
+vient de lire pour decider. Mesure sur `_moule` : +19,43 % d'equity. Ce n'est
+pas un defaut de Nautilus - c'est une convention de simulation sur barres, que
+rien n'annonce et que personne ne remarque tant qu'il ne la cherche pas.
+
+**Ensuite une divergence, apres correction.** Le differe supprime la fuite mais
+place les fills sur `close[t+1]` la ou nous servons a `open[t+1]`. Une journee
+entiere d'ecart sur du quotidien, et - c'est le point - **il se compose a
+chaque trade** :
+
+    4 trades   ->  -0,93 %
+    10 trades  ->  -0,47 %
+    18 trades  ->  +23,84 %
+    49 trades  ->  +17,44 %
+
+La lecon generale : **l'absence de fuite ne rend pas deux moteurs
+comparables**. Ils peuvent etre tous deux corrects et mesurer deux choses
+differentes. Ce qui les separe n'est pas la justesse mais la CONVENTION, et une
+convention ne se devine pas - elle se mesure.
+
+Corollaire sur les tests, et c'est celui qui a failli passer : mon premier test
+de concordance tolerait 0,5 % d'ecart. Il PASSAIT, parce que l'exemple sur
+lequel il portait negocie dix fois. Un test vert sur le cas tranquille pendant
+que les cas actifs derivent de vingt pour cent est pire que pas de test. Il a
+ete remplace par un test qui NOMME l'ecart et borne par le BAS - se rejouir
+d'une convergence qu'on n'a pas provoquee serait la mauvaise reaction.
+
+Deuxieme corollaire, sur les temoins : le premier temoin ne neutralisait rien.
+Il remplacait une file par un espion, mais `on_bar` reassigne cette file des la
+premiere barre. Le test comparait deux executions identiques et passait. Un
+temoin doit etre VERIFIE comme le reste - c'est ce que fait desormais
+`test_le_temoin_reproduit_bien_la_fuite`.
+
+Fonde sur [[log]] (2026-09-13) · `tests/test_nautilus_coexistence.py`

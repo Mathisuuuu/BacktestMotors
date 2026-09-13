@@ -17,9 +17,9 @@ generated: true
 | Indicateur | Valeur |
 |---|---|
 | Pages de wiki | 26 |
-| Entrees de log | 149 |
+| Entrees de log | 153 |
 | Derniere activite | 2026-09-13 |
-| Idees ecartees (ledger) | 19 |
+| Idees ecartees (ledger) | 20 |
 | Idees en attente (ledger) | 4 |
 | Pages `Failed Ideas/` | 1 |
 | Pages `concepts/` | 6 |
@@ -27,7 +27,7 @@ generated: true
 | Pages `reference/` | 7 |
 | Pages `research/` | 1 |
 
-**Activite par type :** note × 68, fix × 30, feat × 23, decision × 18, essai × 4, experiment × 2, setup × 1, lint × 1, audit × 1, refactor × 1
+**Activite par type :** note × 68, fix × 32, feat × 24, decision × 19, essai × 4, experiment × 2, setup × 1, lint × 1, audit × 1, refactor × 1
 
 ## Experiences
 
@@ -45,14 +45,14 @@ Le total des essais alimente le Deflated Sharpe : un essai non enregistre gonfle
 
 ## Derniere activite — 8 entree(s)
 
+- **2026-09-13** — fix | Mon test de concordance passait POUR LA MAUVAISE RAISON : il tolerait 0,5 % et portait sur le seul exemple qui negocie dix fois | remplace par `test_nautilus_coexistence.py`, qui NOMME l'ecart et le borne par le BAS. Et son temoin ne neutralisait rien - il remplacait une file que `on_bar` reassigne des la premiere barre
+- **2026-09-13** — decision | **Les deux moteurs sont GARDES**, la suppression de `rsl.engine` est abandonnee | apres correction de la fuite, les conventions de remplissage restent differentes - `open[t+1]` chez nous, `close[t+1]` chez Nautilus - et l'ecart se compose : 23,84 % sur 18 trades, 0,47 % sur 10. Supprimer notre moteur rendrait incomparables les 7 empreintes, les 493 essais, la PBO et le DSR. Lecon [[lessons]] L24
+- **2026-09-13** — fix | **Fuite trouvee chez Nautilus** : un ordre au marche se remplit a la cloture de la barre qui a DECLENCHE la decision | +19,43 % d'equity sur `_moule`. Corrige par un differe dans le pont plutot que par un `LatencyModel` - une latence se regle en nanosecondes, pas en barres
+- **2026-09-13** — feat | Le vocabulaire JSON tourne sur Nautilus sans qu'une ligne de son code change | l'idee courte : ne pas le porter. Il parle a un `Context`, pas a un moteur - Nautilus mene l'horloge, notre `BarContext` sert le vocabulaire, et la synchronisation est VERIFIEE barre par barre. `rules@1` reutilise entier, ses neuf cles comprises
 - **2026-09-13** — note | Premier cout visible de la migration : `mypy --strict` ne voit RIEN de Nautilus (Cython compile, sans stubs) | exception declaree dans `pyproject.toml`, confinee a la bibliotheque et au seul module qui herite de `Strategy`. Le precedent existait : `rsl.gui.charts` et matplotlib
 - **2026-09-13** — note | pip installe `nautilus_trader 1.221.0`, la ligne v1 hybride (modele Rust via PyO3, moteur Cython) et non la v2 pure annoncee | la v2 n'est pas encore le defaut sur PyPI pour Python 3.11. Le coeur `nautilus_pyo3` est bien present
 - **2026-09-13** — feat | Pont vers Nautilus : `rsl.nautilus` (pont, strategies, moteur) — instruments, barres, venue, frais | `sma_crossover@1` porte et confronte a notre moteur sur ES quotidien : **627 312,41 contre 627 822,40, soit 0,081 % d'ecart**, dont 262,50 de slippage que nous seuls payons. 6 tests de concordance, marques `slow`
 - **2026-09-13** — decision | **Migration vers `nautilus_trader`** : l'execution est deleguee, le depot garde le vocabulaire declaratif, le registre des essais et la PBO | branche `migration-nautilus`. Declencheur : aucune alternative n'avait JAMAIS ete evaluee — zero occurrence de backtrader/vectorbt/zipline/nautilus dans tout le wiki
-- **2026-09-12** — note | Contre-intuitif et mesure : ajouter 462 essais CORRELES a fait BAISSER le maximum attendu sous H0, de 0,1600 a 0,0663 | le maximum attendu est proportionnel a l'ecart-type des Sharpe essayes, et 462 variantes du meme croisement sont homogenes. Remplir le compteur d'essais quasi identiques AFFAIBLIT le DSR au lieu de le durcir - l'hypothese d'independance des essais est violee. Lecon [[lessons]] L23
-- **2026-09-12** — fix | Le dossier `essais/` n'etait cree qu'en effet de bord de l'ecriture d'un rapport | un balayage n'en ecrit aucun (un seul artefact partage par N lignes), donc le premier archivage sur un depot neuf echouait a ouvrir le registre. Trouve par les tests du chemin de balayage, avant le premier usage reel
-- **2026-09-12** — fix | `rsl pbo` n'acceptait pas une grille de plusieurs centaines : 462 chemins depassent la ligne de commande admise (`Argument list too long`) | un REPERTOIRE est desormais developpe en ses fichiers .json, TRIES - l'ordre determine quelle configuration `argmax` designe en cas d'egalite
-- **2026-09-12** — note | Le retrait des inactives n'est pas neutre a grande echelle : 357 configurations sur 462 retirees a S=8, TOUTES sur la sous-periode 0 | une strategie de croisement entre sur un croisement, et les longues moyennes ne se croisent pas en 2017, annee calme. Le retrait elimine donc systematiquement les fenetres longues, et la PBO porte alors sur un sous-ensemble biaise. Arbitrage structurel : peu de blocs preservent la grille mais donnent peu de combinaisons ; beaucoup de blocs donnent des combinaisons mais decimant la grille
 
 ## Next Actions
 
@@ -60,13 +60,41 @@ Le total des essais alimente le Deflated Sharpe : un essai non enregistre gonfle
 > Bloc edite a la main. Le generateur le recopie tel quel a chaque passage :
 > c'est le seul endroit de ce fichier ou ecrire.
 
-Etat au 2026-09-11, l'audit d'architecture etant **entierement traite** (A-P0
-a A-P3) et la bibliotheque portee a 136 primitives : **3566 tests passent,
-aucun n'echoue** - dont 183 marques `slow`, qui tournent sur les donnees
-reelles et sautent proprement sans elles. ; `ruff` et `mypy --strict` sont propres sur `src` et `tests` ;
-les **7 empreintes d'exemples sont inchangees** depuis l'avant-derniere
-session. (L'audit du meme jour partait de 1179 tests dont 1 echouait ; cet
-echec est le P6 ci-dessous, corrige.)
+## Deux moteurs, et le contrat entre eux (2026-09-13)
+
+Branche `migration-nautilus`. `main` est intact.
+
+| | notre moteur | Nautilus |
+|---|---|---|
+| sert a | la RECHERCHE reproductible | la VALIDATION croisee, et le futur live |
+| remplit a | `open[t+1]` | `close[t+1]` |
+| porte | 7 empreintes, 493 essais, PBO, DSR | backtest et live partagent le meme noyau |
+
+**Ce qu'on ne compare JAMAIS** : les equity des deux moteurs. Elles divergent de
+0,5 % sur une strategie qui negocie dix fois et de 24 % sur une qui en negocie
+dix-huit, parce que l'ecart de convention se COMPOSE a chaque trade. Ce n'est
+pas une imprecision, c'est deux mesures differentes ([[lessons]] L24).
+
+**Ce qui est partage, et qui doit le rester** : le vocabulaire JSON. Un meme
+fichier decrit la meme strategie des deux cotes - c'est toute la valeur de la
+coexistence, et `tests/test_nautilus_coexistence.py` la garde.
+
+- [ ] **Alimenter Nautilus en TICKS plutot qu'en barres.** C'est le regime pour
+      lequel son moteur est fait, et la seule voie qui rendrait les deux
+      comparables : les fills retrouveraient un sens physique au lieu de tomber
+      sur une cloture de barre. Cout a mesurer - 33 M de barres minute
+      deviendraient des quotes.
+- [ ] **Porter le transversal.** `panel_rules@1` et `ranking@1` demandent un
+      `MultiContext` ; le pont ne porte que le mono-instrument et le REFUSE
+      explicitement. C'est la moitie du vocabulaire qui ne traverse pas encore.
+- [ ] **Corriger `cumulative`, en O(n^2) par seance.** 25 777x plus lent que
+      l'equivalent vectorise, trouve en lancant la strategie Zarattini. Le
+      correctif est borne - un accumulateur incremental - et les 7 empreintes
+      permettent de verifier qu'aucun bit ne bouge. Independant de Nautilus.
+- [ ] **Decider du sort de la branche.** Fusionner `migration-nautilus` dans
+      `main` maintenant, ou attendre que le transversal passe ? Rien n'est
+      supprime, donc la fusion est sans risque ; c'est une question de lisibilite
+      de l'historique.
 
 ## Plan de l'audit d'architecture (2026-09-11)
 
