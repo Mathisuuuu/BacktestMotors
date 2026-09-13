@@ -78,3 +78,23 @@ packages = ["rsl"]
 [[tool.mypy.overrides]]
 module = "rsl.gui.charts"
 disallow_untyped_calls = false
+
+# `nautilus_trader` est distribue en Cython COMPILE, sans stubs ni marqueur
+# `py.typed` : mypy ne voit rien de son API, pas meme les noms de modules.
+# L'exception porte donc sur la BIBLIOTHEQUE, jamais sur notre code - `strict`
+# reste entier dans `rsl.nautilus`, ou la traduction se fait.
+#
+# C'est le premier cout visible de la migration du 2026-09-13, et il est
+# assume : sans lui, la seule alternative serait d'ecrire a la main des stubs
+# pour une API de plusieurs centaines de classes, qui divergeraient a la
+# premiere version.
+[[tool.mypy.overrides]]
+module = "nautilus_trader.*"
+ignore_missing_imports = true
+
+# Heriter d'une classe que mypy voit comme `Any` est refuse par `strict`.
+# L'exception est confinee au SEUL module qui definit des strategies Nautilus ;
+# `pont.py` et `moteur.py`, ou vivent les conversions, gardent `strict` entier.
+[[tool.mypy.overrides]]
+module = "rsl.nautilus.strategies"
+disallow_subclassing_any = false

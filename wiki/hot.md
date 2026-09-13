@@ -17,9 +17,9 @@ generated: true
 | Indicateur | Valeur |
 |---|---|
 | Pages de wiki | 26 |
-| Entrees de log | 145 |
-| Derniere activite | 2026-09-12 |
-| Idees ecartees (ledger) | 18 |
+| Entrees de log | 149 |
+| Derniere activite | 2026-09-13 |
+| Idees ecartees (ledger) | 19 |
 | Idees en attente (ledger) | 4 |
 | Pages `Failed Ideas/` | 1 |
 | Pages `concepts/` | 6 |
@@ -27,7 +27,7 @@ generated: true
 | Pages `reference/` | 7 |
 | Pages `research/` | 1 |
 
-**Activite par type :** note × 66, fix × 30, feat × 22, decision × 17, essai × 4, experiment × 2, setup × 1, lint × 1, audit × 1, refactor × 1
+**Activite par type :** note × 68, fix × 30, feat × 23, decision × 18, essai × 4, experiment × 2, setup × 1, lint × 1, audit × 1, refactor × 1
 
 ## Experiences
 
@@ -45,14 +45,14 @@ Le total des essais alimente le Deflated Sharpe : un essai non enregistre gonfle
 
 ## Derniere activite — 8 entree(s)
 
+- **2026-09-13** — note | Premier cout visible de la migration : `mypy --strict` ne voit RIEN de Nautilus (Cython compile, sans stubs) | exception declaree dans `pyproject.toml`, confinee a la bibliotheque et au seul module qui herite de `Strategy`. Le precedent existait : `rsl.gui.charts` et matplotlib
+- **2026-09-13** — note | pip installe `nautilus_trader 1.221.0`, la ligne v1 hybride (modele Rust via PyO3, moteur Cython) et non la v2 pure annoncee | la v2 n'est pas encore le defaut sur PyPI pour Python 3.11. Le coeur `nautilus_pyo3` est bien present
+- **2026-09-13** — feat | Pont vers Nautilus : `rsl.nautilus` (pont, strategies, moteur) — instruments, barres, venue, frais | `sma_crossover@1` porte et confronte a notre moteur sur ES quotidien : **627 312,41 contre 627 822,40, soit 0,081 % d'ecart**, dont 262,50 de slippage que nous seuls payons. 6 tests de concordance, marques `slow`
+- **2026-09-13** — decision | **Migration vers `nautilus_trader`** : l'execution est deleguee, le depot garde le vocabulaire declaratif, le registre des essais et la PBO | branche `migration-nautilus`. Declencheur : aucune alternative n'avait JAMAIS ete evaluee — zero occurrence de backtrader/vectorbt/zipline/nautilus dans tout le wiki
 - **2026-09-12** — note | Contre-intuitif et mesure : ajouter 462 essais CORRELES a fait BAISSER le maximum attendu sous H0, de 0,1600 a 0,0663 | le maximum attendu est proportionnel a l'ecart-type des Sharpe essayes, et 462 variantes du meme croisement sont homogenes. Remplir le compteur d'essais quasi identiques AFFAIBLIT le DSR au lieu de le durcir - l'hypothese d'independance des essais est violee. Lecon [[lessons]] L23
 - **2026-09-12** — fix | Le dossier `essais/` n'etait cree qu'en effet de bord de l'ecriture d'un rapport | un balayage n'en ecrit aucun (un seul artefact partage par N lignes), donc le premier archivage sur un depot neuf echouait a ouvrir le registre. Trouve par les tests du chemin de balayage, avant le premier usage reel
 - **2026-09-12** — fix | `rsl pbo` n'acceptait pas une grille de plusieurs centaines : 462 chemins depassent la ligne de commande admise (`Argument list too long`) | un REPERTOIRE est desormais developpe en ses fichiers .json, TRIES - l'ordre determine quelle configuration `argmax` designe en cas d'egalite
 - **2026-09-12** — note | Le retrait des inactives n'est pas neutre a grande echelle : 357 configurations sur 462 retirees a S=8, TOUTES sur la sous-periode 0 | une strategie de croisement entre sur un croisement, et les longues moyennes ne se croisent pas en 2017, annee calme. Le retrait elimine donc systematiquement les fenetres longues, et la PBO porte alors sur un sous-ensemble biaise. Arbitrage structurel : peu de blocs preservent la grille mais donnent peu de combinaisons ; beaucoup de blocs donnent des combinaisons mais decimant la grille
-- **2026-09-12** — essai | Grille SMA elargie a **462 configurations** (rapide 2-40 pas 2, lent 20-250 pas 10) : PBO **0,833** a S=4, ou la grille entiere survit | elargir a EMPIRE le chiffre - 0,80 sur seize configurations, 0,833 sur 462 - exactement comme la theorie l'annonce : le maximum d'un ensemble plus grand doit davantage a la chance. 462 backtests en 1021 s, tous archives. Voir [[experiments/pbo-grille-large-462-sma]]
-- **2026-09-12** — note | Deux problemes de METHODE trouves en lancant la premiere grille reelle | (1) une grille de fenetres inegales ne partage pas son echantillon - quatre longueurs pour seize configurations - donc la CSCV comparait des epoques ; le warmup est desormais aligne. (2) quatre configurations ne negocient pas du tout sur une sous-periode ; leur donner zero les classerait au-dessus des perdantes, elles sont retirees sur demande explicite
-- **2026-09-12** — essai | Grille SMA 4x4 sur ES quotidien, 16 configurations : PBO **0,70 a 0,80** | le processus de selection n'a pas montre de pouvoir predictif. Et une fois les 31 essais du registre comptes, le DSR de l'exemple phare `sma_es_daily` tombe de 0,9719 SIGNIFICATIF a **0,0000** - le maximum attendu sous H0 vaut 0,1600 contre un Sharpe observe de 0,0376. Voir [[experiments/pbo-grille-sma-es-quotidien]]
-- **2026-09-12** — feat | PBO par CSCV implementee (`rsl pbo`, `metrics/surapprentissage.py`) : le protocole fige le 2026-09-10 avait attendu deux ans de sessions | 45 tests, dont deux matrices dont la PBO se calcule de tete (1,0 et 0,0 exactement) plutot que des seuls tirages aleatoires
 
 ## Next Actions
 
