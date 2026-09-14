@@ -413,6 +413,12 @@
                 }
               ]
             },
+            "sessions": {
+              "default": 1,
+              "description": "Nombre de seances couvertes, la courante comprise. 1 - le defaut - cumule depuis l'ouverture du jour. Au-dela, la fenetre franchit la nuit, et reste BORNEE.",
+              "minimum": 1,
+              "type": "integer"
+            },
             "stat": {
               "enum": [
                 "sum",
@@ -439,6 +445,52 @@
             "inner"
           ],
           "title": "cumulative@1",
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Feuille : distance a un evenement d'un calendrier DECLARE.",
+          "properties": {
+            "field": {
+              "default": "minutes_since",
+              "enum": [
+                "minutes_since",
+                "minutes_until",
+                "is_now"
+              ],
+              "type": "string"
+            },
+            "name": {
+              "description": "Nom declare dans `events`.",
+              "type": "string"
+            },
+            "note": {
+              "description": "Commentaire libre, ignore par le moteur. Une liste vaut plusieurs lignes.",
+              "oneOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                }
+              ]
+            },
+            "type": {
+              "const": "event"
+            },
+            "version": {
+              "const": 1,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "type",
+            "name"
+          ],
+          "title": "event@1",
           "type": "object"
         },
         {
@@ -1081,6 +1133,53 @@
             "type"
           ],
           "title": "time@1",
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Valeur d'une expression a la derniere barre ou une condition etait vraie.",
+          "properties": {
+            "inner": {
+              "$ref": "#/$defs/node",
+              "description": "Ce qu'on lit a cette barre-la."
+            },
+            "lookback": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "note": {
+              "description": "Commentaire libre, ignore par le moteur. Une liste vaut plusieurs lignes.",
+              "oneOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                }
+              ]
+            },
+            "type": {
+              "const": "value_when"
+            },
+            "version": {
+              "const": 1,
+              "type": "integer"
+            },
+            "when": {
+              "$ref": "#/$defs/node",
+              "description": "La condition, cherchee vers le PASSE."
+            }
+          },
+          "required": [
+            "type",
+            "lookback",
+            "when",
+            "inner"
+          ],
+          "title": "value_when@1",
           "type": "object"
         }
       ]

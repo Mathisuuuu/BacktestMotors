@@ -23,10 +23,10 @@ Aucun verdict n'est donne de memoire.
 
 ## Deux comptages, et pourquoi il en faut deux
 
-| | mesure |
-|---|---|
-| **Elements** de strategie (71) | **63 OK**, 3 partiels, 5 impossibles — **88,7 %** |
-| **Familles** de strategie (25) | **21 realisables**, 4 bloquees — **84,0 %** |
+| | 2026-09-14, premier jet | apres les ajouts du meme jour |
+|---|---|---|
+| **Elements** (71) | 63 OK — 88,7 % | **67 OK**, 2 partiels, 2 impossibles — **94,4 %** |
+| **Familles** (25) | 21 realisables — 84,0 % | **24 realisables**, 1 bloquee — **96,0 %** |
 
 Le second est le chiffre honnete. Un pourcentage d'elements **surestime** la
 couverture : une strategie est une COMBINAISON, et un seul element manquant
@@ -37,12 +37,16 @@ qui dit quelque chose d'utile — **les manques sont concentres**, pas disperses
 
 Quatre familles, quatre causes distinctes, aucune redondante.
 
-| Famille bloquee | Cause | Nature |
+| Famille | Cause | Etat |
 |---|---|---|
-| Reprise de niveau evitee | retenir un PRIX arbitraire d'une barre a l'autre | vocabulaire |
-| Reduction apres serie de mauvais JOURS | `cumulative` remet a zero a chaque seance | vocabulaire |
-| Trading d'annonce macro | aucun canal de donnees exogene | donnees |
-| Scalping sur carnet | le moteur est a la BARRE | moteur |
+| Reprise de niveau evitee | retenir un PRIX d'une barre a l'autre | **comble** — `value_when` |
+| Reduction apres serie de mauvais JOURS | `cumulative` remettait a zero chaque seance | **comble** — `cumulative.sessions` |
+| Trading d'annonce macro | aucun canal de donnees exogene | **comble** — section `events` + noeud `event` |
+| Scalping sur carnet | le moteur est a la BARRE | **bloque**, et hors du perimetre declare |
+
+Les trois combles touchaient chacun une idee que le ledger avait ecartee.
+Aucune n'a ete rouverte : chacune remplissait la condition de reprise que le
+ledger avait ECRITE ([[lessons]] L34).
 
 Et trois reserves, qui s'ecrivent mais pas exactement :
 
@@ -74,13 +78,14 @@ scalping sur carnet n'en releve pas. Il rend aussi sans objet deux limites du
 vocabulaire qui comptaient ailleurs : une seule position nette par symbole, et
 le dimensionnement qui ne voit pas le signal.
 
-Restent, par ordre d'utilite decroissante pour ce perimetre :
+Les trois manques que ce perimetre rendait genants sont combles. **Il ne reste
+que le scalping sur carnet**, qu'une strategie a une position et a decisions a
+la barre ne demande pas.
 
-1. **le calendrier d'evenements** — sur futures intraday, FOMC et NFP font la
-   seance, et rien ne permet de les voir ;
-2. **la memoire au-dela de la seance** — `cumulative` ne franchit pas la nuit,
-   donc aucune regle ne peut reagir a une serie de mauvais jours ;
-3. **la memoire d'un niveau** — retenir un prix d'une barre a l'autre.
+Restent deux reserves, aucune bloquante ici : la taille proportionnelle au
+signal (possible en transversal, pas en mono-actif — sans objet a une position)
+et deux ancrages de seance en intra-journalier reechantillonne (refus
+delibere).
 
 ## Liens wiki
 

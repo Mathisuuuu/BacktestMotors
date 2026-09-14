@@ -1179,3 +1179,56 @@ pourquoi la garde « une perte » plafonne a quatre pertes par seance mesurees e
 P&L net, et non a une.
 
 Fonde sur [[log]] (2026-09-14) · `tests/unit/test_frontiere_de_trade.py`
+
+---
+
+## L34 -- Combler un manque sans rouvrir ce que le ledger a ferme
+
+Le recensement du 2026-09-14 laissait quatre familles intraday bloquees. Trois
+ont ete comblees le meme jour, et chacune touchait une idee que le ledger avait
+DEJA ecartee. Aucune n'a ete rouverte : chacune remplissait la condition de
+reprise que le ledger avait ecrite.
+
+**`value_when`** - la valeur d'une expression a la derniere barre ou une
+condition tenait. Le ledger ecarte depuis le 2026-09-10 les « noeuds de signaux
+a memoire interne », au motif qu'un noeud a etat survit d'un run a l'autre. Ce
+noeud ne retient rien : il RECALCULE sur une fenetre bornee, exactement comme
+`bars_since@1` qui est accepte depuis toujours. Meme borne obligatoire, meme
+arret des qu'il a trouve, meme refus de rendre une sentinelle.
+
+**`cumulative.sessions`** - franchir la nuit. Le ledger ecarte `reset: never` le
+2026-09-11, et ecrit sa condition de reprise : « jamais, **sauf borne par une
+fenetre explicite** ». `sessions: N` EST cette fenetre. Le motif du rejet - un
+cout qui depend de la position dans l'echantillon - tombe avec elle.
+
+**Le calendrier d'evenements** - ce n'etait pas au ledger, mais il posait la
+question la plus delicate : `minutes_until` lit un instant FUTUR.
+
+Ce que le troisieme a appris
+-----------------------------
+Un calendrier economique est publie a l'avance : le lire n'est pas du
+look-ahead. Mais **cette propriete appartient au FICHIER, pas au code**. Un
+calendrier reconstruit apres coup ferait entrer du futur sans qu'aucune
+inspection du socle ne le voie - c'est un angle mort que ni les tests
+adversariaux ni le test de corruption du futur ne peuvent atteindre.
+
+D'ou la forme retenue : `minutes_since` est toujours lisible, `minutes_until`
+exige que la source declare `known_in_advance: true`. **Ce n'est pas une
+garantie, c'est une affirmation signee** - elle entre dans le `config_hash` et
+engage celui qui l'ecrit.
+
+C'est un mecanisme qu'on n'avait pas encore : jusqu'ici le socle REFUSAIT ce
+qu'il ne pouvait pas verifier. Ici il ne peut pas verifier, et il ne peut pas
+refuser sans amputer une famille entiere. Il fait donc signer.
+
+Le resultat
+------------
+| | avant | apres |
+|---|---|---|
+| elements | 63/71 (88,7 %) | **67/71 (94,4 %)** |
+| familles | 21/25 (84,0 %) | **24/25 (96,0 %)** |
+
+La seule famille encore bloquee est le scalping sur CARNET, que le perimetre
+declare - une position a la fois, decisions a la barre - rend sans objet.
+
+Fonde sur [[log]] (2026-09-14) · [[reference/couverture-intraday]]

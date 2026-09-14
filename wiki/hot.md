@@ -17,7 +17,7 @@ generated: true
 | Indicateur | Valeur |
 |---|---|
 | Pages de wiki | 28 |
-| Entrees de log | 200 |
+| Entrees de log | 205 |
 | Derniere activite | 2026-09-14 |
 | Idees ecartees (ledger) | 22 |
 | Idees en attente (ledger) | 4 |
@@ -27,7 +27,7 @@ generated: true
 | Pages `reference/` | 8 |
 | Pages `research/` | 1 |
 
-**Activite par type :** note × 84, fix × 42, feat × 32, decision × 20, mesure × 10, essai × 4, experiment × 2, setup × 1, lint × 1, audit × 1, refactor × 1, perf × 1, bug × 1
+**Activite par type :** note × 85, fix × 42, feat × 35, decision × 20, mesure × 11, essai × 4, experiment × 2, setup × 1, lint × 1, audit × 1, refactor × 1, perf × 1, bug × 1
 
 ## Experiences
 
@@ -46,14 +46,14 @@ Le total des essais alimente le Deflated Sharpe : un essai non enregistre gonfle
 
 ## Derniere activite — 8 entree(s)
 
+- **2026-09-14** — note | `_moule_universel` change d'empreinte pour `value_when` ; VERIFIE terme a terme | equity, cash, ts et exposure IDENTIQUES apres realignement des 25 barres de warmup supplementaire ; trades et portefeuille identiques ; equity finale inchangee au bit pres. Le noeud `event` est EXEMPTE du moule - il exige un fichier que le depot ne peut pas embarquer, exemption documentee dans le test
+- **2026-09-14** — mesure | Couverture intraday : **63/71 -> 67/71 elements (94,4 %)** et **21/25 -> 24/25 familles (96,0 %)** | la seule famille encore bloquee est le scalping sur CARNET, que le perimetre declare rend sans objet. Recensement rejouable : `python tests/couverture/recensement_intraday.py`
+- **2026-09-14** — feat | **Calendrier d'evenements declare** : section `events` + noeud `event` (`minutes_since`, `minutes_until`, `is_now`) | fichier hache au manifeste comme les cotations. `minutes_until` lit un instant FUTUR : il exige que la source declare `known_in_advance`, affirmation qui entre au `config_hash`. Le socle ne peut pas verifier, ne peut pas refuser sans amputer une famille : il fait SIGNER. Lecon [[lessons]] L34
+- **2026-09-14** — feat | **`cumulative.sessions`** : la fenetre franchit la nuit, et reste BORNEE | le ledger ecartait `reset: never` « sauf borne par une fenetre explicite » - `sessions: N` EST cette fenetre. Debloque « reduire apres une serie de mauvais JOURS »
+- **2026-09-14** — feat | **`value_when`** : la valeur d'une expression a la derniere barre ou une condition tenait | leve la limite la plus nette du vocabulaire - `lag.bars` etant une CONSTANTE, on ne pouvait pas reculer d'un nombre de barres calcule. Debloque « ne pas rejouer le meme niveau » et la perte NETTE d'un trade. Ne retient rien : recalcule sur une fenetre bornee, comme `bars_since@1`
 - **2026-09-14** — note | Cinq verdicts « impossible » du premier jet etaient des erreurs de MON banc d'essai, pas des limites | parametre `k` au lieu de `multiplier` sur trois primitives de bandes, un compte non branche pour `account`, et un `peer` demande depuis un contexte mono-instrument. 81,7 % annonce a tort avant correction, 88,7 % apres
 - **2026-09-14** — note | Les manques sont CONCENTRES, pas disperses : quatre familles bloquees, quatre causes distinctes | retenir un prix d'une barre a l'autre ; `cumulative` qui ne franchit pas la nuit ; aucun canal de donnees exogene ; moteur a la barre. Le perimetre declare (une position a la fois) en retire une - le scalping sur carnet
 - **2026-09-14** — mesure | **Recensement de couverture intraday** : 63 elements sur 71 (88,7 %) et **21 familles de strategie sur 25 (84,0 %)** | denominateur explicite, chaque element ECRIT en JSON et evalue sur 4 680 barres. Rejouable : `python tests/couverture/recensement_intraday.py`. Page [[reference/couverture-intraday]]
-- **2026-09-14** — note | Avertissement qui subsiste : `bars_held < lag(1, bars_held)` repere une FIN DE TRADE, pas une perte | le vocabulaire ne voit ni les frais ni le prix du fill de sortie. `close < entry_price` a la derniere barre en position est une approximation, d'ou une garde « une perte » qui plafonne a quatre pertes par seance mesurees en P&L net
-- **2026-09-14** — note | Trois pistes explorees et ECARTEES avant de trouver : l'ordre du runner (correct), la borne de l'historique de position (elargie, sans effet), et `cumulative` sur `position` | ce dernier isole sur trajectoire controlee : **360/360 justes** avec le tampon vivant, a toutes les profondeurs ; le chemin de reconstruction rend `None`, jamais une valeur fausse. Le tampon est donc sain sur les sous-arbres non memoisables
-- **2026-09-14** — mesure | Avec les deux correctifs : sans garde 12 585 trades et -5,36 % ; **stop apres 1 perte 5 966 trades et +3,60 %** ; stop apres 2 pertes 8 948 trades et +6,15 % | les seances a 3 pertes ou plus tombent de 1 094 a 25. Chiffres d'une sonde, PAS un essai : la strategie sondee est un momentum jetable, aucune archive
-- **2026-09-14** — fix | **La garde « apres N pertes » mord** : la cause n'etait pas elle, c'etait le `is_last` de [[lessons]] L31 | le defaut faisait sortir et re-entrer a chaque barre, donc chaque trade durait UNE barre, donc `bars_held` valait 0 en permanence - et `bars_held < lag(1, bars_held)`, seule facon de reperer une fin de trade depuis une regle, est alors toujours faux. Le detecteur voyait **9,7 %** des fins de trade (3 995 sur 41 110). Lecon [[lessons]] L33
-- **2026-09-14** — note | L'attribution horaire n'est PAS un outil d'optimisation | retenir les heures qui gagnent est du sur-ajustement, et les tranches ne sont pas des essais independants - memes seances, memes regimes, meme strategie. L'usage legitime est de constater une MECANIQUE, pas de choisir un seuil
 
 ## Next Actions
 

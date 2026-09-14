@@ -20,6 +20,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from rsl.data.evenements import EventCalendar, charger_calendrier
 from rsl.data.instruments import get_instrument
 from rsl.data.loader import build_panel, load_bar_store
 from rsl.data.resample import CloseStamp, Period, resample
@@ -111,6 +112,18 @@ def _sans_plafonds_muets(payload: SpecDict) -> None:
     plafonds = risque.get("limits")
     if isinstance(plafonds, dict) and all(v is None for v in plafonds.values()):
         del risque["limits"]
+
+
+def _sans_calendriers_muets(payload: SpecDict) -> None:
+    """Retire `events` quand aucun calendrier n'est declare.
+
+    Meme regle que `_sans_plafonds_muets`, et meme raison : une liste vide
+    dit « aucun calendrier », ce que disait deja l'absence du champ avant
+    qu'il existe. Sans ce retrait, l'ajouter changerait les sept
+    `config_hash` archives sans qu'aucune decision n'ait bouge.
+    """
+    if not payload.get("events"):
+        payload.pop("events", None)
 
 
 def _sans_allegement_muet(payload: SpecDict) -> None:
@@ -526,6 +539,32 @@ class StrategySpec(StrictModel):
         return {"ref": self.ref, "params": dict(self.params)}
 
 
+class EventSourceSpec(StrictModel):
+    """Un calendrier d'ANNONCES declare.
+
+    Le fichier porte une colonne `ts_event` en nanosecondes UTC. Son
+    contenu est hache et entre au manifeste, comme les cotations.
+    """
+
+    name: str = Field(min_length=1, description="Nom lu par le noeud `event`")
+    path: Path = Field(description="Relatif a RSL_DATA_DIR, ou absolu")
+    known_in_advance: bool = Field(
+        default=False,
+        description=(
+            "AFFIRME que ces dates etaient publiees a l'avance. Sans cette "
+            "affirmation, `minutes_until` leve - il lit un instant futur, et "
+            "un calendrier reconstruit apres coup ferait entrer du futur sans "
+            "qu'aucune inspection du code ne le voie."
+        ),
+    )
+
+    def canonical_path(self) -> str:
+        """Meme regle que pour les cotations : relatif reste relatif."""
+        if self.path.is_absolute():
+            return str(self.path.resolve())
+        return self.path.as_posix()
+
+
 class RebalanceSpec(StrictModel):
     kind: Literal["every_row", "every_n_rows"] = "every_row"
     n: int = Field(default=1, ge=1)
@@ -560,6 +599,10 @@ class BacktestSpec(StrictModel):
     name: str = Field(min_length=1)
     initial_cash: float = Field(gt=0.0)
     data: list[DataSpec] = Field(min_length=1)
+    events: list[EventSourceSpec] = Field(
+        default_factory=list,
+        description="Calendriers d'annonces, lus par le noeud `event`",
+    )
     execution: ExecutionSpec
     strategy: StrategySpec
     risk: RiskSpec = RiskSpec()
@@ -704,6 +747,7 @@ class BacktestSpec(StrictModel):
             entry["path"] = source.canonical_path()
         _sans_plafonds_muets(payload)
         _sans_allegement_muet(payload)
+        _sans_calendriers_muets(payload)
         propre = _sans_notes(payload)
         assert isinstance(propre, dict)
         return propre
@@ -725,6 +769,24 @@ class BacktestSpec(StrictModel):
 # ---------------------------------------------------------------------------
 # Chargement des donnees
 # ---------------------------------------------------------------------------
+
+
+def load_events(spec: BacktestSpec) -> dict[str, EventCalendar]:
+    """Charge les calendriers declares, et refuse deux fois le meme nom."""
+    calendriers: dict[str, EventCalendar] = {}
+    for source in spec.events:
+        if source.name in calendriers:
+            raise ConfigurationError(
+                f"deux calendriers portent le nom '{source.name}' : le noeud "
+                f"`event` ne saurait lequel lire."
+            )
+        calendriers[source.name] = charger_calendrier(
+            resolve_data_path(source.path),
+            name=source.name,
+            known_in_advance=source.known_in_advance,
+            with_hash=spec.with_data_hash,
+        )
+    return calendriers
 
 
 def load_stores(

@@ -402,6 +402,55 @@
                   }
                 }
               }
+            },
+            {
+              "type": "compare",
+              "op": ">",
+              "note": [
+                "`value_when`, ajoute le 2026-09-14 : la valeur d'une expression a la",
+                "DERNIERE barre ou une condition etait vraie.",
+                "",
+                "Ce qu'il est seul a permettre : retenir un NIVEAU. `bars_since` disait",
+                "QUAND une condition avait ete vraie, jamais CE QUI valait alors - et",
+                "`lag.bars` etant une CONSTANTE, on ne pouvait pas reculer d'un nombre de",
+                "barres calcule. C'etait la limite la plus nette du vocabulaire.",
+                "",
+                "Sens de la regle : couvrir le short si le cours repasse au-dessus du prix",
+                "auquel le dernier croisement baissier a eu lieu - le niveau ou l'on avait",
+                "eu tort, et non un seuil fixe.",
+                "",
+                "Il ne RETIENT rien : il recalcule en remontant au plus `lookback` barres.",
+                "Ce n'est donc pas le « noeud a memoire » que le ledger ecarte."
+              ],
+              "left": {
+                "type": "price",
+                "field": "close"
+              },
+              "right": {
+                "type": "value_when",
+                "lookback": 60,
+                "when": {
+                  "type": "crosses_below",
+                  "fast": {
+                    "type": "primitive",
+                    "ref": "ema@1",
+                    "params": {
+                      "window": 9
+                    }
+                  },
+                  "slow": {
+                    "type": "primitive",
+                    "ref": "ema@1",
+                    "params": {
+                      "window": 21
+                    }
+                  }
+                },
+                "inner": {
+                  "type": "price",
+                  "field": "close"
+                }
+              }
             }
           ]
         },

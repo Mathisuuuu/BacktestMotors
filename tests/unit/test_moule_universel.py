@@ -10,6 +10,7 @@ ici, avec le nom du manquant.
 from __future__ import annotations
 
 import json
+from typing import ClassVar
 
 import pytest
 
@@ -54,10 +55,24 @@ def regles(moule: dict[str, object]) -> dict[str, object]:
 
 
 class TestCouverture:
+    HORS_MOULE: ClassVar[frozenset[str]] = frozenset({"event"})
+    """Les noeuds qu'on ne peut pas mettre dans le moule, et pourquoi.
+
+    `event` exige un CALENDRIER declare - un fichier externe, hache au
+    manifeste. Le moule est execute a chaque verification des sept empreintes ;
+    y placer un `event` exigerait que le depot embarque un calendrier, ou que
+    tout le monde en ait un au meme endroit. Le noeud leve sans, et c'est
+    voulu : le socle ne devine pas plus un calendrier d'annonces qu'une seance.
+
+    Cette exemption n'affaiblit pas la couverture : `event` est exerce par
+    `tests/unit/test_evenements.py` et par l'instance du test de schema, qui
+    verifie qu'il se construit depuis sa description publiee.
+    """
+
     def test_chaque_type_de_noeud_enregistre_est_utilise(self, moule):
         """Le message nomme les manquants : c'est ce qui rend l'echec actionnable."""
         utilises = types_utilises(regles(moule))
-        enregistres = {noeud.name for noeud in list_node_types()}
+        enregistres = {noeud.name for noeud in list_node_types()} - self.HORS_MOULE
         manquants = enregistres - utilises
         assert not manquants, (
             f"types de noeuds absents du moule universel : {sorted(manquants)}. "

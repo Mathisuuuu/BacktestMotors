@@ -237,6 +237,11 @@
           "requis": false,
           "type": "noeud"
         },
+        "sessions": {
+          "defaut": 1,
+          "min": 1,
+          "type": "entier"
+        },
         "stat": {
           "choix": [
             "sum",
@@ -252,6 +257,24 @@
         }
       },
       "resume": "Cumul d'un sous-signal DEPUIS l'ouverture de la seance courante."
+    },
+    "event": {
+      "champs": {
+        "field": {
+          "choix": [
+            "minutes_since",
+            "minutes_until",
+            "is_now"
+          ],
+          "defaut": "minutes_since",
+          "type": "choix"
+        },
+        "name": {
+          "requis": true,
+          "type": "texte"
+        }
+      },
+      "resume": "Feuille : distance a un evenement d'un calendrier DECLARE."
     },
     "if_then_else": {
       "champs": {
@@ -646,6 +669,24 @@
         }
       },
       "resume": "Feuille : un champ calendaire de la barre courante (UTC)."
+    },
+    "value_when": {
+      "champs": {
+        "inner": {
+          "requis": true,
+          "type": "noeud"
+        },
+        "lookback": {
+          "min": 1,
+          "requis": true,
+          "type": "entier"
+        },
+        "when": {
+          "requis": true,
+          "type": "noeud"
+        }
+      },
+      "resume": "Valeur d'une expression a la derniere barre ou une condition etait vraie."
     }
   },
   "primitives": {
@@ -3422,6 +3463,27 @@
         "type": "objet"
       },
       "requis": true,
+      "type": "liste"
+    },
+    "events": {
+      "element": {
+        "champs": {
+          "known_in_advance": {
+            "defaut": false,
+            "type": "booleen"
+          },
+          "name": {
+            "requis": true,
+            "type": "texte"
+          },
+          "path": {
+            "requis": true,
+            "type": "texte"
+          }
+        },
+        "requis": true,
+        "type": "objet"
+      },
       "type": "liste"
     },
     "execution": {

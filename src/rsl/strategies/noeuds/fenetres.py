@@ -612,6 +612,136 @@ class BarsSince:
         return cls(lookback, _child(spec, "inner", build))
 
 
+@signal_node(
+    "value_when",
+    summary="Valeur d'une expression a la derniere barre ou une condition etait vraie.",
+    fields=(
+        NodeField("lookback", FieldKind.INTEGER, minimum=1),
+        NodeField("when", FieldKind.NODE, description="La condition, cherchee vers le PASSE."),
+        NodeField("inner", FieldKind.NODE, description="Ce qu'on lit a cette barre-la."),
+    ),
+)
+@dataclass(frozen=True, slots=True)
+class ValueWhen:
+    """La valeur de `inner` a la derniere barre ou `when` etait vraie.
+
+    Ce qu'il debloque, et pourquoi rien d'autre ne le faisait
+    ---------------------------------------------------------
+    Le vocabulaire savait dire QUAND une condition avait ete vraie
+    (`bars_since`), mais pas CE QUI valait alors : `lag.bars` est une
+    CONSTANTE, donc on ne peut pas reculer d'un nombre de barres calcule.
+    C'etait la limite la plus nette du vocabulaire, mesuree le 2026-09-14.
+
+    Elle bloquait, entre autres :
+
+    - retenir un NIVEAU - le prix de la derniere cassure, du dernier stop
+      touche - donc « ne pas rejouer le meme niveau » ;
+    - lire l'equity du compte a la fin du trade precedent, donc la PERTE
+      NETTE d'un trade, frais compris, que `close < entry_price`
+      n'approximait que grossierement ;
+    - le plus haut du dernier sommet, l'ecart au dernier signal, et toute
+      forme d'ancrage sur un evenement passe.
+
+    Pourquoi ce n'est PAS le « noeud a memoire » ecarte au ledger
+    -------------------------------------------------------------
+    Le rejet du 2026-09-10 vise un noeud qui RETIENT un etat d'une barre a
+    l'autre, et survit donc au-dela de ce que la strategie a declare. Ce
+    noeud ne retient rien : il RECALCULE, a chaque barre, en remontant au
+    plus `lookback` barres. Deux evaluations du meme instant donnent le meme
+    resultat, et rien ne survit a un run.
+
+    C'est exactement la forme de `bars_since@1`, dont il est le frere : meme
+    borne obligatoire, meme arret des qu'il a trouve, meme refus de rendre
+    une sentinelle.
+
+    La borne est obligatoire
+    -------------------------
+    Sans elle le noeud remonterait tout l'historique : son cout dependrait
+    de la position dans l'echantillon et son warmup serait indefinissable.
+    C'est le motif qui borne `bars_since`, et il vaut ici mot pour mot.
+
+    Ce qu'il rend quand il ne trouve pas : `None`
+    ----------------------------------------------
+    Et non zero, ni la valeur courante. « Jamais vu dans la fenetre » n'est
+    pas « vu, et cela valait zero » - une sentinelle se comparerait sans
+    lever et ferait declencher des regles sur un evenement qui n'a pas eu
+    lieu ([[lessons]] L30).
+
+    Convention : la barre COURANTE compte. Si `when` est vraie maintenant,
+    c'est la valeur de maintenant qui est rendue - meme convention que
+    `bars_since`, qui rend alors zero.
+    """
+
+    NODE_TYPE: ClassVar[str] = "value_when"
+    NODE_VERSION: ClassVar[int] = 1
+
+    lookback: int
+    when: Signal
+    inner: Signal
+    _memoire_when: Memoire | None = field(default=None, compare=False, repr=False)
+    _memoire_inner: Memoire | None = field(default=None, compare=False, repr=False)
+
+    def __post_init__(self) -> None:
+        if self.lookback < 1:
+            raise ConfigurationError(
+                f"'value_when' exige un `lookback` >= 1, recu {self.lookback}. Sans "
+                f"borne, le noeud remonterait tout l'historique et son warmup serait "
+                f"indefinissable."
+            )
+        object.__setattr__(
+            self, "_memoire_when", memoire_pour(self.lookback, self.when)
+        )
+        object.__setattr__(
+            self, "_memoire_inner", memoire_pour(self.lookback, self.inner)
+        )
+
+    @property
+    def warmup_bars(self) -> int:
+        return max(self.when.warmup_bars, self.inner.warmup_bars) + self.lookback - 1
+
+    def __call__(self, ctx: Context) -> float | None:
+        # Valeur par valeur, et `inner` n'est evalue QUE sur la barre trouvee :
+        # construire les deux fenetres entieres annulerait l'arret anticipe et
+        # paierait `inner` sur des barres dont on n'a que faire.
+        for lag in range(self.lookback):
+            condition = valeur_a(self._memoire_when, self.when, ctx, lag)
+            if condition is None or isinstance(condition, Leve):
+                return None
+            if condition != FALSE:
+                trouvee = valeur_a(self._memoire_inner, self.inner, ctx, lag)
+                if trouvee is None or isinstance(trouvee, Leve):
+                    return None
+                return float(trouvee)
+        return None
+
+    def describe(self) -> SpecDict:
+        return {
+            "type": self.NODE_TYPE,
+            "version": self.NODE_VERSION,
+            "lookback": self.lookback,
+            "when": self.when.describe(),
+            "inner": self.inner.describe(),
+        }
+
+    @classmethod
+    def from_spec(cls, spec: SpecDict, build: Builder) -> Signal:
+        lookback = spec.get("lookback")
+        if not isinstance(lookback, int) or isinstance(lookback, bool):
+            raise ConfigurationError(
+                f"'value_when' exige un `lookback` entier, recu {lookback!r}"
+            )
+        return cls(
+            lookback,
+            _child(spec, "when", build),
+            _child(spec, "inner", build),
+        )
+
+
+def value_when(lookback: int, when: Signal, inner: Signal) -> ValueWhen:
+    """Raccourci : `value_when(50, condition, price("close"))`."""
+    return ValueWhen(lookback, when, inner)
+
+
 def bars_since(lookback: int, inner: Signal) -> BarsSince:
     """Raccourci : `bars_since(50, condition)`."""
     return BarsSince(lookback, inner)
@@ -763,6 +893,18 @@ def _fenetre_de_seance(
         ),
         NodeField("inner", FieldKind.NODE),
         NodeField(
+            "sessions",
+            FieldKind.INTEGER,
+            required=False,
+            default=1,
+            minimum=1,
+            description=(
+                "Nombre de seances couvertes, la courante comprise. 1 - le "
+                "defaut - cumule depuis l'ouverture du jour. Au-dela, la "
+                "fenetre franchit la nuit, et reste BORNEE."
+            ),
+        ),
+        NodeField(
             "mask",
             FieldKind.NODE,
             required=False,
@@ -830,6 +972,32 @@ class Cumulative:
 
     Verite du masque : `> 0`, comme `count_true`. Les booleens du
     vocabulaire valent 1.0 ou 0.0.
+
+    Franchir la nuit : `sessions`
+    ------------------------------
+    `sessions: N` etend la fenetre aux `N` dernieres seances, la courante
+    comprise. Elle debloque ce qu'aucune regle ne pouvait dire : reagir a
+    une serie de mauvais JOURS, compter les trades de la semaine, mesurer
+    un volume cumule sur plusieurs seances.
+
+    Pourquoi ce n'est pas le `reset: never` du ledger
+    --------------------------------------------------
+    Le ledger ecarte `reset: never` le 2026-09-11, avec un motif precis : un
+    cumul depuis l'ORIGINE remonterait tout l'historique, son cout
+    dependrait de la position dans l'echantillon et son warmup serait
+    indefinissable. Et une condition de reprise tout aussi precise :
+    **« jamais, sauf borne par une fenetre explicite »**.
+
+    `sessions: N` EST cette fenetre explicite. Le cout est borne par N
+    seances, il ne depend pas de la position dans l'echantillon, et la
+    fenetre est declaree dans la specification - donc hachee.
+
+    Ce que le warmup ne peut toujours pas dire
+    -------------------------------------------
+    Combien de barres font N seances depend des DONNEES. `warmup_bars` ne
+    declare donc que celui du sous-arbre, comme `rolling(across=sessions)`
+    et `session_lag` ; l'insuffisance se signale a l'evaluation, ou elle
+    rend `None` - jamais une valeur calculee sur une fenetre tronquee.
     """
 
     NODE_TYPE: ClassVar[str] = "cumulative"
@@ -838,6 +1006,7 @@ class Cumulative:
     stat: CumulativeStat
     inner: Signal
     mask: Signal | None = None
+    sessions: int = 1
     _memoire: Memoire | None = field(default=None, compare=False, repr=False)
     _tampon: _TamponDeSeance = field(
         default_factory=_TamponDeSeance, compare=False, repr=False
@@ -848,15 +1017,21 @@ class Cumulative:
     )
 
     def __post_init__(self) -> None:
+        if self.sessions < 1:
+            raise ConfigurationError(
+                f"'cumulative' : `sessions` doit valoir au moins 1, recu "
+                f"{self.sessions}. Zero ne designerait aucune barre."
+            )
         # Portee : une seance de barres d'une minute en compte ~1 380. Le
         # chiffre n'a pas besoin d'etre exact - il borne la memoire, il ne
         # gouverne rien. Trop petit, on perd des reprises ; trop grand, on
         # retient des barres inutiles. C'est le seul parametre approximatif du
         # mecanisme, et il ne peut pas changer un resultat.
-        object.__setattr__(self, "_memoire", memoire_pour(1_500, self.inner))
+        portee = 1_500 * self.sessions
+        object.__setattr__(self, "_memoire", memoire_pour(portee, self.inner))
         if self.mask is not None:
             object.__setattr__(
-                self, "_memoire_masque", memoire_pour(1_500, self.mask)
+                self, "_memoire_masque", memoire_pour(portee, self.mask)
             )
 
     @property
@@ -866,7 +1041,9 @@ class Cumulative:
         return max(self.inner.warmup_bars, self.mask.warmup_bars)
 
     def __call__(self, ctx: Context) -> float | None:
-        rang = int(ctx.session_value(SessionField.BAR_INDEX, 0))
+        rang = self._rang(ctx)
+        if rang is None:
+            return None
         fenetre = _fenetre_de_seance(
             self._tampon, self._memoire, self.inner, ctx, rang
         )
@@ -903,6 +1080,26 @@ class Cumulative:
             case CumulativeStat.COUNT_TRUE:
                 return float(np.count_nonzero(fenetre > 0.0))
 
+    def _rang(self, ctx: Context) -> int | None:
+        """Nombre de barres ecoulees depuis le debut de la FENETRE.
+
+        Sur une seule seance c'est le rang dans la seance, et le calcul se
+        reduit a une lecture. Sur plusieurs, il faut remonter a l'ouverture
+        de la seance la plus ancienne : `lags_de_seance` le dit en une
+        passe, et refuse plutot que de tronquer si l'echantillon ne remonte
+        pas assez loin.
+        """
+        rang = int(ctx.session_value(SessionField.BAR_INDEX, 0))
+        if self.sessions == 1:
+            return rang
+        try:
+            # Le meme rang `rang` dans la seance la plus ancienne de la
+            # fenetre ; son ouverture est `rang` barres plus tot encore.
+            (recul,) = ctx.lags_de_seance(self.sessions - 1, 1)
+        except InsufficientHistoryError:
+            return None
+        return rang + recul
+
     def describe(self) -> SpecDict:
         decrit: SpecDict = {
             "type": self.NODE_TYPE,
@@ -910,6 +1107,10 @@ class Cumulative:
             "stat": self.stat.value,
             "inner": self.inner.describe(),
         }
+        # Publie SEULEMENT quand il s'ecarte du defaut, pour la meme raison
+        # que `mask` : ne pas changer le `config_hash` des exemples archives.
+        if self.sessions != 1:
+            decrit["sessions"] = self.sessions
         # Publie SEULEMENT quand il existe : l'emettre a `null` changerait
         # le `config_hash` des sept exemples archives pour un champ qui ne
         # dit rien chez eux.
@@ -926,10 +1127,16 @@ class Cumulative:
                 f"Attendu l'un de {', '.join(s.value for s in CumulativeStat)}"
             )
         masque = spec.get("mask")
+        seances = spec.get("sessions", 1)
+        if not isinstance(seances, int) or isinstance(seances, bool):
+            raise ConfigurationError(
+                f"'cumulative' : `sessions` doit etre un entier, recu {seances!r}"
+            )
         return cls(
             CumulativeStat(brut),
             _child(spec, "inner", build),
             _child(spec, "mask", build) if masque is not None else None,
+            seances,
         )
 
 

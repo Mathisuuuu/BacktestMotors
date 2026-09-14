@@ -155,6 +155,12 @@ class TestSurfacePublique:
             # vers le passe et refuse la seance en cours, dont la longueur
             # est un fait futur tant qu'elle n'est pas close.
             "lags_de_seance",
+            # `event_value` a rejoint la surface le 2026-09-14, pour les
+            # calendriers d'annonces declares (`events`). Elle ne lit qu'un
+            # fichier DECLARE, hache au manifeste, et son seul champ qui
+            # regarde l'avenir - `minutes_until` - exige que la source affirme
+            # `known_in_advance`. Sans calendrier declare, elle LEVE.
+            "event_value",
         }
 
     def test_sans_calendrier_le_noeud_leve_au_lieu_de_deviner(self):

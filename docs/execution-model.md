@@ -231,6 +231,45 @@ de contrôle « 30 minutes après l'ouverture » est la barre qui *se ferme* à 
 minute — le choix causal correct, celle qui s'ouvre avec elle n'étant pas encore
 connue.
 
+#### Calendriers d'événements déclarés
+
+Une entrée `data` est un parquet OHLCV. Les stratégies qui se positionnent
+autour d'une annonce macro exigent un autre canal : la section `events`.
+
+```json
+"events": [{"name": "fomc", "path": "calendriers/fomc.parquet",
+            "known_in_advance": true}]
+```
+
+Le fichier porte une colonne `ts_event` en nanosecondes UTC. Son contenu est
+**haché** et entre au manifeste, comme les cotations. Une liste `events` vide
+est retirée de la forme canonique, donc n'altère pas les `config_hash`
+antérieurs.
+
+Le nœud `event` expose trois champs :
+
+| Champ | Sens | Disponible |
+|---|---|---|
+| `minutes_since` | depuis la dernière annonce | **toujours** |
+| `minutes_until` | avant la prochaine | si `known_in_advance` |
+| `is_now` | une annonce tombe sur cette barre | toujours |
+
+##### Pourquoi `minutes_until` est conditionné
+
+Il lit un instant **futur**. Ce n'est pas du look-ahead pour autant : un
+calendrier économique est publié à l'avance, et savoir que le FOMC parle à 14 h
+ne dit rien du prix qu'il fera.
+
+Mais cette propriété dépend du **fichier**, pas du socle. Un calendrier
+reconstruit après coup — dates révisées, événements ajoutés rétrospectivement —
+ferait entrer du futur sans qu'aucune inspection du code ne le voie. La source
+doit donc déclarer `known_in_advance: true`, ce qui n'est pas une garantie mais
+une **affirmation signée** : elle entre dans le `config_hash`.
+
+Convention : une annonce tombant exactement sur la clôture d'une barre
+appartient au **passé** de cette barre. La barre est close, son prix est connu,
+l'annonce a eu lieu pendant qu'elle se formait.
+
 #### Conséquence sur les panneaux
 
 Deux instruments dont les séances diffèrent n'ont **plus aucune frontière

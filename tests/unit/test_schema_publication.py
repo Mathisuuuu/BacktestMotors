@@ -118,6 +118,10 @@ class TestSchemaAcceptsRealSpecifications:
             "session": {"type": "session", "field": "high", "lag": 1},
             "cumulative": {"type": "cumulative", "stat": "sum", "inner": leaf},
             "session_lag": {"type": "session_lag", "sessions": 1, "inner": leaf},
+            "event": {"type": "event", "name": "fomc",
+                      "field": "minutes_since"},
+            "value_when": {"type": "value_when", "lookback": 10,
+                           "when": leaf, "inner": leaf},
         }
         assert set(instances) == {node.name for node in list_node_types()}
         for name, instance in instances.items():

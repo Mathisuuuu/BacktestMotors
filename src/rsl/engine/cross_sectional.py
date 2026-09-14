@@ -32,9 +32,11 @@ Un instrument peut ne pas coter a une ligne donnee (calendrier UNION, cf.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import Protocol, runtime_checkable
 
+from rsl.data.evenements import EventCalendar
 from rsl.data.feed import MultiContext, PanelFeed
 from rsl.data.schema import AccountState, Bar, InstrumentSpec, Panel
 from rsl.engine.execution import ExecutionEngine, IntrabarPriority, assert_within_bar
@@ -197,7 +199,16 @@ class CrossSectionalRunResult:
 class CrossSectionalRunner:
     """Execute une `CrossSectionalStrategy` sur un panneau multi-instruments."""
 
-    __slots__ = ("_execution", "_next_order_id", "config", "panel", "risk", "schedule", "specs")
+    __slots__ = (
+        "_execution",
+        "_next_order_id",
+        "config",
+        "events",
+        "panel",
+        "risk",
+        "schedule",
+        "specs",
+    )
 
     def __init__(
         self,
@@ -207,7 +218,9 @@ class CrossSectionalRunner:
         *,
         risk: RiskManager | None = None,
         schedule: RebalanceSchedule | None = None,
+        events: Mapping[str, EventCalendar] | None = None,
     ) -> None:
+        self.events: Mapping[str, EventCalendar] = events or {}
         missing = sorted(set(panel.symbols) - set(specs))
         if missing:
             raise ConfigurationError(f"specification manquante pour : {', '.join(missing)}")
@@ -249,6 +262,7 @@ class CrossSectionalRunner:
                 # fois sur chacun.
                 for symbole in self.panel.symbols:
                     mctx._context_of(symbole)._set_position_depth(warmup)
+                    mctx._context_of(symbole)._set_events(self.events)
                 mctx._account_history().set_initial(self.config.initial_cash)
                 # La taille des contrats, transmise depuis les specifications
                 # du run : c'est ce qui permet a une ALLOCATION de convertir

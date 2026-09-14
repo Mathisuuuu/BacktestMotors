@@ -237,6 +237,12 @@ class TestNoSampleLengthLeak:
             # connue qu'une fois finie, donc la lire serait lire le futur.
             # Les deux tests qui suivent l'attaquent sur ces deux points.
             "lags_de_seance",
+            # `event_value` a rejoint la surface le 2026-09-14, pour les
+            # calendriers d'annonces declares (`events`). Elle ne lit qu'un
+            # fichier DECLARE, hache au manifeste, et son seul champ qui
+            # regarde l'avenir - `minutes_until` - exige que la source affirme
+            # `known_in_advance`. Sans calendrier declare, elle LEVE.
+            "event_value",
         }
 
     def test_session_lags_cannot_reach_the_current_session(self, session_store: BarStore):

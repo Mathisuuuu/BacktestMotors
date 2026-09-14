@@ -15,6 +15,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import ClassVar
 
+from rsl.data.evenements import EventField
 from rsl.data.feed import Context
 from rsl.data.schema import (
     ACCOUNT_FIELDS,
@@ -535,6 +536,101 @@ def when(field: str = "weekday") -> Time:
 def peer(symbol: str, inner: Signal) -> Peer:
     """Raccourci : `peer("NQ.v.0", price("close"))`."""
     return Peer(symbol, inner)
+
+
+@signal_node(
+    "event",
+    summary="Feuille : distance a un evenement d'un calendrier DECLARE.",
+    fields=(
+        NodeField("name", FieldKind.STRING, description="Nom declare dans `events`."),
+        NodeField(
+            "field",
+            FieldKind.STRING,
+            required=False,
+            default=EventField.MINUTES_SINCE.value,
+            choices=tuple(f.value for f in EventField),
+        ),
+    ),
+)
+@dataclass(frozen=True, slots=True)
+class Event:
+    """Ce que la strategie sait d'un calendrier d'ANNONCES.
+
+    Exige une entree `events` dans la specification. Sans elle le noeud
+    leve : le socle ne devine pas plus un calendrier d'annonces qu'un
+    calendrier de seance.
+
+    Ce que chaque champ lit
+    ------------------------
+    | Champ | Sens | Disponible |
+    |---|---|---|
+    | `minutes_since` | depuis la derniere annonce | toujours |
+    | `minutes_until` | avant la prochaine | si `known_in_advance` |
+    | `is_now` | une annonce tombe sur cette barre | toujours |
+
+    Pourquoi `minutes_until` est conditionne
+    -----------------------------------------
+    Il lit un instant FUTUR. Ce n'est pas du look-ahead pour autant : un
+    calendrier economique est PUBLIE A L'AVANCE, et savoir que le FOMC parle
+    a 14 h ne dit rien du prix qu'il fera.
+
+    Mais cette propriete depend du FICHIER, pas du socle. Un calendrier
+    reconstruit apres coup - dates revisees, evenements ajoutes
+    retrospectivement - ferait entrer du futur par la porte de derriere, et
+    aucune inspection du code ne le verrait. La source doit donc declarer
+    `known_in_advance: true`, ce qui n'est pas une garantie mais une
+    AFFIRMATION signee : elle entre dans le `config_hash`.
+
+    Ce que le noeud rend quand il n'a rien a dire : `None`
+    ------------------------------------------------------
+    Aucune annonce avant la barre, ou aucune apres. Et non zero : « pas
+    d'annonce en vue » et « annonce dans zero minute » sont deux choses, et
+    les confondre ferait declencher une regle sur un evenement absent
+    ([[lessons]] L30).
+    """
+
+    NODE_TYPE: ClassVar[str] = "event"
+    NODE_VERSION: ClassVar[int] = 1
+
+    name: str
+    field: EventField = EventField.MINUTES_SINCE
+
+    def __post_init__(self) -> None:
+        if not self.name:
+            raise ConfigurationError(
+                "'event' exige un `name` non vide : celui declare dans `events`"
+            )
+
+    @property
+    def warmup_bars(self) -> int:
+        """Une barre suffit : le calendrier ne depend pas de l'historique."""
+        return 1
+
+    def __call__(self, ctx: Context) -> float | None:
+        return ctx.event_value(self.name, self.field)
+
+    def describe(self) -> SpecDict:
+        return {
+            "type": self.NODE_TYPE,
+            "version": self.NODE_VERSION,
+            "name": self.name,
+            "field": self.field.value,
+        }
+
+    @classmethod
+    def from_spec(cls, spec: SpecDict, build: Builder) -> Signal:
+        nom = spec.get("name")
+        if not isinstance(nom, str) or not nom:
+            raise ConfigurationError(
+                f"'event' exige un `name` texte non vide, recu {nom!r}"
+            )
+        brut = spec.get("field", EventField.MINUTES_SINCE.value)
+        if not isinstance(brut, str) or brut not in set(EventField):
+            raise ConfigurationError(
+                f"'event' : champ invalide {brut!r}. Attendu l'un de "
+                f"{', '.join(f.value for f in EventField)}"
+            )
+        return cls(nom, EventField(brut))
 
 
 @signal_node(

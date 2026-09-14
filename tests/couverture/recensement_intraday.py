@@ -230,9 +230,20 @@ axe("E. Etat et meta-regles", {
         CUM("count_true", TOUS(
             C("<", POS("bars_held"), LAG(1, POS("bars_held"))),
             LAG(1, C("<", P("close"), POS("entry_price"))))), K(2.0)),
-    "arret sur perte du jour (P&L NET realise)": None,
-    "ne pas rejouer le meme niveau": None,
-    "serie de pertes sur PLUSIEURS seances": None,
+    # `value_when` donne l'equity du compte a la derniere fin de trade : la
+    # perte NETTE devient lisible, frais compris.
+    "arret sur perte du jour (P&L NET realise)": C(">",
+        CPT("equity"),
+        {"type": "value_when", "lookback": 200,
+         "when": C("<", POS("bars_held"), LAG(1, POS("bars_held"))),
+         "inner": CPT("equity")}),
+    "ne pas rejouer le meme niveau": C(">", P("close"),
+        A("*", {"type": "value_when", "lookback": 200,
+                "when": C(">", P("close"), CUM("max", P("high"), mask=AVANT_30)),
+                "inner": P("close")}, K(1.002))),
+    "serie de pertes sur PLUSIEURS seances": C("<",
+        CUM("count_true", C("<", POS("bars_held"), LAG(1, POS("bars_held"))),
+            sessions=5), K(6.0)),
     "taille fonction de la force du signal": None,
     "barres depuis la derniere entree": {"type": "bars_since", "lookback": 50,
                                          "inner": C("!=", POS("quantity"), K(0.0))},
@@ -285,7 +296,10 @@ HORS_SIGNAL: dict[str, tuple[str, str]] = {
     "un autre instrument en filtre": ("OK", "noeud `peer` + panel_rules@1"),
     "carnet d'ordres / ticks": ("IMPOSSIBLE", "le moteur est a la BARRE ; item ouvert cote Nautilus"),
     "calendrier d'evenements (FOMC, NFP)": (
-        "IMPOSSIBLE", "une entree `data` est un parquet OHLCV, aucun canal exogene"),
+        "OK",
+        "section `events` + noeud `event`, 2026-09-14 ; `minutes_until` exige "
+        "que la source declare `known_in_advance`",
+    ),
     "donnees fondamentales ou de sentiment": ("IMPOSSIBLE", "meme raison"),
 }
 

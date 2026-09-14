@@ -22,7 +22,7 @@ import json
 from dataclasses import dataclass
 from pathlib import Path
 
-from rsl.config import BacktestSpec, build_panel_from, load_stores
+from rsl.config import BacktestSpec, build_panel_from, load_events, load_stores
 from rsl.data.schema import BarStore, InstrumentSpec
 from rsl.engine.cross_sectional import CrossSectionalRunner, CrossSectionalRunResult
 from rsl.engine.limites import MOTIFS as LIMIT_MOTIFS
@@ -442,6 +442,7 @@ def _run_single(
         instruments[symbol],
         spec.build_run_config(),
         risk=spec.build_risk(),
+        events=load_events(spec),
     )
     return runner.run(strategy)
 
@@ -460,5 +461,6 @@ def _run_cross_sectional(
         spec.build_run_config(),
         risk=spec.build_risk(),
         schedule=spec.rebalance.build(),
+        events=load_events(spec),
     )
     return runner.run(strategy)

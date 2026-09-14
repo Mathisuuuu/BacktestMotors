@@ -17,6 +17,7 @@ from typing import Final, Protocol, runtime_checkable
 
 import numpy as np
 
+from rsl.data.evenements import EventCalendar, EventField
 from rsl.data.schema import (
     ABSENT,
     FLAT,
@@ -338,6 +339,18 @@ class Context(Protocol):
         """
         ...
 
+    def event_value(self, name: str, field: EventField) -> float | None:
+        """Grandeur d'un calendrier d'EVENEMENTS declare.
+
+        Leve si aucun calendrier de ce nom n'est declare : le socle ne
+        devine pas de calendrier, pas plus qu'il ne devine une seance.
+
+        Rend `None` quand il n'y a rien a dire - aucun evenement avant, ou
+        aucun apres - et jamais une sentinelle : « pas d'annonce en vue »
+        et « annonce dans zero minute » ne doivent pas se confondre.
+        """
+        ...
+
     def lags_de_seance(self, depart: int, nombre: int) -> tuple[int, ...]:
         """Decalages en BARRES vers le MEME RANG dans les seances precedentes.
 
@@ -371,7 +384,14 @@ class BarContext:
     strategie n'a contourne le contrat.
     """
 
-    __slots__ = ("_account", "_i", "_peers", "_positions", "_store")
+    __slots__ = (
+        "_account",
+        "_evenements",
+        "_i",
+        "_peers",
+        "_positions",
+        "_store",
+    )
 
     def __init__(self, store: BarStore) -> None:
         self._store = store
@@ -379,6 +399,9 @@ class BarContext:
         self._positions = PositionHistory()
         self._account = AccountHistory()
         self._peers: PeerResolver | None = None
+        # Les calendriers sont PARTAGES avec les vues reculees et les
+        # pairs : ils ne dependent ni de la barre ni de l'instrument.
+        self._evenements: Mapping[str, EventCalendar] = {}
 
     # -- avancee du curseur : reserve au feed -----------------------------
 
@@ -388,6 +411,10 @@ class BarContext:
     def _seek(self, index: int) -> None:
         """Positionnement absolu, utilise par le feed multi-instruments."""
         self._i = index
+
+    def _set_events(self, calendriers: Mapping[str, EventCalendar]) -> None:
+        """Branche les calendriers declares. Reserve au chargement."""
+        self._evenements = calendriers
 
     def _set_peers(self, resolver: PeerResolver | None) -> None:
         """Branche le resolveur de pairs. Reserve au feed multi-instruments."""
@@ -581,6 +608,25 @@ class BarContext:
             )
         return read_session(index, self._require_index(0), field, lag)
 
+    def event_value(self, name: str, field: EventField) -> float | None:
+        """Lit un calendrier declare, a l'instant de CLOTURE de la barre.
+
+        A la cloture et non a l'ouverture : c'est l'instant que la barre
+        represente une fois connue, et le seul dont la strategie dispose
+        quand elle decide.
+        """
+        calendrier = self._evenements.get(name)
+        if calendrier is None:
+            connus = sorted(self._evenements) or ["aucun"]
+            raise ConfigurationError(
+                f"event : aucun calendrier '{name}' declare. Declares : "
+                f"{', '.join(connus)}. Ajouter une entree a `events` : le socle "
+                f"ne devine pas de calendrier."
+            )
+        return calendrier.valeur(
+            int(self._store.ts_close[self._require_index(0)]), field
+        )
+
     def lags_de_seance(self, depart: int, nombre: int) -> tuple[int, ...]:
         """Delegue a `lags_meme_rang`, qui porte les regles.
 
@@ -611,6 +657,7 @@ class BarContext:
         index = self._require_index(lag)
         sub = BarContext(self._store)
         sub._seek(index)
+        sub._set_events(self._evenements)
         # La vue PARTAGE l'historique de positions, et son propre curseur y
         # designe sa barre : `position` y lit donc l'etat qu'avait la position
         # a ce moment-la. Recopier l'etat courant, comme jusqu'au 2026-09-11,
