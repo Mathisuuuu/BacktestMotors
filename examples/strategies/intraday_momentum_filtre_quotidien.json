@@ -12,7 +12,7 @@
     "Aucun essai archive. Forme, pas resultat."
   ],
   "strategy": {
-    "ref": "rules@1",
+    "ref": "panel_rules@1",
     "params": {
       "quantity": 1,
       "allow_pyramiding": false,
@@ -83,7 +83,7 @@
             },
             {
               "type": "peer",
-              "symbol": "ES_D.v.0",
+              "symbol": "ES_D",
               "inner": {
                 "type": "compare",
                 "op": ">",
@@ -363,7 +363,7 @@
               "type": "not",
               "inner": {
                 "type": "peer",
-                "symbol": "ES_D.v.0",
+                "symbol": "ES_D",
                 "inner": {
                   "type": "compare",
                   "op": ">",
