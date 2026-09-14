@@ -17,7 +17,7 @@ generated: true
 | Indicateur | Valeur |
 |---|---|
 | Pages de wiki | 27 |
-| Entrees de log | 182 |
+| Entrees de log | 184 |
 | Derniere activite | 2026-09-14 |
 | Idees ecartees (ledger) | 22 |
 | Idees en attente (ledger) | 4 |
@@ -27,7 +27,7 @@ generated: true
 | Pages `reference/` | 7 |
 | Pages `research/` | 1 |
 
-**Activite par type :** note × 78, fix × 38, feat × 30, decision × 20, mesure × 5, essai × 4, experiment × 2, setup × 1, lint × 1, audit × 1, refactor × 1, perf × 1
+**Activite par type :** note × 78, fix × 39, feat × 30, decision × 20, mesure × 6, essai × 4, experiment × 2, setup × 1, lint × 1, audit × 1, refactor × 1, perf × 1
 
 ## Experiences
 
@@ -46,14 +46,14 @@ Le total des essais alimente le Deflated Sharpe : un essai non enregistre gonfle
 
 ## Derniere activite — 8 entree(s)
 
+- **2026-09-14** — mesure | Premiers chiffres des trois formes intraday sur ES, 10,5 ans, taux d'execution 100 % partout | opening range 5 min : -5,72 %, 7 639 trades. VWAP reversion 5 min : -8,96 %, 1 363 trades, hit 59,9 % et profit factor 0,92 - elle gagne souvent et perd gros. Momentum filtre par le quotidien, 15 min : +6,04 %, 2 051 trades. **Aucun essai archive** : ce sont des formes, et leurs seuils viennent de la litterature
+- **2026-09-14** — fix | Les TROIS exemples intraday tournent, apres deux corrections que seul le run pouvait reveler | (1) `rules@1` REFUSE une specification a deux instruments : une strategie qui lit un `peer` doit declarer `panel_rules@1`, meme si elle ne negocie qu'un symbole ; (2) un `alias` produit le symbole tel quel - `ES_D`, et non `ES_D.v.0`. Les deux ont leve proprement, avec le nom du probleme
 - **2026-09-14** — feat | Trois strategies intraday d'exemple : opening range, VWAP reversion, momentum filtre par le quotidien | une par famille, avec leurs reglages. Aucune n'a d'essai archive : elles servent de FORME, pas de resultat
 - **2026-09-14** — fix | L'ecriture par SENTINELLE rendait **-1e+18** sur une tranche vide, et la regle `cours > cette borne` valait vrai a chaque barre | backtest ouvrant des positions partout, sans erreur ni avertissement. Quatrieme occurrence de la famille apres L18, L25, L28 - et la pire : les trois premieres faisaient trop peu negocier, celle-ci fait negocier TROP. Lecon [[lessons]] L30
 - **2026-09-14** — feat | `cumulative.mask` : agreger sur une TRANCHE de seance, sans sentinelle | debloque l'opening range, l'etendue de la premiere heure, le VWAP d'ouverture. Equivalence verifiee au bit pres avec l'ecriture par sentinelle la ou celle-ci est juste - 249 declenchements identiques sur l'ORB de 30 minutes
 - **2026-09-14** — feat | `arith %` : une grille horaire periodique s'ecrit en TROIS noeuds au lieu de douze comparaisons | la specification Zarattini en portait quatre jeux, soit 48 noeuds pour dire « toutes les 30 minutes ». Le signe suit le diviseur, un modulo par zero rend `None`
 - **2026-09-14** — mesure | INVENTAIRE de l'intraday : 13 familles canoniques ecrites en JSON, construites et evaluees. **12 sur 13 s'ecrivaient deja** | la seule impossible etait la grille horaire periodique, faute de modulo. Deux autres n'etaient possibles que par un ARTIFICE. Le multi-horizon, lui, etait deja couvert : ES 15 min + ES quotidien avec `alias`, 100 % des lignes du panneau portent les deux series
 - **2026-09-14** — fix | L'ancienne ligne `Refus` ne couvrait que les quatre motifs de `risk.limits`, et n'etait emise que si un plafond etait DECLARE | donc muette sur exactement le cas qui comptait : Zarattini ne declarait aucun plafond et voyait 5 080 ordres refuses pour `margin`. Le detail couvre desormais TOUS les compteurs, trie du plus frequent au moins, et vit a cote du taux
-- **2026-09-14** — feat | Le resume imprime porte desormais une ligne **Execution** a cote du rendement : fills / ordres emis, taux, motifs de refus tries | et un AVERTISSEMENT sous 90 % disant que « le rendement ci-dessus ne mesure PAS la strategie declaree ». Sur le run Zarattini du 2026-09-13 : `Execution 4 fill(s) sur 5084 ordre(s) emis taux 0.1 % / Refus margin 5080`. Ferme la troisieme occurrence de la famille [[lessons]] L18 / L25 / L28
-- **2026-09-13** — note | RESERVE sur la comparaison des deux runs : les echantillons ne sont pas identiques | `min_warmup_bars` passe de 23 790 a 85 000, le warmup en seances ne pouvant pas se declarer en barres. Le run par seance porte donc sur 3 643 989 barres contre 3 705 199, soit **45 seances de moins** - environ deux mois sur 10,6 ans. L'ecart de performance est trop grand pour venir de la, mais il n'est pas mesure a echantillon egal
 
 ## Next Actions
 
