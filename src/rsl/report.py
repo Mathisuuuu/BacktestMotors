@@ -29,6 +29,11 @@ from rsl.engine.limites import MOTIFS as LIMIT_MOTIFS
 from rsl.engine.runner import RunResult, SingleAssetRunner
 from rsl.errors import ConfigurationError
 from rsl.manifest import RunManifest, apply_seed, canonical_hash
+from rsl.metrics.intraday import (
+    AttributionHoraire,
+    attribution_horaire,
+    verifier_coherence,
+)
 from rsl.metrics.performance import PerformanceMetrics, compute_performance
 from rsl.metrics.statistics import DeflatedSharpeResult, TrialLog, deflated_sharpe_ratio
 from rsl.primitives.registry import RegistrySnapshot
@@ -100,6 +105,13 @@ class BacktestReport:
     deflated_sharpe: DeflatedSharpeResult | None
     symbols: tuple[str, ...]
     cross_sectional: bool
+    attribution: AttributionHoraire | None = None
+    """Repartition des trades par heure de seance. `None` sans calendrier.
+
+    Champ a defaut plutot qu'obligatoire : un `BacktestReport` se construit
+    aussi dans les tests avec un minimum de matiere, et exiger l'attribution
+    partout aurait fait porter a chacun d'eux le chargement d'un magasin.
+    """
 
     def to_dict(self) -> SpecDict:
         return {
@@ -107,6 +119,11 @@ class BacktestReport:
             "cross_sectional": self.cross_sectional,
             "symbols": list(self.symbols),
             "result_fingerprint": self.result_fingerprint,
+            **(
+                {}
+                if self.attribution is None
+                else {"attribution_horaire": self.attribution.describe()}
+            ),
             "manifest": self.manifest.describe(),
             "specification": self.spec.canonical(),
             "metrics": self.metrics.describe(),
@@ -272,6 +289,10 @@ class BacktestReport:
             *self._lignes_d_execution(),
             rule,
         ]
+        if self.attribution is not None:
+            horaires = self.attribution.render()
+            if horaires:
+                lines.extend([*horaires, rule])
         if self.deflated_sharpe is not None:
             lines.extend([self.deflated_sharpe.render(), rule])
         lines.append(f"Empreinte    {self.result_fingerprint}")
@@ -355,6 +376,13 @@ def run_backtest_detailed(
         else None
     )
 
+    fermes = result.portfolio.closed_trades
+    attribution = attribution_horaire(fermes, stores)
+    if attribution is not None:
+        # Un tableau dont les lignes ne somment pas au total serait pire
+        # qu'absent : il aurait l'air complet.
+        verifier_coherence(attribution, len(fermes))
+
     report = BacktestReport(
         spec=spec,
         manifest=manifest,
@@ -364,6 +392,7 @@ def run_backtest_detailed(
         deflated_sharpe=deflated,
         symbols=symbols,
         cross_sectional=entry.cross_sectional,
+        attribution=attribution,
     )
     return RunArtifacts(
         report=report, result=result, stores=stores, instruments=instruments

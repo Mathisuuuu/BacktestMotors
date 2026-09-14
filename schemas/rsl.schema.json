@@ -164,6 +164,21 @@
             "$ref": "#/$defs/IntrabarPriority",
             "default": "pessimistic"
           },
+          "intraday_margin_ratio": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "maximum": 1.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Fraction de la marge initiale immobilisee, pour une strategie qui ne franchit pas la nuit. La table des instruments porte des marges OVERNIGHT ; un intraday paie une marge de JOUR, fixee par son courtier. Sans ce champ, la marge de place s'applique.",
+            "title": "Intraday Margin Ratio"
+          },
           "lag_bars": {
             "default": 1,
             "minimum": 1,

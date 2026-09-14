@@ -231,6 +231,42 @@ def bornes_de_seances(
     )
 
 
+def _premiere_apres_cloture(
+    ts_ns: IntArray, cloture: IntArray, numeros: IntArray
+) -> BoolArray:
+    """La PREMIERE barre de chaque seance a atteindre l'heure de fermeture.
+
+    Corrige le 2026-09-14. L'ecriture d'avant etait `ts_ns >= cloture`, qui
+    marque non pas la derniere barre mais TOUTES celles qui suivent la
+    fermeture - or une seance declaree court jusqu'a l'ouverture suivante, et
+    les barres d'apres-cloture lui appartiennent encore.
+
+    Mesure sur ES en 30 minutes, seance declaree 08:30-15:00 America/Chicago :
+    **90 515 barres sur 125 806 portaient `is_last`, soit 71,9 %** - trente
+    par seance de trente-huit. Une regle « sortir a la cloture » ecrite
+    `session.is_last == 1` etait donc vraie les trois quarts du temps.
+
+    Le document de reference dit « aucune barre n'est marquee derniere ce
+    jour-la » : au SINGULIER, et `is_first` ne marque bien qu'une barre. Le
+    code contredisait donc la norme, et c'est le code qui avait tort.
+
+    Ce qui ne change pas : la regle reste causale - elle ne regarde jamais la
+    barre suivante, seulement l'heure declaree - et une seance dont les
+    barres s'arretent avant la fermeture ne porte toujours AUCUN `is_last`.
+    """
+    marque: BoolArray = np.zeros(ts_ns.size, dtype=np.bool_)
+    apres = np.flatnonzero(ts_ns >= cloture)
+    if apres.size == 0:
+        return marque
+    # Parmi les barres d'apres-cloture, garder la premiere de chaque seance.
+    seances = numeros[apres]
+    premieres = np.concatenate(
+        (np.ones(1, dtype=np.bool_), seances[1:] != seances[:-1])
+    )
+    marque[apres[premieres]] = True
+    return marque
+
+
 def build_session_index(
     ts_ns: IntArray,
     open_: FloatArray,
@@ -272,7 +308,7 @@ def build_session_index(
     minutes = (ts_ns - ouverture_de_barre).astype(np.float64) / NS_PER_MINUTE
 
     is_first = bar_in_session == 0
-    is_last = ts_ns >= fermes[presents][numeros]
+    is_last = _premiere_apres_cloture(ts_ns, fermes[presents][numeros], numeros)
 
     # Agregats par seance. `reduceat` decoupe sur les debuts de seance : une
     # boucle Python ferait le meme calcul en beaucoup plus de temps.

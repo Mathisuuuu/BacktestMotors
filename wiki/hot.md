@@ -17,7 +17,7 @@ generated: true
 | Indicateur | Valeur |
 |---|---|
 | Pages de wiki | 27 |
-| Entrees de log | 188 |
+| Entrees de log | 193 |
 | Derniere activite | 2026-09-14 |
 | Idees ecartees (ledger) | 22 |
 | Idees en attente (ledger) | 4 |
@@ -27,7 +27,7 @@ generated: true
 | Pages `reference/` | 7 |
 | Pages `research/` | 1 |
 
-**Activite par type :** note × 79, fix × 39, feat × 30, decision × 20, mesure × 8, essai × 4, experiment × 2, setup × 1, lint × 1, audit × 1, refactor × 1, perf × 1, bug × 1
+**Activite par type :** note × 80, fix × 41, feat × 32, decision × 20, mesure × 8, essai × 4, experiment × 2, setup × 1, lint × 1, audit × 1, refactor × 1, perf × 1, bug × 1
 
 ## Experiences
 
@@ -46,14 +46,14 @@ Le total des essais alimente le Deflated Sharpe : un essai non enregistre gonfle
 
 ## Derniere activite — 8 entree(s)
 
+- **2026-09-14** — note | L'attribution horaire n'est PAS un outil d'optimisation | retenir les heures qui gagnent est du sur-ajustement, et les tranches ne sont pas des essais independants - memes seances, memes regimes, meme strategie. L'usage legitime est de constater une MECANIQUE, pas de choisir un seuil
+- **2026-09-14** — feat | **Attribution horaire** dans le rapport : trades, P&L net et hit par heure depuis l'ouverture declaree | premier diagnostic d'une strategie intraday, jusqu'ici inaccessible. Sur `intraday_opening_range` : -55 987 sur la tranche +2 h et -32 877 sur +4 h, gains partout ailleurs. Un garde-fou REFUSE un tableau dont les lignes ne totalisent pas les trades fermes - incomplet, il se lirait comme complet
+- **2026-09-14** — fix | **`is_last` marquait 71,9 % des barres** au lieu d'une par seance : 90 515 sur 125 806 sur ES en 30 minutes | l'ecriture etait `ts >= cloture`, vraie pour toutes les barres d'apres-cloture, qui appartiennent encore a la seance. Aucune des 7 empreintes ne bouge : elles sont toutes quotidiennes, regime ou une seance contient une barre et ou le defaut est invisible. Lecon [[lessons]] L31
+- **2026-09-14** — fix | **`bars_held` et `entry_price` decrivaient deux trades differents** ; le suivi recopie desormais la frontiere du portefeuille | `paire_es_nq` : 149 -> 33 trades, dont **121 sur 149 etaient des artefacts** d'une boucle sortie/re-entree. Empreinte de resultat changee, `config_hash` INCHANGE - la specification n'a pas bouge. Lecon [[lessons]] L32
+- **2026-09-14** — feat | **Marge de JOUR** : `execution.intraday_margin_ratio` allege la marge immobilisee | la table porte des marges OVERNIGHT (ES 17 000, NQ 27 000) qu'un intraday ne paie pas. Un RATIO declare plutot qu'une table de marges de jour : celle-ci est fixee par le COURTIER, aucun chiffre publie a recopier. Laisse a `null`, le champ est retire de la forme canonique - sans quoi les 7 `config_hash` changeaient
 - **2026-09-14** — note | Les marges declarees sont des marges OVERNIGHT (ES 17 000, NQ 27 000) | une strategie intraday paie chez un courtier une marge de jour, d'un ordre de grandeur plus faible. Tout dimensionnement intraday du depot est donc trop contraint - c'est ce qui a fait lire le run Zarattini comme une strategie perdante
 - **2026-09-14** — mesure | Consequence : « arreter apres N pertes dans la seance » n'est PAS exprimable, alors que « un seul trade par seance » l'est | le second ne demande que de compter des entrees - verifie, 12,54 -> 0,89 trade par seance. Le premier demande l'ISSUE d'un trade passe, donc sa frontiere. Deux formulations essayees (`position == 0`, puis remise a zero de `bars_held`) : aucune ne mord
 - **2026-09-14** — mesure | Ce n'est pas un cas de bord : sur un momentum ES 30 min, **30 119 barres sur 37 615 portent DEUX fills** - sortie et re-entree immediates | la position n'est observee a plat que 3 748 fois pour 33 867 trades fermes. Le portefeuille connait la frontiere entre trades ; le vocabulaire de signaux ne la voit pas
-- **2026-09-14** — bug | **`bars_held` et `entry_price` peuvent decrire DEUX TRADES DIFFERENTS** | `runner.track_positions` ne reinitialise le suivi que si la quantite est NULLE en fin de barre (`runner.py:80`). Quand la strategie sort et re-entre sur la MEME barre, la position n'est jamais observee a plat : `bars_held` continue de compter depuis l'entree d'ORIGINE tandis que `entry_price` prend le prix du trade NEUF. `high_since_entry` et `low_since_entry` gardent aussi les extremes de l'ancien. Reproduit sur 4 barres
-- **2026-09-14** — mesure | Premiers chiffres des trois formes intraday sur ES, 10,5 ans, taux d'execution 100 % partout | opening range 5 min : -5,72 %, 7 639 trades. VWAP reversion 5 min : -8,96 %, 1 363 trades, hit 59,9 % et profit factor 0,92 - elle gagne souvent et perd gros. Momentum filtre par le quotidien, 15 min : +6,04 %, 2 051 trades. **Aucun essai archive** : ce sont des formes, et leurs seuils viennent de la litterature
-- **2026-09-14** — fix | Les TROIS exemples intraday tournent, apres deux corrections que seul le run pouvait reveler | (1) `rules@1` REFUSE une specification a deux instruments : une strategie qui lit un `peer` doit declarer `panel_rules@1`, meme si elle ne negocie qu'un symbole ; (2) un `alias` produit le symbole tel quel - `ES_D`, et non `ES_D.v.0`. Les deux ont leve proprement, avec le nom du probleme
-- **2026-09-14** — feat | Trois strategies intraday d'exemple : opening range, VWAP reversion, momentum filtre par le quotidien | une par famille, avec leurs reglages. Aucune n'a d'essai archive : elles servent de FORME, pas de resultat
-- **2026-09-14** — fix | L'ecriture par SENTINELLE rendait **-1e+18** sur une tranche vide, et la regle `cours > cette borne` valait vrai a chaque barre | backtest ouvrant des positions partout, sans erreur ni avertissement. Quatrieme occurrence de la famille apres L18, L25, L28 - et la pire : les trois premieres faisaient trop peu negocier, celle-ci fait negocier TROP. Lecon [[lessons]] L30
 
 ## Next Actions
 
@@ -113,7 +113,35 @@ coexistence, et `tests/test_nautilus_coexistence.py` la garde.
       Consequence : la question « ce regime est-il hors perimetre » ne se pose
       plus, et la reecriture en C# envisagee sur la foi des 3 h est ECARTEE,
       motif chiffre au [[Failed Ideas/ledger]].
-## Intraday : ce qui est couvert, et ce qui reste (2026-09-14)
+## Intraday : les trois points faits, et le bug trouve en chemin (2026-09-14)
+
+- [x] **Marge de JOUR** (`execution.intraday_margin_ratio`). La table porte des
+      marges OVERNIGHT qu'un intraday ne paie pas. Un RATIO declare, parce que
+      la marge de jour est fixee par le COURTIER et qu'aucun chiffre publie
+      n'existe a recopier.
+- [x] **Frontiere de trade.** `bars_held` et `entry_price` decrivaient deux
+      trades differents quand la sortie et la re-entree partageaient une barre.
+      `paire_es_nq` : 149 -> 33 trades, dont **121 sur 149 etaient des
+      artefacts**. Empreinte changee, `config_hash` inchange ([[lessons]] L32).
+- [x] **Attribution horaire** dans le rapport. Sur `intraday_opening_range` :
+      -55 987 sur la tranche +2 h, -32 877 sur +4 h, gains partout ailleurs.
+      Ce n'est PAS un outil d'optimisation - voir l'en-tete du module.
+- [x] **`is_last` marquait 71,9 % des barres** au lieu d'une par seance.
+      Trouve en cherchant pourquoi une garde ne mordait pas. Invisible aux 7
+      empreintes parce qu'elles sont toutes quotidiennes, regime ou une seance
+      contient une barre ([[lessons]] L31).
+
+- [ ] **« Arreter apres N pertes dans la seance » n'est TOUJOURS pas
+      exprimable.** C'etait la motivation du point 2, et le correctif n'a pas
+      suffi. Deux formulations essayees, aucune ne mord. Ce qui reste a
+      elucider : `cumulative` sur un sous-arbre qui lit `position` est-il juste ?
+      Son tampon de seance n'a jamais ete conditionne a la memoisabilite, et
+      l'historique de position est BORNE par le `warmup_bars` declare - deux
+      pistes, aucune verifiee.
+- [ ] **Les trois exemples intraday n'ont pas ete rejoues** depuis les deux
+      correctifs. Leurs chiffres publies au log du 2026-09-14 sont ceux d'AVANT.
+
+## Intraday : inventaire d'expressivite (2026-09-14)
 
 **Inventaire MESURE**, pas suppose : 13 familles canoniques ecrites en JSON,
 construites et evaluees. **12 sur 13 s'ecrivaient deja.**

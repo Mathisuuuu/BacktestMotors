@@ -53,11 +53,15 @@ NS_PER_SECOND = 1_000_000_000
 
 @dataclass(slots=True)
 class _SinceEntry:
-    """Ce que seul le runner peut savoir : depuis quand, et jusqu'ou.
+    """Ce que seul le runner peut savoir : jusqu'ou le cours est alle.
 
-    Le portefeuille connait la quantite et le prix moyen ; il ne voit pas les
-    barres. Les extremes traverses depuis l'entree ne peuvent donc etre
-    accumules que par la boucle, barre apres barre.
+    Le portefeuille connait la quantite, le prix moyen et la barre
+    d'ouverture du trade en cours ; il ne voit pas les barres. Les extremes
+    traverses depuis l'entree ne peuvent donc etre accumules que par la
+    boucle, barre apres barre.
+
+    `opened_bar` est RECOPIE du portefeuille et non decide ici : c'est lui
+    qui fait autorite sur la frontiere entre deux trades.
     """
 
     opened_bar: int
@@ -75,15 +79,36 @@ def track_positions(
 
     Appele APRES les fills : une position ouverte a la barre `i` compte `i`
     comme sa barre d'entree, donc `bars_held = 0` sur cette barre-la.
+
+    Le suivi repart a chaque TRADE, et non a chaque passage a plat
+    ------------------------------------------------------------------
+    Jusqu'au 2026-09-14, la seule remise a zero etait `held == 0`. Quand la
+    strategie ressort et re-entre sur la MEME barre, la quantite ne passe
+    jamais par zero : le suivi n'etait pas repris, `bars_held` continuait
+    de compter depuis l'entree d'ORIGINE, et `high_since_entry` gardait les
+    extremes de l'ancien trade - pendant que `entry_price`, lu sur le
+    portefeuille, prenait le prix du trade NEUF.
+
+    Ce n'etait pas un cas de bord : mesure sur un momentum ES 30 minutes,
+    **30 119 barres sur 37 615 portaient deux fills**, et la position n'etait
+    observee a plat que 3 748 fois pour 33 867 trades fermes.
+
+    La frontiere vient desormais du portefeuille, seul a voir les fills.
+    Consequence voulue : un RETOURNEMENT direct - long vers short en un
+    fill - repart lui aussi de zero, ce qui est le comportement correct et
+    ne l'etait pas non plus.
     """
     for symbol, bar in bars.items():
         held = portfolio.quantity_of(symbol)
-        if held == 0:
+        ouverture = portfolio.opened_bar_of(symbol)
+        if held == 0 or ouverture is None:
             tracking.pop(symbol, None)
             continue
         current = tracking.get(symbol)
-        if current is None:
-            tracking[symbol] = _SinceEntry(opened_bar=index, high=bar.high, low=bar.low)
+        if current is None or current.opened_bar != ouverture:
+            tracking[symbol] = _SinceEntry(
+                opened_bar=ouverture, high=bar.high, low=bar.low
+            )
         else:
             current.high = max(current.high, bar.high)
             current.low = min(current.low, bar.low)
@@ -310,7 +335,11 @@ class SingleAssetRunner:
         warmup = max(
             strategy.warmup_bars, self.risk.warmup_bars, self.config.min_warmup_bars
         )
-        portfolio = Portfolio(self.config.initial_cash, {self.spec.symbol: self.spec})
+        portfolio = Portfolio(
+            self.config.initial_cash,
+            {self.spec.symbol: self.spec},
+            self.config.execution.margin_ratio,
+        )
         # Le sommet court depuis le DEBUT du run : c'est ce qui rend
         # `drawdown` comparable d'une barre a l'autre.
         sommet = self.config.initial_cash

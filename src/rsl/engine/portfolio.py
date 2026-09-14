@@ -80,8 +80,9 @@ class Position:
             return 0.0
         return self.quantity * spec.multiplier * (mark - self.avg_entry)
 
-    def margin(self, spec: InstrumentSpec) -> float:
-        return abs(self.quantity) * spec.initial_margin
+    def margin(self, spec: InstrumentSpec, ratio: float = 1.0) -> float:
+        """Marge immobilisee. `ratio` < 1 represente une marge de JOUR."""
+        return abs(self.quantity) * spec.initial_margin * ratio
 
 
 @dataclass(slots=True)
@@ -151,16 +152,27 @@ class Portfolio:
         "cash",
         "closed_trades",
         "initial_cash",
+        "margin_ratio",
         "positions",
         "stats",
     )
 
-    def __init__(self, initial_cash: float, specs: dict[str, InstrumentSpec]) -> None:
+    def __init__(
+        self,
+        initial_cash: float,
+        specs: dict[str, InstrumentSpec],
+        margin_ratio: float = 1.0,
+    ) -> None:
         if initial_cash <= 0.0:
             raise ConfigurationError(f"initial_cash doit etre > 0, recu {initial_cash}")
         if not specs:
             raise ConfigurationError("au moins une specification d'instrument est requise")
+        if not 0.0 < margin_ratio <= 1.0:
+            raise ConfigurationError(
+                f"margin_ratio doit etre dans ]0, 1], recu {margin_ratio}"
+            )
         self._specs = dict(specs)
+        self.margin_ratio = margin_ratio
         self.initial_cash = initial_cash
         self.cash = initial_cash
         self.positions: dict[str, Position] = {s: Position(s) for s in sorted(specs)}
@@ -262,8 +274,27 @@ class Portfolio:
         """Chemin d'attribution de P&L. Doit coincider avec `equity`."""
         return self._equity_incremental
 
+    def opened_bar_of(self, symbol: str) -> int | None:
+        """Barre d'ouverture du trade EN COURS, ou `None` s'il n'y en a pas.
+
+        Le portefeuille est seul a connaitre la frontiere entre deux
+        trades : il voit les fills, donc il sait qu'une vente suivie d'un
+        achat sur la MEME barre ferme un aller-retour et en ouvre un autre.
+        La quantite, elle, ne le dit pas - elle ne passe jamais par zero.
+
+        Publie le 2026-09-14 parce que le runner en avait besoin : sans
+        elle, `bars_held` continuait de compter depuis l'entree d'ORIGINE
+        pendant que `entry_price` prenait le prix du trade NEUF, et les
+        deux champs decrivaient des trades differents.
+        """
+        trade = self._open_trades.get(symbol)
+        return None if trade is None else trade.opened_bar
+
     def margin_required(self) -> float:
-        return sum(p.margin(self._specs[s]) for s, p in self.positions.items())
+        return sum(
+            p.margin(self._specs[s], self.margin_ratio)
+            for s, p in self.positions.items()
+        )
 
     def quantity_of(self, symbol: str) -> int:
         position = self.positions.get(symbol)

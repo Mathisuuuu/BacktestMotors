@@ -113,6 +113,28 @@ def _sans_plafonds_muets(payload: SpecDict) -> None:
         del risque["limits"]
 
 
+def _sans_allegement_muet(payload: SpecDict) -> None:
+    """Retire `execution.intraday_margin_ratio` quand il n'est pas declare.
+
+    Meme regle que `_sans_plafonds_muets`, et meme raison : `null` dit « la
+    marge de place s'applique », ce que disait deja l'absence du champ avant
+    qu'il existe. Deux runs ont recu les memes instructions ; deux hachages
+    differents pretendraient le contraire.
+
+    Verifie le 2026-09-14 : sans ce retrait, ajouter le champ changeait le
+    `config_hash` des SEPT exemples, sans qu'aucune decision n'ait bouge.
+
+    Un ratio DECLARE, meme a 1.0, reste hache - c'est une instruction, et
+    elle dit quelque chose de different de son absence : celui qui l'ecrit
+    affirme avoir considere la question.
+    """
+    execution = payload.get("execution")
+    if not isinstance(execution, dict):
+        return
+    if execution.get("intraday_margin_ratio") is None:
+        execution.pop("intraday_margin_ratio", None)
+
+
 class StrictModel(BaseModel):
     """Base commune : immuable, fermee aux champs inconnus, annotable."""
 
@@ -321,6 +343,22 @@ class ExecutionSpec(StrictModel):
     intrabar_priority: IntrabarPriority = IntrabarPriority.PESSIMISTIC
     max_fill_gap_seconds: float | None = Field(default=None, gt=0.0)
     margin_policy: MarginPolicy = MarginPolicy.REJECT
+    intraday_margin_ratio: float | None = Field(
+        default=None,
+        gt=0.0,
+        le=1.0,
+        description=(
+            "Fraction de la marge initiale immobilisee, pour une strategie "
+            "qui ne franchit pas la nuit. La table des instruments porte des "
+            "marges OVERNIGHT ; un intraday paie une marge de JOUR, fixee par "
+            "son courtier. Sans ce champ, la marge de place s'applique."
+        ),
+    )
+
+    @property
+    def margin_ratio(self) -> float:
+        """1.0 tant qu'aucun allegement intraday n'est declare."""
+        return 1.0 if self.intraday_margin_ratio is None else self.intraday_margin_ratio
 
     def build(self) -> ExecutionConfig:
         return ExecutionConfig(
@@ -334,6 +372,7 @@ class ExecutionSpec(StrictModel):
                 else timedelta(seconds=self.max_fill_gap_seconds)
             ),
             margin_policy=self.margin_policy,
+            margin_ratio=self.margin_ratio,
         )
 
 
@@ -463,6 +502,9 @@ class RiskSpec(StrictModel):
     limits: PortfolioLimitsSpec = PortfolioLimitsSpec()
 
     def build(self, margin_policy: MarginPolicy) -> RiskManager:
+        # Le ratio de marge ne passe PAS par ici : il vit sur le
+        # portefeuille, que le gestionnaire de risque interroge. Le
+        # dupliquer ouvrirait la porte a ce que les deux divergent.
         return RiskManager(
             sizing=self.sizing.build(),
             margin_policy=margin_policy,
@@ -645,7 +687,8 @@ class BacktestSpec(StrictModel):
         Un bloc `risk.limits` entierement nul est retire : voir
         `_sans_plafonds_muets`. Il ne dit rien de plus que son absence, et
         l'avoir hache aurait rendu incomparable tout run anterieur a son
-        existence.
+        existence. Meme traitement pour `execution.intraday_margin_ratio`
+        laisse a `null` (`_sans_allegement_muet`).
 
         Les `note` sont retirees a TOUTE profondeur. Sur les blocs types,
         pydantic s'en charge deja (`exclude=True`) - mais les noeuds de
@@ -660,6 +703,7 @@ class BacktestSpec(StrictModel):
         for entry, source in zip(payload["data"], self.data, strict=True):
             entry["path"] = source.canonical_path()
         _sans_plafonds_muets(payload)
+        _sans_allegement_muet(payload)
         propre = _sans_notes(payload)
         assert isinstance(propre, dict)
         return propre

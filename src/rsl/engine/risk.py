@@ -557,7 +557,12 @@ class RiskManager:
         ):
             return None
 
-        added_margin = (projected - abs(held)) * spec.initial_margin
+        # MEME ratio que le portefeuille : projeter avec la marge de place
+        # alors que le portefeuille immobilise une marge de jour refuserait
+        # des ordres que le compte peut financer.
+        added_margin = (
+            (projected - abs(held)) * spec.initial_margin * portfolio.margin_ratio
+        )
         if added_margin <= 0.0:
             return order
 

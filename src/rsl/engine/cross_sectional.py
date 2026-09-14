@@ -229,7 +229,9 @@ class CrossSectionalRunner:
         warmup = max(
             strategy.warmup_bars, self.risk.warmup_bars, self.config.min_warmup_bars
         )
-        portfolio = Portfolio(self.config.initial_cash, self.specs)
+        portfolio = Portfolio(
+            self.config.initial_cash, self.specs, self.config.execution.margin_ratio
+        )
         recorder = EquityRecorder()
         counters = CrossSectionalCounters(warmup_rows=warmup)
 

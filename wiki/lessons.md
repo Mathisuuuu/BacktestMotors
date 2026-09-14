@@ -1042,3 +1042,86 @@ d'honnetete. Un test qui fige le defaut historique garde la trace de ce qu'on
 evite - s'il devenait vert tout seul, c'est l'argument qui aurait change.
 
 Fonde sur [[log]] (2026-09-14) · `docs/execution-model.md` §1.3
+
+---
+
+## L31 -- `is_last` marquait 72 % des barres, et personne ne l'avait compte
+
+« Sortir a la cloture » est la regle qui fait qu'une strategie est INTRADAY.
+Elle s'ecrit `session.is_last == 1`. L'implementation valait
+`ts_ns >= heure_de_fermeture` - donc vrai pour TOUTES les barres suivant la
+fermeture, et non pour la derniere.
+
+Une seance declaree court jusqu'a l'ouverture suivante : les barres
+d'apres-cloture lui appartiennent encore, et elles etaient toutes marquees.
+Mesure sur ES en 30 minutes, seance 08:30-15:00 America/Chicago : **90 515
+barres sur 125 806, soit 71,9 %** - trente par seance de trente-huit.
+
+Comment il a echappe a tout le monde
+-------------------------------------
+Les sept exemples archives sont QUOTIDIENS ou mensuels. Sur du quotidien, une
+seance contient une barre : `ts >= cloture` en marque une, la bonne. Le defaut
+n'existait qu'a la granularite ou la fonctionnalite sert.
+
+**Une garantie verifiee sur le seul regime ou elle est triviale n'est pas
+verifiee.** Les 4 168 tests ne le voyaient pas, et les 7 empreintes non plus -
+elles sont restees inchangees quand le correctif est tombe.
+
+Ce que la norme disait deja
+----------------------------
+[[reference/seances]] : « aucune barre n'est marquee derniere ce jour-la ». Au
+SINGULIER. Et `is_first` ne marque bien qu'une barre. Le code contredisait la
+norme, et `CLAUDE.md` tranche ce cas : « un comportement du code qui les
+contredit est un bug du code, pas du document ». Il aurait suffi de comparer
+`is_first.sum()` et `is_last.sum()` - c'est desormais un test.
+
+L'effet combine, qui est le vrai enseignement
+----------------------------------------------
+Pris seul, ce defaut est benin : on sort trop souvent d'une position deja
+plate. Combine a une entree qui tient encore, il produit une BOUCLE - sortie et
+re-entree a chaque barre. Et cette boucle rencontrait un second defaut
+([[lessons]] L32) qui l'empechait de se voir.
+
+Sur un momentum ES 30 minutes : **37 115 trades sur 41 110 ne duraient qu'une
+barre**. Le rendement affiche etait -96,7 %, dont l'essentiel en frais et
+slippage payes a tourner en rond.
+
+Fonde sur [[log]] (2026-09-14) · `tests/unit/test_derniere_barre_de_seance.py`
+
+---
+
+## L32 -- Deux champs qui decrivent deux trades differents
+
+`track_positions` ne reinitialisait le suivi de position que sur `held == 0`.
+Quand une strategie ressort et re-entre sur la MEME barre, la quantite ne passe
+jamais par zero : `bars_held` continuait de compter depuis l'entree d'ORIGINE et
+`high_since_entry` gardait les extremes de l'ancien trade - pendant que
+`entry_price`, lu sur le portefeuille, prenait le prix du trade NEUF.
+
+Le portefeuille, lui, comptait bien deux trades. Il voit les fills ; le suivi ne
+voyait qu'une quantite.
+
+Ce que cela coutait, sur un exemple ARCHIVE
+--------------------------------------------
+`paire_es_nq` sort a `bars_held >= 40`. Une fois ce seuil franchi, `bars_held`
+ne redescendait plus : la sortie se declenchait a chaque barre et la strategie
+re-entrait aussitot.
+
+| | trades | dont 1 barre | duree mediane |
+|---|---|---|---|
+| avant | 149 | **121** | 1 |
+| apres | **33** | 0 | **41** |
+
+**121 trades sur 149 etaient des artefacts.** L'empreinte de resultat change ;
+le `config_hash`, non - la specification n'a pas bouge, c'est le moteur qui
+avait tort. C'est exactement la distinction que les deux empreintes existent
+pour rendre lisible.
+
+La regle generale
+------------------
+**Quand deux champs decrivent le meme objet, l'un d'eux doit faire autorite.**
+Ici `entry_price` venait du portefeuille et `bars_held` d'un suivi parallele qui
+redecouvrait la frontiere entre trades a sa maniere. Le correctif ne calcule pas
+mieux : il RECOPIE la frontiere de celui qui la connait.
+
+Fonde sur [[log]] (2026-09-14) · `tests/unit/test_frontiere_de_trade.py`

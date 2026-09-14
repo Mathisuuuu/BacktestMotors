@@ -173,8 +173,32 @@ class ExecutionConfig:
     intrabar_priority: IntrabarPriority = IntrabarPriority.PESSIMISTIC
     max_fill_gap: timedelta | None = None
     margin_policy: MarginPolicy = MarginPolicy.REJECT
+    margin_ratio: float = 1.0
+    """Fraction de la marge INITIALE reellement immobilisee.
+
+    `1.0` - le defaut - est la marge overnight publiee par la place,
+    celle que porte la table des instruments. Un intraday ne la paie
+    pas : son courtier lui accorde une marge de JOUR, sensiblement plus
+    faible, a charge pour lui d'etre plat a la cloture.
+
+    Pourquoi un RATIO declare plutot qu'une table de marges de jour :
+    la marge de jour est fixee par le COURTIER, pas par la place. Il
+    n'existe aucun chiffre publie a recopier, et en inventer un serait
+    exactement ce que le socle refuse - la table des marges overnight
+    porte deja un avertissement sur son caractere anachronique.
+
+    Le ratio vit dans la specification, donc dans le `config_hash` :
+    deux runs qui supposent des marges differentes ne peuvent pas se
+    confondre.
+    """
 
     def __post_init__(self) -> None:
+        if not 0.0 < self.margin_ratio <= 1.0:
+            raise ConfigurationError(
+                f"margin_ratio doit etre dans ]0, 1], recu {self.margin_ratio}. Au-dela "
+                f"de 1 il ne s'agirait plus d'un allegement intraday mais d'une marge "
+                f"PLUS lourde que celle de la place, ce qu'aucun courtier ne pratique."
+            )
         if self.execution_lag < 1:
             raise ConfigurationError(
                 f"execution_lag doit etre >= 1, recu {self.execution_lag}. Executer a la "

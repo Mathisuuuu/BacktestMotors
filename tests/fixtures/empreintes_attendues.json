@@ -22,9 +22,9 @@
   },
   "paire_es_nq.json": {
     "config_hash": "c686c31fa61e36d2b739f8dd97d183cb26a6666c55f90b27c0baead2f7680184",
-    "final_equity": 1135877.0999999861,
-    "n_trades": 149,
-    "result_fingerprint": "479348a0ff34b8e36d5ed79d26d9642573ea67d6890bf193fff2c1ca4bb86ac3",
+    "final_equity": 1145648.199999997,
+    "n_trades": 33,
+    "result_fingerprint": "15cd0935edf7bb9342a74a40ea582c29d79f9de51859e4e11a4b58220e0b92c2",
     "symbol": "ES.v.0"
   },
   "retour_moyenne_dans_tendance.json": {

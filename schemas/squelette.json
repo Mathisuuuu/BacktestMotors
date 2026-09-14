@@ -3455,6 +3455,13 @@
           "defaut": "pessimistic",
           "type": "choix"
         },
+        "intraday_margin_ratio": {
+          "accepte_null": true,
+          "defaut": null,
+          "max": 1.0,
+          "min_exclu": 0.0,
+          "type": "nombre"
+        },
         "lag_bars": {
           "defaut": 1,
           "min": 1,
