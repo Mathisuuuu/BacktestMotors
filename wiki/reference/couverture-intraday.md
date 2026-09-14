@@ -35,7 +35,8 @@ qui dit quelque chose d'utile — **les manques sont concentres**, pas disperses
 
 ## Ce qui bloque, et c'est tout
 
-Quatre familles, quatre causes distinctes, aucune redondante.
+Quatre familles, quatre causes distinctes, aucune redondante. Trois sont
+comblees depuis.
 
 | Famille | Cause | Etat |
 |---|---|---|
@@ -48,11 +49,8 @@ Les trois combles touchaient chacun une idee que le ledger avait ecartee.
 Aucune n'a ete rouverte : chacune remplissait la condition de reprise que le
 ledger avait ECRITE ([[lessons]] L34).
 
-Et trois reserves, qui s'ecrivent mais pas exactement :
+Et deux reserves, qui s'ecrivent mais pas exactement :
 
-- **arret sur perte NETTE du jour** — `close < entry_price` a la derniere barre
-  en position approxime la perte ; les FRAIS et le prix du fill de sortie sont
-  invisibles au vocabulaire ;
 - **taille fonction de la force du signal** — possible par `ranking@1` (poids
   `signal`), pas par les regles de dimensionnement de `rules@1` ;
 - **deux ancrages de seance differents** — accepte sur barres brutes, refuse en
@@ -89,6 +87,6 @@ delibere).
 
 ## Liens wiki
 
-- [[reference/vocabulaire-signaux]] — les 24 types de noeuds et 136 primitives
+- [[reference/vocabulaire-signaux]] — les 26 types de noeuds et 136 primitives
 - [[reference/seances]] — ce que le calendrier declare rend possible
 - [[Failed Ideas/ledger]] — `reset: never` y figure, avec son motif

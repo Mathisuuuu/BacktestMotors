@@ -19,7 +19,7 @@ generated: true
 | Pages de wiki | 28 |
 | Entrees de log | 205 |
 | Derniere activite | 2026-09-14 |
-| Idees ecartees (ledger) | 22 |
+| Idees ecartees (ledger) | 25 |
 | Idees en attente (ledger) | 4 |
 | Pages `Failed Ideas/` | 1 |
 | Pages `concepts/` | 6 |

@@ -28,6 +28,9 @@ autorite: schemas/signals.schema.json (engendre, ne pas editer a la main)
 | Comment prendre le plus haut des 30 PREMIERES MINUTES ? | `cumulative` avec `mask`. Jamais par une sentinelle `if_then_else(..., -1e18)` : sur une tranche vide elle rend -1e18, et la regle declenche partout ([[lessons]] L30) |
 | Comment decider toutes les N minutes ? | `arith` avec `%` : trois noeuds au lieu de N comparaisons. Attention, `minutes_from_open` parcourt 1..N et jamais 0 - une barre est horodatee a sa CLOTURE |
 | Comment filtrer l'intraday par la tendance QUOTIDIENNE ? | Deux entrees `data` sur le meme `root`, la seconde avec un `alias` et `resample: day`, plus `panel.allow_mixed_granularity`. Le filtre se lit par `peer` |
+| Comment retenir un NIVEAU - le prix de la derniere cassure ? | `value_when`. `bars_since` dit QUAND, jamais CE QUI valait alors, et `lag.bars` est une constante |
+| Comment reagir a une serie de mauvais JOURS ? | `cumulative` avec `sessions: N`. La fenetre franchit la nuit et reste bornee |
+| Comment eviter de negocier autour d'une annonce macro ? | Declarer un calendrier dans `events`, le lire avec `event`. `minutes_until` exige `known_in_advance` sur la source |
 | Wilder ou moyenne simple ? | `atr@1` / `rsi@1` sont des moyennes ARITHMETIQUES ; `atr_wilder@1` / `rsi_wilder@1` sont les variantes de Wilder. Des noms distincts, jamais des versions — voir [[lessons]] L10 |
 | Ou sont les moules de strategie descriptibles ? | [rules.py](../../src/rsl/strategies/rules.py) · [ranking.py](../../src/rsl/strategies/ranking.py) |
 | Ou branchera le futur compilateur de specifications ? | [src/rsl/pipeline.py](../../src/rsl/pipeline.py) — decrit, sans implementation |
@@ -390,8 +393,8 @@ famille.
 | Module | Ce qu'il contient |
 |---|---|
 | `contrat` | ce qu'EST un noeud : protocole `Signal`, `NodeField`, registre, `build_signal` |
-| `feuilles` | ce qui lit le monde : `price`, `primitive`, `position`, `time`, `session`, `peer`, `constant` |
-| `fenetres` | ce qui regarde plusieurs barres : `rolling`, `lag`, `session_lag`, `bars_since`, `cumulative` |
+| `feuilles` | ce qui lit le monde : `price`, `primitive`, `position`, `time`, `session`, `event`, `peer`, `constant` |
+| `fenetres` | ce qui regarde plusieurs barres : `rolling`, `lag`, `session_lag`, `bars_since`, `cumulative`, `value_when` |
 | `operateurs` | ce qui combine : `compare`, `arith`, `all_of`, `not`, `crosses_*`, `if_then_else`, `math`, `min_of`, `max_of` |
 | `raccourcis` | abreviations Python (`prim`, `const`, `price`) - pas utilisees par le chemin declaratif |
 
