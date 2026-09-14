@@ -1,6 +1,6 @@
 ---
 type: reference
-updated: 2026-09-13
+updated: 2026-09-14
 autorite: schemas/signals.schema.json (engendre, ne pas editer a la main)
 ---
 
@@ -25,6 +25,9 @@ autorite: schemas/signals.schema.json (engendre, ne pas editer a la main)
 | Comment lisser une EXPRESSION (pas un champ de prix) ? | `rolling` avec `stat: "ema"`. `primitive` est une feuille : elle ne lit que des champs de prix |
 | Comment comparer une barre a celle de MEME RANG les jours precedents ? | `rolling` avec `across: "sessions"`, pas `stride`. Un pas fixe suppose des seances de longueur egale ; sur NQ elles font 1 362 barres, 435 le vendredi. Voir [[reference/seances]] |
 | Comment reculer d'UNE SEANCE plutot que de N barres ? | `session_lag`. `lag` compte des barres et ne peut pas suivre une longueur de seance qui change |
+| Comment prendre le plus haut des 30 PREMIERES MINUTES ? | `cumulative` avec `mask`. Jamais par une sentinelle `if_then_else(..., -1e18)` : sur une tranche vide elle rend -1e18, et la regle declenche partout ([[lessons]] L30) |
+| Comment decider toutes les N minutes ? | `arith` avec `%` : trois noeuds au lieu de N comparaisons. Attention, `minutes_from_open` parcourt 1..N et jamais 0 - une barre est horodatee a sa CLOTURE |
+| Comment filtrer l'intraday par la tendance QUOTIDIENNE ? | Deux entrees `data` sur le meme `root`, la seconde avec un `alias` et `resample: day`, plus `panel.allow_mixed_granularity`. Le filtre se lit par `peer` |
 | Wilder ou moyenne simple ? | `atr@1` / `rsi@1` sont des moyennes ARITHMETIQUES ; `atr_wilder@1` / `rsi_wilder@1` sont les variantes de Wilder. Des noms distincts, jamais des versions — voir [[lessons]] L10 |
 | Ou sont les moules de strategie descriptibles ? | [rules.py](../../src/rsl/strategies/rules.py) · [ranking.py](../../src/rsl/strategies/ranking.py) |
 | Ou branchera le futur compilateur de specifications ? | [src/rsl/pipeline.py](../../src/rsl/pipeline.py) — decrit, sans implementation |

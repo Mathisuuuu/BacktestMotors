@@ -1,0 +1,582 @@
+{
+  "format": "rsl-strategy@1",
+  "name": "intraday_momentum_filtre_quotidien",
+  "note": [
+    "MOMENTUM DE SEANCE FILTRE PAR LE QUOTIDIEN - « ne jouer la hausse",
+    "intraday que si la tendance de fond est haussiere ».",
+    "",
+    "C'est l'exemple MULTI-HORIZON du depot : deux granularites de la meme",
+    "serie dans un seul panneau. Il exige les reglages qui vont avec, et",
+    "`examples/reglages/intraday_momentum_filtre_quotidien.json` les porte.",
+    "",
+    "Aucun essai archive. Forme, pas resultat."
+  ],
+  "strategy": {
+    "ref": "rules@1",
+    "params": {
+      "quantity": 1,
+      "allow_pyramiding": false,
+      "rules": {
+        "entry_long": {
+          "type": "all_of",
+          "operands": [
+            {
+              "type": "all_of",
+              "operands": [
+                {
+                  "type": "compare",
+                  "op": ">=",
+                  "left": {
+                    "type": "session",
+                    "field": "minutes_from_open",
+                    "lag": 0
+                  },
+                  "right": {
+                    "type": "constant",
+                    "value": 30.0
+                  }
+                },
+                {
+                  "type": "compare",
+                  "op": "<=",
+                  "left": {
+                    "type": "session",
+                    "field": "minutes_from_open",
+                    "lag": 0
+                  },
+                  "right": {
+                    "type": "constant",
+                    "value": 330.0
+                  }
+                },
+                {
+                  "type": "compare",
+                  "op": "==",
+                  "left": {
+                    "type": "arith",
+                    "op": "%",
+                    "left": {
+                      "type": "session",
+                      "field": "minutes_from_open",
+                      "lag": 0
+                    },
+                    "right": {
+                      "type": "constant",
+                      "value": 30.0
+                    }
+                  },
+                  "right": {
+                    "type": "constant",
+                    "value": 0.0
+                  }
+                }
+              ],
+              "note": [
+                "Grille horaire : une decision toutes les 30 minutes, de la",
+                "minute 30 a la minute 330 depuis l'ouverture DECLAREE.",
+                "",
+                "`arith %` remplace ici douze comparaisons `any_of`. Attention a la",
+                "convention : une barre est horodatee a sa CLOTURE, donc",
+                "`minutes_from_open` parcourt 1..N et jamais 0. Le point « 30 minutes",
+                "apres l'ouverture » est la barre qui SE FERME a cette minute."
+              ]
+            },
+            {
+              "type": "peer",
+              "symbol": "ES_D.v.0",
+              "inner": {
+                "type": "compare",
+                "op": ">",
+                "left": {
+                  "type": "price",
+                  "field": "close",
+                  "lag": 0
+                },
+                "right": {
+                  "type": "primitive",
+                  "ref": "sma@1",
+                  "params": {
+                    "window": 50
+                  }
+                }
+              },
+              "note": [
+                "Le filtre MULTI-HORIZON : la meme serie, agregee au QUOTIDIEN, lue",
+                "depuis le contexte intraday par `peer`.",
+                "",
+                "Comment cela tient : la seconde entree `data` porte le meme `root` ES",
+                "avec un `alias` distinct, et le panneau declare",
+                "`allow_mixed_granularity` avec `align_policy: ffill`. La derniere",
+                "cloture quotidienne CONNUE est reportee sur les barres intraday - ce",
+                "qui est causal, le report n'allant que vers l'avant.",
+                "",
+                "Mesure du 2026-09-14 : sur ES 15 min + ES quotidien, 100 % des lignes",
+                "du panneau portent les deux series."
+              ]
+            },
+            {
+              "type": "compare",
+              "op": ">",
+              "left": {
+                "type": "arith",
+                "op": "/",
+                "left": {
+                  "type": "price",
+                  "field": "close",
+                  "lag": 0
+                },
+                "right": {
+                  "type": "session",
+                  "field": "open",
+                  "lag": 0
+                }
+              },
+              "right": {
+                "type": "constant",
+                "value": 1.002
+              }
+            },
+            {
+              "type": "compare",
+              "op": ">",
+              "left": {
+                "type": "price",
+                "field": "close",
+                "lag": 0
+              },
+              "right": {
+                "type": "arith",
+                "op": "/",
+                "left": {
+                  "type": "cumulative",
+                  "stat": "sum",
+                  "inner": {
+                    "type": "arith",
+                    "op": "*",
+                    "left": {
+                      "type": "arith",
+                      "op": "/",
+                      "left": {
+                        "type": "arith",
+                        "op": "+",
+                        "left": {
+                          "type": "arith",
+                          "op": "+",
+                          "left": {
+                            "type": "price",
+                            "field": "high",
+                            "lag": 0
+                          },
+                          "right": {
+                            "type": "price",
+                            "field": "low",
+                            "lag": 0
+                          }
+                        },
+                        "right": {
+                          "type": "price",
+                          "field": "close",
+                          "lag": 0
+                        }
+                      },
+                      "right": {
+                        "type": "constant",
+                        "value": 3.0
+                      }
+                    },
+                    "right": {
+                      "type": "price",
+                      "field": "volume",
+                      "lag": 0
+                    }
+                  }
+                },
+                "right": {
+                  "type": "cumulative",
+                  "stat": "sum",
+                  "inner": {
+                    "type": "price",
+                    "field": "volume",
+                    "lag": 0
+                  }
+                },
+                "note": "VWAP ANCRE sur la seance declaree, sur le prix typique."
+              }
+            }
+          ]
+        },
+        "exit_long": {
+          "type": "any_of",
+          "operands": [
+            {
+              "type": "compare",
+              "op": "<",
+              "left": {
+                "type": "price",
+                "field": "close",
+                "lag": 0
+              },
+              "right": {
+                "type": "arith",
+                "op": "/",
+                "left": {
+                  "type": "cumulative",
+                  "stat": "sum",
+                  "inner": {
+                    "type": "arith",
+                    "op": "*",
+                    "left": {
+                      "type": "arith",
+                      "op": "/",
+                      "left": {
+                        "type": "arith",
+                        "op": "+",
+                        "left": {
+                          "type": "arith",
+                          "op": "+",
+                          "left": {
+                            "type": "price",
+                            "field": "high",
+                            "lag": 0
+                          },
+                          "right": {
+                            "type": "price",
+                            "field": "low",
+                            "lag": 0
+                          }
+                        },
+                        "right": {
+                          "type": "price",
+                          "field": "close",
+                          "lag": 0
+                        }
+                      },
+                      "right": {
+                        "type": "constant",
+                        "value": 3.0
+                      }
+                    },
+                    "right": {
+                      "type": "price",
+                      "field": "volume",
+                      "lag": 0
+                    }
+                  }
+                },
+                "right": {
+                  "type": "cumulative",
+                  "stat": "sum",
+                  "inner": {
+                    "type": "price",
+                    "field": "volume",
+                    "lag": 0
+                  }
+                },
+                "note": "VWAP ANCRE sur la seance declaree, sur le prix typique."
+              }
+            },
+            {
+              "type": "compare",
+              "op": "==",
+              "left": {
+                "type": "session",
+                "field": "is_last",
+                "lag": 0
+              },
+              "right": {
+                "type": "constant",
+                "value": 1.0
+              }
+            }
+          ],
+          "note": [
+            "Cloture forcee : aucune position ne franchit la nuit. C'est ce qui",
+            "fait d'une strategie une strategie INTRADAY, et non un swing trade",
+            "qui se trouve decider souvent."
+          ]
+        },
+        "entry_short": {
+          "type": "all_of",
+          "operands": [
+            {
+              "type": "all_of",
+              "operands": [
+                {
+                  "type": "compare",
+                  "op": ">=",
+                  "left": {
+                    "type": "session",
+                    "field": "minutes_from_open",
+                    "lag": 0
+                  },
+                  "right": {
+                    "type": "constant",
+                    "value": 30.0
+                  }
+                },
+                {
+                  "type": "compare",
+                  "op": "<=",
+                  "left": {
+                    "type": "session",
+                    "field": "minutes_from_open",
+                    "lag": 0
+                  },
+                  "right": {
+                    "type": "constant",
+                    "value": 330.0
+                  }
+                },
+                {
+                  "type": "compare",
+                  "op": "==",
+                  "left": {
+                    "type": "arith",
+                    "op": "%",
+                    "left": {
+                      "type": "session",
+                      "field": "minutes_from_open",
+                      "lag": 0
+                    },
+                    "right": {
+                      "type": "constant",
+                      "value": 30.0
+                    }
+                  },
+                  "right": {
+                    "type": "constant",
+                    "value": 0.0
+                  }
+                }
+              ],
+              "note": [
+                "Grille horaire : une decision toutes les 30 minutes, de la",
+                "minute 30 a la minute 330 depuis l'ouverture DECLAREE.",
+                "",
+                "`arith %` remplace ici douze comparaisons `any_of`. Attention a la",
+                "convention : une barre est horodatee a sa CLOTURE, donc",
+                "`minutes_from_open` parcourt 1..N et jamais 0. Le point « 30 minutes",
+                "apres l'ouverture » est la barre qui SE FERME a cette minute."
+              ]
+            },
+            {
+              "type": "not",
+              "inner": {
+                "type": "peer",
+                "symbol": "ES_D.v.0",
+                "inner": {
+                  "type": "compare",
+                  "op": ">",
+                  "left": {
+                    "type": "price",
+                    "field": "close",
+                    "lag": 0
+                  },
+                  "right": {
+                    "type": "primitive",
+                    "ref": "sma@1",
+                    "params": {
+                      "window": 50
+                    }
+                  }
+                },
+                "note": [
+                  "Le filtre MULTI-HORIZON : la meme serie, agregee au QUOTIDIEN, lue",
+                  "depuis le contexte intraday par `peer`.",
+                  "",
+                  "Comment cela tient : la seconde entree `data` porte le meme `root` ES",
+                  "avec un `alias` distinct, et le panneau declare",
+                  "`allow_mixed_granularity` avec `align_policy: ffill`. La derniere",
+                  "cloture quotidienne CONNUE est reportee sur les barres intraday - ce",
+                  "qui est causal, le report n'allant que vers l'avant.",
+                  "",
+                  "Mesure du 2026-09-14 : sur ES 15 min + ES quotidien, 100 % des lignes",
+                  "du panneau portent les deux series."
+                ]
+              }
+            },
+            {
+              "type": "compare",
+              "op": "<",
+              "left": {
+                "type": "arith",
+                "op": "/",
+                "left": {
+                  "type": "price",
+                  "field": "close",
+                  "lag": 0
+                },
+                "right": {
+                  "type": "session",
+                  "field": "open",
+                  "lag": 0
+                }
+              },
+              "right": {
+                "type": "constant",
+                "value": 0.998
+              }
+            },
+            {
+              "type": "compare",
+              "op": "<",
+              "left": {
+                "type": "price",
+                "field": "close",
+                "lag": 0
+              },
+              "right": {
+                "type": "arith",
+                "op": "/",
+                "left": {
+                  "type": "cumulative",
+                  "stat": "sum",
+                  "inner": {
+                    "type": "arith",
+                    "op": "*",
+                    "left": {
+                      "type": "arith",
+                      "op": "/",
+                      "left": {
+                        "type": "arith",
+                        "op": "+",
+                        "left": {
+                          "type": "arith",
+                          "op": "+",
+                          "left": {
+                            "type": "price",
+                            "field": "high",
+                            "lag": 0
+                          },
+                          "right": {
+                            "type": "price",
+                            "field": "low",
+                            "lag": 0
+                          }
+                        },
+                        "right": {
+                          "type": "price",
+                          "field": "close",
+                          "lag": 0
+                        }
+                      },
+                      "right": {
+                        "type": "constant",
+                        "value": 3.0
+                      }
+                    },
+                    "right": {
+                      "type": "price",
+                      "field": "volume",
+                      "lag": 0
+                    }
+                  }
+                },
+                "right": {
+                  "type": "cumulative",
+                  "stat": "sum",
+                  "inner": {
+                    "type": "price",
+                    "field": "volume",
+                    "lag": 0
+                  }
+                },
+                "note": "VWAP ANCRE sur la seance declaree, sur le prix typique."
+              }
+            }
+          ]
+        },
+        "exit_short": {
+          "type": "any_of",
+          "operands": [
+            {
+              "type": "compare",
+              "op": ">",
+              "left": {
+                "type": "price",
+                "field": "close",
+                "lag": 0
+              },
+              "right": {
+                "type": "arith",
+                "op": "/",
+                "left": {
+                  "type": "cumulative",
+                  "stat": "sum",
+                  "inner": {
+                    "type": "arith",
+                    "op": "*",
+                    "left": {
+                      "type": "arith",
+                      "op": "/",
+                      "left": {
+                        "type": "arith",
+                        "op": "+",
+                        "left": {
+                          "type": "arith",
+                          "op": "+",
+                          "left": {
+                            "type": "price",
+                            "field": "high",
+                            "lag": 0
+                          },
+                          "right": {
+                            "type": "price",
+                            "field": "low",
+                            "lag": 0
+                          }
+                        },
+                        "right": {
+                          "type": "price",
+                          "field": "close",
+                          "lag": 0
+                        }
+                      },
+                      "right": {
+                        "type": "constant",
+                        "value": 3.0
+                      }
+                    },
+                    "right": {
+                      "type": "price",
+                      "field": "volume",
+                      "lag": 0
+                    }
+                  }
+                },
+                "right": {
+                  "type": "cumulative",
+                  "stat": "sum",
+                  "inner": {
+                    "type": "price",
+                    "field": "volume",
+                    "lag": 0
+                  }
+                },
+                "note": "VWAP ANCRE sur la seance declaree, sur le prix typique."
+              }
+            },
+            {
+              "type": "compare",
+              "op": "==",
+              "left": {
+                "type": "session",
+                "field": "is_last",
+                "lag": 0
+              },
+              "right": {
+                "type": "constant",
+                "value": 1.0
+              }
+            }
+          ],
+          "note": [
+            "Cloture forcee : aucune position ne franchit la nuit. C'est ce qui",
+            "fait d'une strategie une strategie INTRADAY, et non un swing trade",
+            "qui se trouve decider souvent."
+          ]
+        }
+      }
+    }
+  }
+}

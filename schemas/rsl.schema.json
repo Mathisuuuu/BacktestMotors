@@ -1130,7 +1130,8 @@
                   "+",
                   "-",
                   "*",
-                  "/"
+                  "/",
+                  "%"
                 ],
                 "type": "string"
               },
@@ -1370,6 +1371,10 @@
             "properties": {
               "inner": {
                 "$ref": "#/$defs/node"
+              },
+              "mask": {
+                "$ref": "#/$defs/node",
+                "description": "N'agrege que les barres de la seance ou ce sous-signal est vrai (> 0). Rend `None` si aucune ne l'est - jamais une valeur de remplacement."
               },
               "note": {
                 "description": "Commentaire libre, ignore par le moteur. Une liste vaut plusieurs lignes.",

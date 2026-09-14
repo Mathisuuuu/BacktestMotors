@@ -140,7 +140,8 @@
             "+",
             "-",
             "*",
-            "/"
+            "/",
+            "%"
           ],
           "requis": true,
           "type": "choix"
@@ -230,6 +231,10 @@
       "champs": {
         "inner": {
           "requis": true,
+          "type": "noeud"
+        },
+        "mask": {
+          "requis": false,
           "type": "noeud"
         },
         "stat": {

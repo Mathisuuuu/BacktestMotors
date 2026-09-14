@@ -1,0 +1,65 @@
+{
+  "note": [
+    "MULTI-HORIZON : la meme serie ES a deux granularites.",
+    "",
+    "`alias` est ce qui rend la seconde entree possible - sans lui, les deux",
+    "porteraient le symbole ES.v.0 et la validation refuserait.",
+    "`allow_mixed_granularity` doit etre declare EXPLICITEMENT : melanger des",
+    "granularites dans un classement transversal comparerait des rendements",
+    "de natures differentes.",
+    "",
+    "`max_ffill_bars: 200` borne le report : au-dela, la serie quotidienne",
+    "est reputee absente plutot que reportee indefiniment."
+  ],
+  "initial_cash": 500000.0,
+  "seed": 0,
+  "liquidate_at_end": true,
+  "check_invariant": true,
+  "with_data_hash": true,
+  "min_warmup_bars": 8000,
+  "data": [
+    {
+      "root": "ES",
+      "path": "indices/ES_v0_1m.parquet",
+      "granularity_minutes": 1,
+      "resample": "15min",
+      "resample_min_bars": 5,
+      "session": {
+        "start": "08:30",
+        "end": "15:00",
+        "timezone": "America/Chicago"
+      }
+    },
+    {
+      "root": "ES",
+      "path": "indices/ES_v0_1m.parquet",
+      "granularity_minutes": 1,
+      "resample": "day",
+      "resample_min_bars": 200,
+      "alias": "ES_D"
+    }
+  ],
+  "execution": {
+    "fees": {
+      "kind": "per_contract"
+    },
+    "slippage": {
+      "kind": "tick",
+      "ticks": 0.5
+    },
+    "lag_bars": 1,
+    "intrabar_priority": "pessimistic",
+    "margin_policy": "reject"
+  },
+  "risk": {
+    "sizing": {
+      "kind": "fixed",
+      "contracts": 1
+    }
+  },
+  "panel": {
+    "align_policy": "ffill",
+    "max_ffill_bars": 200,
+    "allow_mixed_granularity": true
+  }
+}

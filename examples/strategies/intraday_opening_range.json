@@ -1,0 +1,343 @@
+{
+  "format": "rsl-strategy@1",
+  "name": "intraday_opening_range",
+  "note": [
+    "OPENING RANGE BREAKOUT - la famille intraday la plus ancienne.",
+    "",
+    "L'etendue des trente premieres minutes sert de bande ; on suit la",
+    "cassure, et on sort au retour sous le VWAP ancre ou a la cloture.",
+    "",
+    "Ce que cet exemple montre du vocabulaire : `cumulative.mask`, qui",
+    "agrege sur une TRANCHE de seance sans sentinelle.",
+    "",
+    "Ce qu'il ne pretend pas etre : une strategie qu'on a validee. Aucun",
+    "essai n'est archive pour elle, et ses seuils - 30 minutes, la borne",
+    "a 330 - sont les valeurs usuelles de la litterature, pas un choix",
+    "mesure. Elle sert de FORME, pas de resultat."
+  ],
+  "strategy": {
+    "ref": "rules@1",
+    "params": {
+      "quantity": 1,
+      "allow_pyramiding": false,
+      "rules": {
+        "entry_long": {
+          "type": "all_of",
+          "operands": [
+            {
+              "type": "compare",
+              "op": ">",
+              "left": {
+                "type": "session",
+                "field": "minutes_from_open",
+                "lag": 0
+              },
+              "right": {
+                "type": "constant",
+                "value": 30.0
+              }
+            },
+            {
+              "type": "compare",
+              "op": "<",
+              "left": {
+                "type": "session",
+                "field": "minutes_from_open",
+                "lag": 0
+              },
+              "right": {
+                "type": "constant",
+                "value": 330.0
+              }
+            },
+            {
+              "type": "compare",
+              "op": ">",
+              "left": {
+                "type": "price",
+                "field": "close",
+                "lag": 0
+              },
+              "right": {
+                "type": "cumulative",
+                "stat": "max",
+                "inner": {
+                  "type": "price",
+                  "field": "high",
+                  "lag": 0
+                },
+                "mask": {
+                  "type": "compare",
+                  "op": "<=",
+                  "left": {
+                    "type": "session",
+                    "field": "minutes_from_open",
+                    "lag": 0
+                  },
+                  "right": {
+                    "type": "constant",
+                    "value": 30.0
+                  }
+                },
+                "note": [
+                  "Extremum des 30 premieres minutes de la seance.",
+                  "Le `mask` n'agrege que les barres ou il est vrai, et rend `None` si",
+                  "aucune ne l'est - la ou l'ecriture par sentinelle rendait -1e18 et",
+                  "faisait declencher la regle partout (lecon L30)."
+                ]
+              }
+            }
+          ]
+        },
+        "exit_long": {
+          "type": "any_of",
+          "operands": [
+            {
+              "type": "compare",
+              "op": "<",
+              "left": {
+                "type": "price",
+                "field": "close",
+                "lag": 0
+              },
+              "right": {
+                "type": "arith",
+                "op": "/",
+                "left": {
+                  "type": "cumulative",
+                  "stat": "sum",
+                  "inner": {
+                    "type": "arith",
+                    "op": "*",
+                    "left": {
+                      "type": "arith",
+                      "op": "/",
+                      "left": {
+                        "type": "arith",
+                        "op": "+",
+                        "left": {
+                          "type": "arith",
+                          "op": "+",
+                          "left": {
+                            "type": "price",
+                            "field": "high",
+                            "lag": 0
+                          },
+                          "right": {
+                            "type": "price",
+                            "field": "low",
+                            "lag": 0
+                          }
+                        },
+                        "right": {
+                          "type": "price",
+                          "field": "close",
+                          "lag": 0
+                        }
+                      },
+                      "right": {
+                        "type": "constant",
+                        "value": 3.0
+                      }
+                    },
+                    "right": {
+                      "type": "price",
+                      "field": "volume",
+                      "lag": 0
+                    }
+                  }
+                },
+                "right": {
+                  "type": "cumulative",
+                  "stat": "sum",
+                  "inner": {
+                    "type": "price",
+                    "field": "volume",
+                    "lag": 0
+                  }
+                },
+                "note": "VWAP ANCRE sur la seance declaree, sur le prix typique."
+              }
+            },
+            {
+              "type": "compare",
+              "op": "==",
+              "left": {
+                "type": "session",
+                "field": "is_last",
+                "lag": 0
+              },
+              "right": {
+                "type": "constant",
+                "value": 1.0
+              }
+            }
+          ],
+          "note": [
+            "Cloture forcee : aucune position ne franchit la nuit. C'est ce qui",
+            "fait d'une strategie une strategie INTRADAY, et non un swing trade",
+            "qui se trouve decider souvent."
+          ]
+        },
+        "entry_short": {
+          "type": "all_of",
+          "operands": [
+            {
+              "type": "compare",
+              "op": ">",
+              "left": {
+                "type": "session",
+                "field": "minutes_from_open",
+                "lag": 0
+              },
+              "right": {
+                "type": "constant",
+                "value": 30.0
+              }
+            },
+            {
+              "type": "compare",
+              "op": "<",
+              "left": {
+                "type": "session",
+                "field": "minutes_from_open",
+                "lag": 0
+              },
+              "right": {
+                "type": "constant",
+                "value": 330.0
+              }
+            },
+            {
+              "type": "compare",
+              "op": "<",
+              "left": {
+                "type": "price",
+                "field": "close",
+                "lag": 0
+              },
+              "right": {
+                "type": "cumulative",
+                "stat": "min",
+                "inner": {
+                  "type": "price",
+                  "field": "low",
+                  "lag": 0
+                },
+                "mask": {
+                  "type": "compare",
+                  "op": "<=",
+                  "left": {
+                    "type": "session",
+                    "field": "minutes_from_open",
+                    "lag": 0
+                  },
+                  "right": {
+                    "type": "constant",
+                    "value": 30.0
+                  }
+                },
+                "note": [
+                  "Extremum des 30 premieres minutes de la seance.",
+                  "Le `mask` n'agrege que les barres ou il est vrai, et rend `None` si",
+                  "aucune ne l'est - la ou l'ecriture par sentinelle rendait -1e18 et",
+                  "faisait declencher la regle partout (lecon L30)."
+                ]
+              }
+            }
+          ]
+        },
+        "exit_short": {
+          "type": "any_of",
+          "operands": [
+            {
+              "type": "compare",
+              "op": ">",
+              "left": {
+                "type": "price",
+                "field": "close",
+                "lag": 0
+              },
+              "right": {
+                "type": "arith",
+                "op": "/",
+                "left": {
+                  "type": "cumulative",
+                  "stat": "sum",
+                  "inner": {
+                    "type": "arith",
+                    "op": "*",
+                    "left": {
+                      "type": "arith",
+                      "op": "/",
+                      "left": {
+                        "type": "arith",
+                        "op": "+",
+                        "left": {
+                          "type": "arith",
+                          "op": "+",
+                          "left": {
+                            "type": "price",
+                            "field": "high",
+                            "lag": 0
+                          },
+                          "right": {
+                            "type": "price",
+                            "field": "low",
+                            "lag": 0
+                          }
+                        },
+                        "right": {
+                          "type": "price",
+                          "field": "close",
+                          "lag": 0
+                        }
+                      },
+                      "right": {
+                        "type": "constant",
+                        "value": 3.0
+                      }
+                    },
+                    "right": {
+                      "type": "price",
+                      "field": "volume",
+                      "lag": 0
+                    }
+                  }
+                },
+                "right": {
+                  "type": "cumulative",
+                  "stat": "sum",
+                  "inner": {
+                    "type": "price",
+                    "field": "volume",
+                    "lag": 0
+                  }
+                },
+                "note": "VWAP ANCRE sur la seance declaree, sur le prix typique."
+              }
+            },
+            {
+              "type": "compare",
+              "op": "==",
+              "left": {
+                "type": "session",
+                "field": "is_last",
+                "lag": 0
+              },
+              "right": {
+                "type": "constant",
+                "value": 1.0
+              }
+            }
+          ],
+          "note": [
+            "Cloture forcee : aucune position ne franchit la nuit. C'est ce qui",
+            "fait d'une strategie une strategie INTRADAY, et non un swing trade",
+            "qui se trouve decider souvent."
+          ]
+        }
+      }
+    }
+  }
+}

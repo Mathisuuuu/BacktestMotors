@@ -1,6 +1,6 @@
 ---
 type: hub
-updated: 2026-09-13
+updated: 2026-09-14
 generated: true
 ---
 
@@ -10,15 +10,15 @@ generated: true
 > Produit par [`wiki/update_hot.py`](update_hot.py), relance par le hook
 > `Stop` a chaque fin de session. Toute modification hors du bloc
 > **Next Actions** sera ecrasee sans avertissement.
-> Derniere generation : 2026-09-13.
+> Derniere generation : 2026-09-14.
 
 ## Current State
 
 | Indicateur | Valeur |
 |---|---|
 | Pages de wiki | 27 |
-| Entrees de log | 175 |
-| Derniere activite | 2026-09-13 |
+| Entrees de log | 182 |
+| Derniere activite | 2026-09-14 |
 | Idees ecartees (ledger) | 22 |
 | Idees en attente (ledger) | 4 |
 | Pages `Failed Ideas/` | 1 |
@@ -27,7 +27,7 @@ generated: true
 | Pages `reference/` | 7 |
 | Pages `research/` | 1 |
 
-**Activite par type :** note × 78, fix × 36, feat × 26, decision × 20, essai × 4, mesure × 4, experiment × 2, setup × 1, lint × 1, audit × 1, refactor × 1, perf × 1
+**Activite par type :** note × 78, fix × 38, feat × 30, decision × 20, mesure × 5, essai × 4, experiment × 2, setup × 1, lint × 1, audit × 1, refactor × 1, perf × 1
 
 ## Experiences
 
@@ -46,14 +46,14 @@ Le total des essais alimente le Deflated Sharpe : un essai non enregistre gonfle
 
 ## Derniere activite — 8 entree(s)
 
+- **2026-09-14** — feat | Trois strategies intraday d'exemple : opening range, VWAP reversion, momentum filtre par le quotidien | une par famille, avec leurs reglages. Aucune n'a d'essai archive : elles servent de FORME, pas de resultat
+- **2026-09-14** — fix | L'ecriture par SENTINELLE rendait **-1e+18** sur une tranche vide, et la regle `cours > cette borne` valait vrai a chaque barre | backtest ouvrant des positions partout, sans erreur ni avertissement. Quatrieme occurrence de la famille apres L18, L25, L28 - et la pire : les trois premieres faisaient trop peu negocier, celle-ci fait negocier TROP. Lecon [[lessons]] L30
+- **2026-09-14** — feat | `cumulative.mask` : agreger sur une TRANCHE de seance, sans sentinelle | debloque l'opening range, l'etendue de la premiere heure, le VWAP d'ouverture. Equivalence verifiee au bit pres avec l'ecriture par sentinelle la ou celle-ci est juste - 249 declenchements identiques sur l'ORB de 30 minutes
+- **2026-09-14** — feat | `arith %` : une grille horaire periodique s'ecrit en TROIS noeuds au lieu de douze comparaisons | la specification Zarattini en portait quatre jeux, soit 48 noeuds pour dire « toutes les 30 minutes ». Le signe suit le diviseur, un modulo par zero rend `None`
+- **2026-09-14** — mesure | INVENTAIRE de l'intraday : 13 familles canoniques ecrites en JSON, construites et evaluees. **12 sur 13 s'ecrivaient deja** | la seule impossible etait la grille horaire periodique, faute de modulo. Deux autres n'etaient possibles que par un ARTIFICE. Le multi-horizon, lui, etait deja couvert : ES 15 min + ES quotidien avec `alias`, 100 % des lignes du panneau portent les deux series
+- **2026-09-14** — fix | L'ancienne ligne `Refus` ne couvrait que les quatre motifs de `risk.limits`, et n'etait emise que si un plafond etait DECLARE | donc muette sur exactement le cas qui comptait : Zarattini ne declarait aucun plafond et voyait 5 080 ordres refuses pour `margin`. Le detail couvre desormais TOUS les compteurs, trie du plus frequent au moins, et vit a cote du taux
+- **2026-09-14** — feat | Le resume imprime porte desormais une ligne **Execution** a cote du rendement : fills / ordres emis, taux, motifs de refus tries | et un AVERTISSEMENT sous 90 % disant que « le rendement ci-dessus ne mesure PAS la strategie declaree ». Sur le run Zarattini du 2026-09-13 : `Execution 4 fill(s) sur 5084 ordre(s) emis taux 0.1 % / Refus margin 5080`. Ferme la troisieme occurrence de la famille [[lessons]] L18 / L25 / L28
 - **2026-09-13** — note | RESERVE sur la comparaison des deux runs : les echantillons ne sont pas identiques | `min_warmup_bars` passe de 23 790 a 85 000, le warmup en seances ne pouvant pas se declarer en barres. Le run par seance porte donc sur 3 643 989 barres contre 3 705 199, soit **45 seances de moins** - environ deux mois sur 10,6 ans. L'ecart de performance est trop grand pour venir de la, mais il n'est pas mesure a echantillon egal
-- **2026-09-13** — note | Le +256,80 % ne passe toujours PAS le compteur d'essais : DSR **0,6148** contre 496 essais, non significatif | le Sharpe par periode (0,0715) depasse desormais le maximum attendu sous H0 (0,0668), ce qui n'etait pas le cas avant - DSR 0,1107 pour la version a `stride`. Corriger sigma a donc rapproche la strategie du seuil sans le franchir. Essai archive, registre a 496
-- **2026-09-13** — mesure | Zarattini a sigma ancre sur la SEANCE : **+256,80 %** contre +111,53 % avec `stride: 390`, Sharpe 1,26 contre 0,83 | 2 067 trades contre 1 241, exposition 11,98 % contre 4,51 %, zero rejet des deux cotes. Mecanisme : le nouveau sigma est PLUS PETIT dans 82,5 % des cas (mediane -25,4 %), l'ancien echantillonnant des barres de NUIT dont le rendement depuis l'ouverture a derive toute la seance. Bandes plus etroites, donc plus de cassures
-- **2026-09-13** — note | `_moule_universel` change d'empreinte, et c'est VOULU : il doit montrer chaque type de noeud | verifie terme a terme avant d'accepter - `equity`, `cash`, `exposure`, `trades` et `portfolio` sont bit-identiques ; seuls bougent les `order_id` et deux compteurs, le nouveau terme d'`exit_short` emettant 12 ordres ecartes faute de position a fermer. Effet economique NUL. Les six autres empreintes sont inchangees
-- **2026-09-13** — note | Choix assume : une seance ECOURTEE fait rendre `None` a la fenetre, sans substitution de barre voisine | substituer comparerait 15 h 59 d'un jour plein a 13 h 00 d'un demi-jour - le desalignement silencieux que ces formes existent pour supprimer. Mesure : 33 % des barres gardent une fenetre complete sur NQ, **88 % aux douze points de controle**. Une politique DECLAREE de moyennage sur les seances disponibles reste ouverte, faute d'un cas ou les 12 % changent une conclusion
-- **2026-09-13** — fix | La note « 3,4 % d'approximation » de la specification Zarattini etait fausse sur ses TROIS affirmations | les cotations NQ portent 1 362 barres par jour et non 390, donc le `stride: 390` ne tombait JAMAIS sur le rang voulu ; les seances courtes ne sont pas 94 accidents mais **les vendredis** (435 barres), une semaine sur une sur dix ans. Reecrit, `sigma[tau]` differe de l'ancien a **100 %** des points de controle, de **28,3 % en mediane** et jusqu'a 94,7 %. Lecon [[lessons]] L29
-- **2026-09-13** — feat | Les fenetres savent compter en SEANCES : `rolling.across: "sessions"` et le noeud `session_lag` | adosses au calendrier DECLARE, ils retrouvent le meme RANG dans les seances precedentes la ou `stride` comptait des barres. Reprise de la ligne du [[Failed Ideas/ledger]] du 2026-09-11, dont les deux conditions etaient remplies. 24 types de noeuds, 4190 tests, `ruff` et `mypy --strict` propres
-- **2026-09-13** — note | Le +111,53 % n'est PAS significatif : DSR 0,9981 -> **0,1107** une fois compte contre les 495 essais du registre | le Sharpe observe par periode (0,0469) est INFERIEUR au maximum attendu sous H0 (0,0667). Le rapport publiait 0,9981 parce que le run avait ete lance sans `--archive`, donc contre un seul essai. Les deux runs sont desormais au registre, le rate y compris. Essai : [[experiments/zarattini-nq-intraday-60-30]]
 
 ## Next Actions
 
@@ -113,15 +113,60 @@ coexistence, et `tests/test_nautilus_coexistence.py` la garde.
       Consequence : la question « ce regime est-il hors perimetre » ne se pose
       plus, et la reecriture en C# envisagee sur la foi des 3 h est ECARTEE,
       motif chiffre au [[Failed Ideas/ledger]].
-- [ ] **Afficher le taux de REJET a cote du rendement.** Le run Zarattini rend
-      -25,62 % avec 2 trades parce que **5 080 ordres sur 5 084 sont refuses
-      pour marge** - `vol_target` sature a 4 contrats NQ, soit 108 000 de marge
-      sur un compte de 100 000. Le chiffre est dans le JSON
-      (`risk_stats.n_rejected_margin`) et NULLE PART dans le resume imprime, si
-      bien qu'un backtest empeche se lit comme une strategie perdante
-      ([[lessons]] L28, troisieme occurrence apres L18 et L25).
-      A trancher : seuil d'alerte, ou affichage systematique du ratio
-      `n_fills / n_orders_submitted` ?
+## Intraday : ce qui est couvert, et ce qui reste (2026-09-14)
+
+**Inventaire MESURE**, pas suppose : 13 familles canoniques ecrites en JSON,
+construites et evaluees. **12 sur 13 s'ecrivaient deja.**
+
+| Famille | Etat |
+|---|---|
+| momentum depuis l'ouverture, VWAP ancre, plus haut de la veille, gap, plus haut de seance, cloture forcee, fenetre horaire, stop temporel | deja couvert |
+| volume relatif et volatilite AU MEME MOMENT des seances passees | couvert depuis le 2026-09-13 (`rolling.across`, `session_lag`) |
+| opening range, etendue de la premiere heure | n'etaient possibles que par un ARTIFICE - voir ci-dessous |
+| grille horaire periodique | etait IMPOSSIBLE, faute de modulo |
+| multi-horizon (5 min filtre par le quotidien) | deja couvert : `alias` + `panel.allow_mixed_granularity`. Mesure : ES 15 min + ES quotidien, **100 %** des lignes portent les deux series |
+
+Deux ajouts ont ferme les deux trous :
+
+- **`arith %`** - une grille horaire en trois noeuds au lieu de douze
+  comparaisons ;
+- **`cumulative.mask`** - agreger sur une TRANCHE de seance. Il remplace une
+  sentinelle `if_then_else(..., -1e18)` qui rendait **-1e+18** sur une tranche
+  vide, faisant declencher la regle a chaque barre. Quatrieme occurrence de la
+  famille L18 / L25 / L28, et la pire : les trois premieres faisaient trop PEU
+  negocier, celle-ci fait negocier TROP ([[lessons]] L30).
+
+Trois exemples executables : `intraday_opening_range`,
+`intraday_vwap_reversion`, `intraday_momentum_filtre_quotidien`. **Aucun n'a
+d'essai archive** - ce sont des FORMES, pas des resultats.
+
+- [ ] **Le cout d'un balayage intraday n'est pas mesure.** `construire_grille`
+      prend n'importe quelles `BacktestSpec`, donc il marche deja. Mais un run
+      d'ES en 5 minutes porte 742 395 barres et prend plusieurs minutes ; une
+      grille de cinquante configurations se compte en heures. Avant de lancer un
+      balayage intraday, mesurer UN run et multiplier - c'est exactement
+      l'erreur que [[lessons]] L27 consigne pour n'avoir pas ete faite.
+- [ ] **Aucune des trois formes intraday n'a ete evaluee.** Les seuils - 30
+      minutes d'opening range, deux ecarts-types au VWAP, SMA 50 quotidienne -
+      sont ceux de la litterature, pas un choix mesure. Les archiver comme
+      essais AVANT d'en regarder les resultats est ce qui evite que le premier
+      chiffre satisfaisant devienne la conclusion.
+- [ ] **Rien ne borne le nombre de decisions par seance.** Une grille horaire
+      mal ecrite - `%` sur une granularite de 5 minutes avec un pas de 1 -
+      decide a chaque barre. Le taux d'execution le montrerait, le nombre de
+      trades aussi, mais aucune garde ne le refuse.
+
+- [x] **Taux de rejet affiche a cote du rendement (2026-09-14).** La ligne
+      `Execution` parait TOUJOURS des qu'un ordre a ete emis - y compris a
+      100 %, un taux plein etant une information et une ligne absente ne se
+      distinguant pas d'une fonctionnalite oubliee. Sous 90 %, un
+      AVERTISSEMENT dit que « le rendement ci-dessus ne mesure PAS la strategie
+      declaree ». Sur le run Zarattini :
+      `Execution 4 fill(s) sur 5084 ordre(s) emis taux 0.1 % / Refus margin 5080`.
+      L'ancienne ligne `Refus` ne couvrait que les quatre motifs de
+      `risk.limits` et n'etait emise que si un plafond etait DECLARE : elle
+      serait restee muette sur le cas qui comptait, `margin` ne relevant
+      d'aucun plafond.
 - [x] **`sigma` reecrit sur un ancrage de seance REEL (2026-09-13).**
       Deux formes neuves, adossees au calendrier declare :
       `rolling.across: "sessions"` compte `window` en SEANCES au meme rang, et
@@ -150,10 +195,9 @@ coexistence, et `tests/test_nautilus_coexistence.py` la garde.
       etait propre a la specification Zarattini, qui vit hors du depot. Toute
       spec EXTERIEURE qui declare un `stride` cense valoir « une seance » porte
       la meme erreur.
-- [ ] **Decider du sort de la branche.** Fusionner `migration-nautilus` dans
-      `main` maintenant, ou attendre que le transversal passe ? Rien n'est
-      supprime, donc la fusion est sans risque ; c'est une question de lisibilite
-      de l'historique.
+- [x] **Branche fusionnee (2026-09-14).** `migration-nautilus` est dans `main`
+      par un commit de fusion qui porte ce que la branche a fait et pourquoi
+      elle ne supprime rien. La branche est CONSERVEE, pas effacee.
 
 ## Plan de l'audit d'architecture (2026-09-11)
 

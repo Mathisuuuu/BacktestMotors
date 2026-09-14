@@ -702,6 +702,56 @@ class _TamponDeSeance:
         return self._valeurs[: rang + 1][::-1]
 
 
+def _fenetre_de_seance(
+    tampon: _TamponDeSeance,
+    memoire: Memoire | None,
+    signal: Signal,
+    ctx: Context,
+    rang: int,
+) -> FloatArray | None:
+    """Les valeurs de `signal` depuis l'ouverture, PRESENT EN TETE.
+
+    Trois chemins, du moins cher au plus cher :
+
+    1. le tampon la connait deja - une vue, rien a calculer ;
+    2. il lui manque exactement la barre courante - une evaluation ;
+    3. il ne sait pas repondre - reconstruction par le chemin general.
+
+    Le troisieme arrive a chaque nouvelle seance, et sur toute vue reculee
+    qui saute en arriere. Il est juste et lent ; les deux premiers sont
+    justes et rapides.
+
+    Fonction et non methode depuis le 2026-09-14 : `cumulative` en tient
+    desormais DEUX - un pour les valeurs, un pour le masque - et ils doivent
+    suivre exactement le meme chemin. Les ecrire deux fois aurait laisse la
+    porte ouverte a ce qu'ils divergent.
+    """
+    jeton = ctx.data_token
+    debut = ctx.n_bars_seen - 1 - rang
+
+    connue = tampon.fenetre(jeton, debut, rang)
+    if connue is not None:
+        return connue
+
+    # Cas 2 : la seance est la bonne et il ne manque que le present.
+    if jeton is tampon._ancre and debut == tampon._debut and rang == tampon._n:
+        valeur = valeur_a(memoire, signal, ctx, 0)
+        if valeur is None or isinstance(valeur, Leve):
+            return None
+        tampon._ajouter(float(valeur))
+        return tampon.fenetre(jeton, debut, rang)
+
+    # Cas 3 : tout reconstruire, et repartir le tampon de la.
+    values = valeurs_de_fenetre(memoire, signal, ctx, range(rang + 1))
+    if values is None:
+        return None
+    tampon._reinitialiser(jeton, debut)
+    # `values[0]` est le PRESENT : le tampon garde l'ordre CHRONOLOGIQUE.
+    for valeur in reversed(values):
+        tampon._ajouter(valeur)
+    return tampon.fenetre(jeton, debut, rang)
+
+
 @signal_node(
     "cumulative",
     summary="Cumul d'un sous-signal DEPUIS l'ouverture de la seance courante.",
@@ -712,6 +762,16 @@ class _TamponDeSeance:
             choices=tuple(s.value for s in CumulativeStat),
         ),
         NodeField("inner", FieldKind.NODE),
+        NodeField(
+            "mask",
+            FieldKind.NODE,
+            required=False,
+            description=(
+                "N'agrege que les barres de la seance ou ce sous-signal est "
+                "vrai (> 0). Rend `None` si aucune ne l'est - jamais une "
+                "valeur de remplacement."
+            ),
+        ),
     ),
 )
 @dataclass(frozen=True, slots=True)
@@ -743,6 +803,33 @@ class Cumulative:
     l'historique, son cout dependrait de la position dans l'echantillon et son
     warmup serait indefinissable. C'est la raison pour laquelle `bars_since@1`
     est borne, et elle vaut ici aussi.
+
+    Le masque, et l'artifice qu'il remplace
+    ----------------------------------------
+    `mask` restreint l'agregation aux barres de la seance ou un sous-signal
+    est vrai. Il debloque toute la famille des agregats sur une TRANCHE de
+    seance - au premier rang desquels l'opening range :
+
+        cumulative(max, price(high),
+                   mask=compare("<=", session("minutes_from_open"), 30))
+
+    Sans lui, cela s'ecrivait par une sentinelle :
+
+        cumulative(max, if_then_else(mfo <= 30, price(high), constant(-1e18)))
+
+    Cet artifice FONCTIONNE tant que le masque est vrai au moins une fois,
+    et produit un NOMBRE quand il ne l'est jamais. Mesure le 2026-09-14 :
+    une tranche vide rendait **-1e+18**, et la regle `cours > cette borne`
+    valait vrai a chaque barre. Le backtest ouvrait des positions partout,
+    sans une erreur ni un avertissement - la famille [[lessons]] L18 / L25 /
+    L28, ou un defaut produit un nombre lisible.
+
+    Avec `mask`, une tranche vide rend `None`, et une regle qui vaut `None`
+    ne declenche pas. Le pire cas devient une strategie qui ne negocie pas,
+    au lieu d'une qui negocie partout.
+
+    Verite du masque : `> 0`, comme `count_true`. Les booleens du
+    vocabulaire valent 1.0 ou 0.0.
     """
 
     NODE_TYPE: ClassVar[str] = "cumulative"
@@ -750,8 +837,13 @@ class Cumulative:
 
     stat: CumulativeStat
     inner: Signal
+    mask: Signal | None = None
     _memoire: Memoire | None = field(default=None, compare=False, repr=False)
     _tampon: _TamponDeSeance = field(
+        default_factory=_TamponDeSeance, compare=False, repr=False
+    )
+    _memoire_masque: Memoire | None = field(default=None, compare=False, repr=False)
+    _tampon_masque: _TamponDeSeance = field(
         default_factory=_TamponDeSeance, compare=False, repr=False
     )
 
@@ -762,16 +854,37 @@ class Cumulative:
         # retient des barres inutiles. C'est le seul parametre approximatif du
         # mecanisme, et il ne peut pas changer un resultat.
         object.__setattr__(self, "_memoire", memoire_pour(1_500, self.inner))
+        if self.mask is not None:
+            object.__setattr__(
+                self, "_memoire_masque", memoire_pour(1_500, self.mask)
+            )
 
     @property
     def warmup_bars(self) -> int:
-        return self.inner.warmup_bars
+        if self.mask is None:
+            return self.inner.warmup_bars
+        return max(self.inner.warmup_bars, self.mask.warmup_bars)
 
     def __call__(self, ctx: Context) -> float | None:
         rang = int(ctx.session_value(SessionField.BAR_INDEX, 0))
-        fenetre = self._fenetre(ctx, rang)
+        fenetre = _fenetre_de_seance(
+            self._tampon, self._memoire, self.inner, ctx, rang
+        )
         if fenetre is None:
             return None
+        if self.mask is not None:
+            retenu = _fenetre_de_seance(
+                self._tampon_masque, self._memoire_masque, self.mask, ctx, rang
+            )
+            if retenu is None:
+                return None
+            fenetre = fenetre[retenu > 0.0]
+            if fenetre.size == 0:
+                # Aucune barre de la seance ne satisfait le masque. Il n'y a
+                # pas de reponse, et en inventer une - zero, ou la derniere
+                # valeur connue - est exactement ce que la sentinelle
+                # faisait.
+                return None
         match self.stat:
             case CumulativeStat.SUM:
                 return float(np.sum(fenetre))
@@ -790,57 +903,19 @@ class Cumulative:
             case CumulativeStat.COUNT_TRUE:
                 return float(np.count_nonzero(fenetre > 0.0))
 
-    def _fenetre(self, ctx: Context, rang: int) -> FloatArray | None:
-        """La fenetre depuis l'ouverture, PRESENT EN TETE.
-
-        Trois chemins, du moins cher au plus cher :
-
-        1. le tampon la connait deja - une vue, rien a calculer ;
-        2. il lui manque exactement la barre courante - une evaluation ;
-        3. il ne sait pas repondre - reconstruction par le chemin general.
-
-        Le troisieme arrive a chaque nouvelle seance, et sur toute vue reculee
-        qui saute en arriere. Il est juste et lent ; les deux premiers sont
-        justes et rapides.
-        """
-        jeton = ctx.data_token
-        debut = ctx.n_bars_seen - 1 - rang
-
-        connue = self._tampon.fenetre(jeton, debut, rang)
-        if connue is not None:
-            return connue
-
-        # Cas 2 : la seance est la bonne et il ne manque que le present.
-        if (
-            jeton is self._tampon._ancre
-            and debut == self._tampon._debut
-            and rang == self._tampon._n
-        ):
-            valeur = valeur_a(self._memoire, self.inner, ctx, 0)
-            if valeur is None or isinstance(valeur, Leve):
-                return None
-            self._tampon._ajouter(float(valeur))
-            return self._tampon.fenetre(jeton, debut, rang)
-
-        # Cas 3 : tout reconstruire, et repartir le tampon de la.
-        values = valeurs_de_fenetre(
-            self._memoire, self.inner, ctx, range(rang + 1)
-        )
-        if values is None:
-            return None
-        self._tampon._reinitialiser(jeton, debut)
-        # `values[0]` est le PRESENT : le tampon garde l'ordre CHRONOLOGIQUE.
-        for valeur in reversed(values):
-            self._tampon._ajouter(valeur)
-        return self._tampon.fenetre(jeton, debut, rang)
-
     def describe(self) -> SpecDict:
-        return {
+        decrit: SpecDict = {
             "type": self.NODE_TYPE,
             "version": self.NODE_VERSION,
             "stat": self.stat.value,
             "inner": self.inner.describe(),
         }
+        # Publie SEULEMENT quand il existe : l'emettre a `null` changerait
+        # le `config_hash` des sept exemples archives pour un champ qui ne
+        # dit rien chez eux.
+        if self.mask is not None:
+            decrit["mask"] = self.mask.describe()
+        return decrit
 
     @classmethod
     def from_spec(cls, spec: SpecDict, build: Builder) -> Signal:
@@ -850,7 +925,12 @@ class Cumulative:
                 f"'cumulative' : statistique invalide {brut!r}. "
                 f"Attendu l'un de {', '.join(s.value for s in CumulativeStat)}"
             )
-        return cls(CumulativeStat(brut), _child(spec, "inner", build))
+        masque = spec.get("mask")
+        return cls(
+            CumulativeStat(brut),
+            _child(spec, "inner", build),
+            _child(spec, "mask", build) if masque is not None else None,
+        )
 
 
 def cumulative(stat: str, inner: Signal) -> Cumulative:

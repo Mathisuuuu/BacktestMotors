@@ -1,6 +1,6 @@
 ---
 type: reference
-updated: 2026-09-13
+updated: 2026-09-14
 autorite: src/rsl/data/session.py
 ---
 
@@ -14,6 +14,23 @@ Le socle a longtemps refuse toute notion de seance, et il avait raison : les
 series continues `.v.0` sont trouees, et inferer une frontiere d'un trou est une
 supposition. Ce qui a change au 2026-09-11 n'est pas ce refus — c'est qu'une
 seance peut desormais etre **declaree**. Une declaration ne devine rien.
+
+
+## Depuis le 2026-09-14 : la seance se decoupe en TRANCHES
+
+`cumulative.mask` n'agrege que les barres de la seance ou un sous-signal est
+vrai - le plus haut des trente premieres minutes, le VWAP de l'ouverture,
+l'etendue de la premiere heure. Norme en
+[docs/execution-model.md](../../docs/execution-model.md) §1.3.
+
+Ce qu'il remplace : une sentinelle `if_then_else(..., -1e18)`, juste tant que la
+tranche contient une barre et **fausse quand elle est vide** - elle rendait
+alors -1e18, et la regle « cours > cette borne » valait vrai a chaque barre
+([[lessons]] L30).
+
+`arith %` s'y ajoute pour les grilles horaires periodiques : « toutes les trente
+minutes » en trois noeuds. Piege a connaitre - `minutes_from_open` parcourt
+`1..N` et **jamais 0**, une barre etant horodatee a sa CLOTURE.
 
 
 ## Depuis le 2026-09-13 : la seance ancre aussi les FENETRES

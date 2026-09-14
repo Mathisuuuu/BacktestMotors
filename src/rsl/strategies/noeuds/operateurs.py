@@ -109,20 +109,46 @@ class ArithOp(StrEnum):
     SUB = "-"
     MUL = "*"
     DIV = "/"
+    MOD = "%"
 
 
 @signal_node(
     "arith",
     summary="Operation arithmetique entre deux sous-signaux.",
     fields=(
-        NodeField("op", FieldKind.STRING, choices=("+", "-", "*", "/")),
+        NodeField("op", FieldKind.STRING, choices=tuple(o.value for o in ArithOp)),
         NodeField("left", FieldKind.NODE),
         NodeField("right", FieldKind.NODE),
     ),
 )
 @dataclass(frozen=True, slots=True)
 class Arith:
-    """Arithmetique. Une division par zero rend `None`, jamais `inf`."""
+    """Arithmetique. Une division par zero rend `None`, jamais `inf`.
+
+    Le modulo, et a quoi il sert
+    -----------------------------
+    `%` existe pour une raison precise : les grilles horaires PERIODIQUES.
+    « Decider toutes les trente minutes » s'ecrivait en douze comparaisons
+    `any_of` - la specification Zarattini en portait quatre jeux, soit
+    quarante-huit noeuds pour dire une chose. Avec le modulo :
+
+        compare("==", arith("%", session("minutes_from_open"), 30), 0)
+
+    Ce n'est pas une fenetre en DUREE - l'idee que le ledger ecarte le
+    2026-09-10. Rien n'est reconstruit et aucune barre absente n'est
+    inventee : le noeud lit une grandeur deja calculee par le calendrier
+    DECLARE, et si la barre de la minute 30 n'existe pas, la condition est
+    simplement fausse ce jour-la.
+
+    Semantique : celle de Python, donc le signe du DIVISEUR. `-10 % 30`
+    vaut 20, pas -10. Sur des grandeurs de seance, qui sont positives, la
+    distinction ne se pose pas ; elle est fixee ici pour que le jour ou
+    elle se pose, la reponse ne depende pas d'une lecture du code.
+
+    Un modulo par zero rend `None`, comme la division - et pour la meme
+    raison : il n'y a pas de reponse, et `inf` ou `nan` en serait une
+    fausse.
+    """
 
     NODE_TYPE: ClassVar[str] = "arith"
     NODE_VERSION: ClassVar[int] = 1
@@ -149,6 +175,8 @@ class Arith:
                 return a * b
             case ArithOp.DIV:
                 return None if b == 0.0 else a / b
+            case ArithOp.MOD:
+                return None if b == 0.0 else a % b
 
     def describe(self) -> SpecDict:
         return {

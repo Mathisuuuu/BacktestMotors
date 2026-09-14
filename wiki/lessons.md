@@ -983,3 +983,62 @@ comparer a un marche ferme n'est pas une perte d'information.
 
 Fonde sur [[log]] (2026-09-13) · `tests/unit/test_fenetre_par_seance.py` ·
 `docs/execution-model.md` §1.3
+
+---
+
+## L30 -- Une valeur NEUTRE est un mensonge quand il n'y a pas de valeur
+
+Pour agreger sur une tranche de seance - le plus haut des trente premieres
+minutes - le vocabulaire n'offrait qu'un detour :
+
+    cumulative(max, if_then_else(mfo <= 30, high, constant(-1e18)))
+
+L'idee est de neutraliser les barres hors tranche par une valeur qui ne gagnera
+jamais un `max`. Elle marche. Elle marche meme tres bien - tant que la tranche
+contient au moins une barre.
+
+Quand elle est vide, il n'y a plus de valeur a rendre, et l'expression en rend
+une quand meme : **-1e+18**. Mesure du 2026-09-14 : la regle `cours > cette
+borne` vaut alors vrai a CHAQUE barre. Le backtest ouvre des positions partout,
+termine sans erreur, et publie un rendement.
+
+Une tranche vide n'est pas un cas d'ecole. Il suffit d'une seance ecourtee plus
+courte que la tranche, d'un masque ecrit en heure UTC quand la seance est
+declaree a New York, ou d'une faute de frappe dans un seuil.
+
+Le correctif, `cumulative.mask`, ne rend pas la tranche vide plus intelligente :
+il la rend **muette**. `None`, et une regle qui vaut `None` ne declenche pas. Le
+pire cas devient une strategie qui ne negocie pas.
+
+La regle generale
+------------------
+**Une valeur de remplacement n'est acceptable que si l'absence est impossible.**
+Des qu'elle ne l'est pas, la valeur neutre transforme un cas indefini en un cas
+defini et faux - et le socle entier est bati sur le refus inverse : pas de
+`NaN`, pas de zero par defaut, `InsufficientHistoryError` plutot qu'une valeur
+inventee.
+
+Ce qui rend celle-ci difficile a voir : l'artifice etait ECRIT PAR L'UTILISATEUR
+dans son JSON, pas par le socle. Les gardes du socle ne s'appliquent pas a une
+expression que l'utilisateur compose lui-meme. Un vocabulaire assez expressif
+pour tout dire est aussi assez expressif pour dire des choses fausses ; la
+reponse n'est pas de le restreindre, mais d'offrir la forme JUSTE assez
+commodement pour que le detour cesse d'etre tentant.
+
+Quatrieme occurrence de la famille
+-----------------------------------
+Apres [[lessons]] L18 (terme de signal inerte), L25 (backtest qui ne negocie
+pas) et L28 (5 080 rejets de marge). Le motif est toujours le meme : **le
+resultat reste LISIBLE**. Ici il est meme pire que d'habitude - les trois
+premiers faisaient trop peu negocier, celui-ci fait negocier trop, ce qui
+ressemble d'autant plus a une strategie.
+
+Comment le test s'en protege
+-----------------------------
+`tests/unit/test_tranche_de_seance.py` fixe DEUX proprietes, et la premiere
+n'est pas decorative : la ou la sentinelle est juste, le masque rend exactement
+la meme chose. Sans elle, on pourrait rendre `None` partout et passer le test
+d'honnetete. Un test qui fige le defaut historique garde la trace de ce qu'on
+evite - s'il devenait vert tout seul, c'est l'argument qui aurait change.
+
+Fonde sur [[log]] (2026-09-14) · `docs/execution-model.md` §1.3

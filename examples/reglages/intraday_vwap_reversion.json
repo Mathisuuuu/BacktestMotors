@@ -1,0 +1,49 @@
+{
+  "note": [
+    "Barres de 5 minutes ANCREES sur la seance reguliere declaree.",
+    "Une periode intra-journaliere sans `session` est refusee a la validation :",
+    "« une barre de 5 minutes » ne dit pas ou elle commence.",
+    "",
+    "Capital 500 000 : a 100 000, quatre contrats ES demandent plus de marge",
+    "que le compte et les ordres sont refuses en silence (lecon L28). Le taux",
+    "d'execution imprime a cote du rendement le dirait desormais."
+  ],
+  "initial_cash": 500000.0,
+  "seed": 0,
+  "liquidate_at_end": true,
+  "check_invariant": true,
+  "with_data_hash": true,
+  "min_warmup_bars": 8000,
+  "data": [
+    {
+      "root": "ES",
+      "path": "indices/ES_v0_1m.parquet",
+      "granularity_minutes": 1,
+      "resample": "5min",
+      "resample_min_bars": 3,
+      "session": {
+        "start": "08:30",
+        "end": "15:00",
+        "timezone": "America/Chicago"
+      }
+    }
+  ],
+  "execution": {
+    "fees": {
+      "kind": "per_contract"
+    },
+    "slippage": {
+      "kind": "tick",
+      "ticks": 0.5
+    },
+    "lag_bars": 1,
+    "intrabar_priority": "pessimistic",
+    "margin_policy": "reject"
+  },
+  "risk": {
+    "sizing": {
+      "kind": "fixed",
+      "contracts": 1
+    }
+  }
+}

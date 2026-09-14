@@ -150,6 +150,87 @@ leur sous-arbre, et l'insuffisance réelle est signalée à l'évaluation —
 `None`, jamais une valeur prise au mauvais rang. Déclarer `min_warmup_bars` au
 niveau du run reste le moyen de faire réellement sauter ces barres au runner.
 
+#### Agréger sur une TRANCHE de séance
+
+`cumulative` agrège depuis l'ouverture jusqu'à maintenant. Toute la famille
+« opening range » demande moins : un agrégat sur une **partie** de la séance —
+le plus haut des trente premières minutes, l'étendue de la première heure, le
+VWAP de l'ouverture.
+
+`cumulative.mask` restreint l'agrégation aux barres de la séance où un
+sous-signal est vrai :
+
+```json
+{"type": "cumulative", "stat": "max", "inner": {"type": "price", "field": "high"},
+ "mask": {"type": "compare", "op": "<=",
+          "left": {"type": "session", "field": "minutes_from_open"},
+          "right": {"type": "constant", "value": 30}}}
+```
+
+Vérité du masque : `> 0`, comme `count_true`. Le champ n'est publié dans la
+forme canonique que lorsqu'il existe, donc une spécification écrite avant cet
+ajout garde son `config_hash` au bit près.
+
+##### Pourquoi ce n'est pas un confort
+
+Sans `mask`, cela s'écrivait par une **sentinelle** :
+
+```json
+{"type": "cumulative", "stat": "max",
+ "inner": {"type": "if_then_else", "condition": "...",
+           "then": {"type": "price", "field": "high"},
+           "otherwise": {"type": "constant", "value": -1e18}}}
+```
+
+Cet artifice est juste tant que la tranche contient au moins une barre, et
+produit un **nombre** quand elle est vide. Mesuré le 2026-09-14 : une tranche
+vide rendait `-1e+18`, et la règle « cours > cette borne » valait vrai à chaque
+barre. Le backtest ouvrait des positions partout, sans une erreur ni un
+avertissement.
+
+Avec `mask`, une tranche vide rend `None`, et une règle qui vaut `None` ne
+déclenche pas. Le pire cas devient une stratégie qui ne négocie pas, au lieu
+d'une qui négocie partout — la différence entre un défaut visible et un défaut
+qui se lit comme un résultat.
+
+L'équivalence est vérifiée : là où la sentinelle est juste, le masque rend
+exactement la même chose, au bit près
+(`tests/unit/test_tranche_de_seance.py`).
+
+#### Grilles horaires périodiques
+
+`arith` accepte `%`. « Décider toutes les trente minutes » s'écrit en trois
+nœuds au lieu de douze comparaisons `any_of` :
+
+```json
+{"type": "all_of", "operands": [
+  {"...": "minutes_from_open >= 30"},
+  {"...": "minutes_from_open <= 360"},
+  {"type": "compare", "op": "==",
+   "left": {"type": "arith", "op": "%",
+            "left": {"type": "session", "field": "minutes_from_open"},
+            "right": {"type": "constant", "value": 30}},
+   "right": {"type": "constant", "value": 0}}]}
+```
+
+Ce n'est **pas** une fenêtre en durée — l'idée que le ledger écarte le
+2026-09-10. Rien n'est reconstruit et aucune barre absente n'est inventée : le
+nœud lit une grandeur déjà calculée par le calendrier déclaré, et si la barre
+de la minute 30 n'existe pas, la condition est simplement fausse ce jour-là.
+
+Deux conventions, fixées explicitement :
+
+- **le signe suit le diviseur** (sémantique Python) : `-10 % 30` vaut 20. Sur
+  des grandeurs de séance, qui sont positives, la question ne se pose pas ;
+- **un modulo par zéro rend `None`**, comme la division, et pour la même
+  raison : il n'y a pas de réponse, et `nan` en serait une fausse.
+
+Piège à connaître, et il n'est pas propre au modulo : une barre est horodatée à
+sa **clôture**, donc `minutes_from_open` parcourt `1..N` et jamais `0`. Le point
+de contrôle « 30 minutes après l'ouverture » est la barre qui *se ferme* à cette
+minute — le choix causal correct, celle qui s'ouvre avec elle n'étant pas encore
+connue.
+
 #### Conséquence sur les panneaux
 
 Deux instruments dont les séances diffèrent n'ont **plus aucune frontière
