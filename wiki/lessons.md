@@ -714,3 +714,272 @@ resultats BIT-IDENTIQUES. Quatre cent soixante-deux croisements voisins ont
 462 empreintes differentes et passent tous pour des essais independants.
 
 Fonde sur [[experiments/pbo-grille-large-462-sma]] · [[log]] (2026-09-12)
+
+---
+
+## L24 -- Deux moteurs sans fuite ne donnent pas le meme chiffre pour autant
+
+Le vocabulaire JSON a ete porte sur Nautilus en une seule idee : ne pas le
+porter. Il ne parle pas a un moteur, il parle a un `Context` - un curseur sur
+des barres closes. Il suffisait que Nautilus mene l'horloge et que notre
+`BarContext` serve le vocabulaire. Les 136 primitives et les 23 noeuds
+fonctionnent sans qu'une ligne de leur code change.
+
+Puis la comparaison a donne 0,081 % d'ecart sur `sma_es_daily`, et j'ai failli
+conclure que les deux moteurs concordaient.
+
+Ils ne concordent pas. Deux mesures l'ont montre, dans cet ordre.
+
+**D'abord une fuite, chez Nautilus.** Son moteur de correspondance remplit un
+ordre au marche a la cloture de la barre qu'il traite. Soumettre pendant
+`on_bar(t)` donne donc un fill a `close[t]` : le prix meme que la strategie
+vient de lire pour decider. Mesure sur `_moule` : +19,43 % d'equity. Ce n'est
+pas un defaut de Nautilus - c'est une convention de simulation sur barres, que
+rien n'annonce et que personne ne remarque tant qu'il ne la cherche pas.
+
+**Ensuite une divergence, apres correction.** Le differe supprime la fuite mais
+place les fills sur `close[t+1]` la ou nous servons a `open[t+1]`. Une journee
+entiere d'ecart sur du quotidien, et - c'est le point - **il se compose a
+chaque trade** :
+
+    4 trades   ->  -0,93 %
+    10 trades  ->  -0,47 %
+    18 trades  ->  +23,84 %
+    49 trades  ->  +17,44 %
+
+La lecon generale : **l'absence de fuite ne rend pas deux moteurs
+comparables**. Ils peuvent etre tous deux corrects et mesurer deux choses
+differentes. Ce qui les separe n'est pas la justesse mais la CONVENTION, et une
+convention ne se devine pas - elle se mesure.
+
+Corollaire sur les tests, et c'est celui qui a failli passer : mon premier test
+de concordance tolerait 0,5 % d'ecart. Il PASSAIT, parce que l'exemple sur
+lequel il portait negocie dix fois. Un test vert sur le cas tranquille pendant
+que les cas actifs derivent de vingt pour cent est pire que pas de test. Il a
+ete remplace par un test qui NOMME l'ecart et borne par le BAS - se rejouir
+d'une convergence qu'on n'a pas provoquee serait la mauvaise reaction.
+
+Deuxieme corollaire, sur les temoins : le premier temoin ne neutralisait rien.
+Il remplacait une file par un espion, mais `on_bar` reassigne cette file des la
+premiere barre. Le test comparait deux executions identiques et passait. Un
+temoin doit etre VERIFIE comme le reste - c'est ce que fait desormais
+`test_le_temoin_reproduit_bien_la_fuite`.
+
+Fonde sur [[log]] (2026-09-13) · `tests/test_nautilus_coexistence.py`
+
+---
+
+## L25 -- Un backtest qui ne negocie pas ressemble a un backtest qui perd
+
+Le portage du vocabulaire TRANSVERSAL sur Nautilus a rencontre deux defauts
+distincts. Ni l'un ni l'autre n'a leve d'exception. Tous deux rendaient le meme
+resultat : capital intact, zero position, aucun avertissement.
+
+**Le premier.** Une coupe transversale se reconstitue a partir de barres
+livrees une par une. Ma premiere version decidait a l'arrivee de la premiere
+barre d'un nouvel instant - la ligne precedente etait bien finie. Mais le
+simulateur, lui, n'avait traite qu'UNE barre du nouvel instant : les neuf
+autres instruments n'avaient pas de prix, et Nautilus rejetait chaque ordre avec
+`no market`. **684 ordres emis, 684 rejetes.**
+
+**Le second.** Meme symptome, autre cause, trouve juste apres. Nautilus ne
+remplit AUCUN ordre sur des barres etiquetees `MONTH`. Mesure en ne changeant
+qu'une chaine de caracteres, tout le reste identique : `1-DAY-LAST` donne 14
+fills, `1-MONTH-LAST` 14 rejets.
+
+Ce que les deux ont en commun est plus important que leurs causes. Un backtest
+qui n'aboutit a rien PRODUIT UN CHIFFRE - le capital initial - et ce chiffre se
+lit comme une performance nulle. Rien ne distingue « la strategie n'a pas gagne »
+de « la strategie n'a jamais joue ».
+
+C'est le meme mecanisme que [[lessons]] L18, ou un terme de signal inerte
+donnait un resultat parfaitement plausible. La famille entiere se resume ainsi :
+**les defauts dangereux ne sont pas ceux qui font echouer, ce sont ceux qui font
+aboutir a quelque chose de lisible.**
+
+Consequence sur les tests : compter les ORDRES ne suffit pas, il faut compter
+les FILLS. Le piege des 684 rejets avait 684 ordres. `test_nautilus_transversal`
+assert donc `n_remplis > n_rejetes`, et separement que le capital a bouge.
+
+Troisieme defaut, trouve par ces tests eux-memes : la garde censee refuser un
+`risk.limits` declare interrogeait `risque.limits.actives` via une chaine de
+`getattr`. `actives` appartient a l'objet CONSTRUIT, pas a la specification ; la
+chaine rendait `False` en silence et la garde ne gardait rien. Un acces TYPE
+l'aurait refuse a la compilation - c'est ce qu'il fait desormais.
+
+Fonde sur [[log]] (2026-09-13) · `src/rsl/nautilus/transversal.py`
+
+---
+
+## L26 -- Une memoire consultee APRES avoir paye ce qu'elle evite n'evite rien
+
+`cumulative` coutait 1249 us par barre sur un VWAP ancre a la seance, contre
+0,05 us pour l'equivalent vectorise en numpy. Vingt-cinq mille fois. J'ai
+d'abord attribue cet ecart a la somme recalculee depuis l'ouverture - un
+O(n^2) par seance - et c'etait faux.
+
+**Le vrai cout etait la creation de contextes.** Pour rassembler ses valeurs,
+le noeud appelait `ctx.shifted(lag)` une fois par lag, soit 400 allocations de
+`BarContext` par barre. La memoisation existait pourtant et rangeait bien les
+valeurs - mais `_vue_et_valeur` construisait la vue AVANT de la consulter.
+Elle payait exactement le cout qu'elle etait censee supprimer.
+
+La cle de la memoire est `n_bars_seen`, qui se calcule depuis le contexte
+courant : `ctx.n_bars_seen - lag`. Il n'y avait aucune raison de reculer pour
+savoir si la reponse etait deja connue. Consulter d'abord : **1249 -> 429 us**,
+et le gain profite a `rolling` et `bars_since` par la meme voie.
+
+Restait une boucle Python par lag - lecture du jeton, recherche, test de type,
+ajout a une liste - soit quatre operations fois quatre cents. Un tampon numpy
+par seance, qui n'ajoute qu'UNE valeur par barre nouvelle : **429 -> 36,5 us**.
+Au total **34 fois**, et les sept empreintes archivees sont inchangees.
+
+Ce qui a failli mal tourner
+----------------------------
+La premiere idee etait un accumulateur courant : garder un total et y ajouter
+la valeur nouvelle. Plus rapide encore, et **faux** - `np.sum` somme par paires,
+l'addition sequentielle non, et les derniers bits different. Les sept empreintes
+auraient bouge, et il aurait fallu decider si c'etait une correction ou une
+regression alors que les deux calculs sont legitimes.
+
+Le tampon garde donc les VALEURS et laisse numpy reduire. Il rend meme une vue
+RENVERSEE, pour que la sequence presentee a `np.sum` soit identique a celle de
+la liste d'avant - le groupement de la sommation par paires depend de l'ordre.
+
+La regle generale : **quand on remplace un calcul par un plus rapide, verifier
+d'abord ce qui coute**. J'ai failli optimiser la sommation, qui ne representait
+rien, et j'aurais ecrit un accumulateur qui aurait change les resultats pour un
+gain nul.
+
+Fonde sur [[log]] (2026-09-13) · `tests/unit/test_cumulative_tampon.py`
+
+---
+
+## L27 -- Une estimation de duree extrapolee d'un microbenchmark s'est trompee trois fois de suite
+
+Le run Zarattini sur 3 705 199 barres minute a ete MESURE de bout en bout le
+2026-09-13 : **15 min 55 s**. Mes trois estimations successives disaient 6,7 h,
+puis 3,05 h, puis 22 min. La derniere n'etait pas juste non plus, elle etait
+seulement moins fausse.
+
+La cause etait la meme les trois fois, et elle n'a rien a voir avec
+l'optimisation : **je mesurais un noeud fraichement construit**, donc une
+memoisation VIDE. Dans un run reel, chaque valeur intermediaire est calculee une
+fois puis relue soixante fois par le `stride`. L'ecart est mesure :
+
+| | a froid | a chaud (24 000 barres) |
+|---|---|---|
+| `rolling` strie | 655,6 us | **52,1 us** |
+
+Douze fois. Un microbenchmark de N barres sur un etat neuf ne mesure pas le cout
+marginal d'une barre, il mesure le cout d'amorcage divise par N.
+
+**La regle : une duree de run se mesure en lancant le run.** Un microbenchmark
+sert a comparer deux implementations du MEME noeud dans le MEME etat ; il ne sert
+pas a predire un temps total. Quand la question posee est « combien de temps »,
+la reponse s'obtient avec `time`, pas avec une multiplication.
+
+Ce que cela a failli couter
+----------------------------
+Sur la foi des 3 h, la question posee etait de tout reecrire en C#. Cela aurait
+voulu dire 24 343 lignes, 136 primitives, 23 noeuds, le moteur, le registre
+d'essais et la PBO - et l'abandon de 4 168 tests et des 7 empreintes - pour un
+programme qui prend seize minutes. Le travail lourd est deja en C : numpy fait
+les reductions. Ce qui restait en Python etait le parcours d'arbre, c'est-a-dire
+exactement ce que [[lessons]] L26 a divise par 34 en deux heures.
+
+Fonde sur [[log]] (2026-09-13)
+
+---
+
+## L28 -- 5 080 rejets de marge se lisent comme une strategie perdante
+
+Le meme run rend **-25,62 %** sur 10,59 ans, avec 2 trades et une exposition de
+5,7 x 10^-6. Lu comme un resultat, c'est une strategie qui perd. Ce n'en est pas
+un : les compteurs disent autre chose.
+
+```
+n_orders_submitted     5084
+n_orders_dropped_risk  5080
+n_rejected_margin      5080
+n_fills                   4
+```
+
+**Quatre ordres sur 5 084 ont ete executes.** La regle d'entree, elle, fonctionne :
+mesuree sur 120 000 barres contigues, `entry_long` est vraie 94 fois, soit environ
+une par seance - l'ordre de grandeur du papier.
+
+Le blocage est arithmetique. Le facteur `vol_target` sature a `vol_max_multiple`
+= 4, la strategie demande donc 4 contrats NQ. La marge initiale de NQ est
+27 000 : **4 x 27 000 = 108 000 sur un compte de 100 000**. Chaque entree est
+refusee. Les deux seules qui sont passees l'ont ete a 3 contrats, et leur perte -
+12 808 chacune - EST le -25,62 % affiche.
+
+Le -25,62 % ne mesure donc pas la strategie. Il mesure deux trades.
+
+C'est la troisieme occurrence de la meme famille apres [[lessons]] L18 et L25 :
+**un backtest empeche produit un nombre lisible**. Ici le diagnostic etait
+pourtant a portee de main - le rapport publie `n_rejected_margin` - mais rien
+dans le resume imprime ne le signale. Un taux de rejet de 99,9 % devrait
+s'afficher a cote du rendement, pas seulement dans le JSON.
+
+<!-- NOTE: action ouverte, pas encore faite. -->
+
+Fonde sur [[log]] (2026-09-13) · rapport `zarattini_rapport.json`
+
+---
+
+## L29 -- Une approximation annoncee a 3,4 % en valait 100 %
+
+La specification Zarattini portait cette note, ecrite de bonne foi :
+
+> « Le stride suppose 390 barres par seance. Sur les seances ECOURTEES
+> l'alignement derive - 94 seances sur 2748 dans notre historique, soit 3,4 %.
+> C'est la seule approximation qui subsiste. »
+
+Trois affirmations, et **les trois etaient fausses**.
+
+Les cotations NQ portent la seance ELECTRONIQUE, pas le RTH : **1 362 barres
+par jour**, pas 390. Le pas de 390 ne tombait donc jamais sur le rang voulu -
+pas « rarement », jamais. Et les seances courtes ne sont pas 94 accidents de
+calendrier : ce sont **les vendredis**, la seance ouverte le vendredi a 9 h 30
+se fermant avant le week-end, soit 435 barres. Une semaine sur une, sur dix
+ans. Enfin, ce n'etait pas la seule approximation : c'etait la seule qui avait
+ete ECRITE.
+
+Le chiffre qui tranche : reecrit sur un ancrage de seance reel, `sigma[tau]`
+differe de l'ancien a **100 % des points de controle** ou tous deux sont
+definis, de **28,3 % en mediane** et jusqu'a 94,7 %. Le seuil de la strategie
+etant `1,5 x sigma`, c'est la decision entiere qui portait sur autre chose que
+ce que le papier decrit.
+
+Pourquoi la note n'a rien protege
+----------------------------------
+Elle chiffrait l'erreur **dans l'hypothese ou l'hypothese etait vraie**. « 94
+seances sur 2748 » compte les seances plus courtes que 390 barres ; il fallait
+compter les seances differentes de 390 barres, c'est-a-dire toutes. Une
+approximation documentee reste une approximation non mesuree tant que personne
+n'a compte la grandeur reelle.
+
+Le cout d'une minute de verification : `len(barres) / len(seances)` rend 1 362.
+
+La regle : **une note qui chiffre une approximation doit nommer la mesure qui
+la produit**, sinon elle donne a une supposition l'apparence d'un fait verifie.
+Celle-ci a survecu a la redaction de la strategie, a un run de sept heures
+estimees, a deux backtests complets et a trois seances de travail.
+
+Ce que la correction a coute, et ce qu'elle refuse
+---------------------------------------------------
+`rolling.across: "sessions"` et le noeud `session_lag`, tous deux adosses au
+calendrier DECLARE. Ils reprennent une idee du [[Failed Ideas/ledger]] ecartee
+le 2026-09-11 - la condition de reprise etait « un calendrier existe ET le
+desalignement devient genant » : il ne l'est pas devenu, il l'etait deja.
+
+Ils refusent de substituer une barre voisine quand une seance ecourtee n'a pas
+le rang demande. Consequence assumee et mesuree : 33 % des barres gardent une
+fenetre complete sur NQ, **88 % aux douze points de controle**. Les 67 % perdus
+sont des barres de nuit dont le rang n'existe pas un vendredi - refuser de les
+comparer a un marche ferme n'est pas une perte d'information.
+
+Fonde sur [[log]] (2026-09-13) · `tests/unit/test_fenetre_par_seance.py` ·
+`docs/execution-model.md` §1.3

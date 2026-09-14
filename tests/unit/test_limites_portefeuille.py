@@ -463,9 +463,17 @@ class TestLeRapportLisibleDitCeQuIlAEmpeche:
             spec=spec,
             manifest=None,  # type: ignore[arg-type]
             metrics=None,  # type: ignore[arg-type]
-            run={"risk_stats": {f"n_rejected_{m}": 0 for m in MOTIFS} | {
-                "n_rejected_positions": 7
-            }},
+            run={
+                "risk_stats": {f"n_rejected_{m}": 0 for m in MOTIFS}
+                | {"n_rejected_positions": 7},
+                # Depuis le 2026-09-13, le detail des refus accompagne le
+                # TAUX D'EXECUTION et non plus la ligne des plafonds : il
+                # couvre tous les motifs, `margin` et `sizing` compris, qui
+                # ne relevent d'aucun plafond declare. Il faut donc des
+                # ordres emis pour qu'il ait quelque chose a rapporter.
+                "counters": {"n_orders_submitted": 50},
+                "n_fills": 43,
+            },
             result_fingerprint="",
             deflated_sharpe=None,
             symbols=("ES.v.0",),
@@ -482,8 +490,27 @@ class TestLeRapportLisibleDitCeQuIlAEmpeche:
         assert "max_positions 3" in lignes[0]
 
     def test_les_refus_sont_nommes_et_chiffres(self):
-        lignes = self.rapport(max_positions=3)._lignes_de_plafonds()
-        assert "positions 7" in lignes[1]
+        """La garantie n'a pas bouge, son emplacement si.
+
+        Le detail vit desormais sous le TAUX D'EXECUTION, parce qu'il
+        couvre TOUS les motifs et non les seuls plafonds - le run Zarattini
+        du 2026-09-13 a ete tue par `margin`, qui ne releve d'aucun plafond
+        declare et que l'ancienne ligne aurait tu ([[lessons]] L28).
+        """
+        lignes = self.rapport(max_positions=3)._lignes_d_execution()
+        assert any("positions 7" in ligne for ligne in lignes), lignes
+
+    def test_le_refus_est_visible_meme_sans_plafond_declare(self):
+        """Le cas qui manquait, et qui a coute une journee.
+
+        Sans `risk.limits`, l'ancienne ligne `Refus` n'etait pas emise du
+        tout - et c'est exactement la situation du run Zarattini, qui n'en
+        declarait aucun et voyait pourtant 5 080 ordres refuses.
+        """
+        rapport = self.rapport()
+        assert rapport._lignes_de_plafonds() == [], "aucun plafond declare"
+        lignes = rapport._lignes_d_execution()
+        assert any("positions 7" in ligne for ligne in lignes), lignes
 
     def test_zero_refus_se_dit_plutot_que_de_disparaitre(self):
         """« Aucun » est une information - le plafond etait peut-etre trop
@@ -493,4 +520,13 @@ class TestLeRapportLisibleDitCeQuIlAEmpeche:
         rapport.run["risk_stats"] = dict.fromkeys(
             (f"n_rejected_{m}" for m in MOTIFS), 0
         )
-        assert rapport._lignes_de_plafonds()[1].endswith("aucun")
+        assert rapport._lignes_de_plafonds()[1].endswith("n'a mordu")
+
+    def test_le_taux_d_execution_accompagne_toujours_le_rendement(self):
+        """Meme a 100 %, et meme sans aucun plafond declare."""
+        rapport = self.rapport()
+        rapport.run["risk_stats"] = {}
+        rapport.run["n_fills"] = 50
+        lignes = rapport._lignes_d_execution()
+        assert lignes and lignes[0].startswith("Execution")
+        assert "taux 100.0 %" in lignes[0]

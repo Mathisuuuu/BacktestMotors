@@ -542,6 +542,14 @@
     },
     "rolling": {
       "champs": {
+        "across": {
+          "choix": [
+            "bars",
+            "sessions"
+          ],
+          "defaut": "bars",
+          "type": "choix"
+        },
         "inner": {
           "requis": true,
           "type": "noeud"
@@ -601,6 +609,20 @@
         }
       },
       "resume": "Feuille : une grandeur de la seance courante ou d'une seance close."
+    },
+    "session_lag": {
+      "champs": {
+        "inner": {
+          "requis": true,
+          "type": "noeud"
+        },
+        "sessions": {
+          "min": 1,
+          "requis": true,
+          "type": "entier"
+        }
+      },
+      "resume": "Evalue un sous-signal au MEME RANG, N seances en arriere."
     },
     "time": {
       "champs": {

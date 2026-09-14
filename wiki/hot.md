@@ -16,18 +16,18 @@ generated: true
 
 | Indicateur | Valeur |
 |---|---|
-| Pages de wiki | 26 |
-| Entrees de log | 145 |
-| Derniere activite | 2026-09-12 |
-| Idees ecartees (ledger) | 18 |
+| Pages de wiki | 27 |
+| Entrees de log | 175 |
+| Derniere activite | 2026-09-13 |
+| Idees ecartees (ledger) | 22 |
 | Idees en attente (ledger) | 4 |
 | Pages `Failed Ideas/` | 1 |
 | Pages `concepts/` | 6 |
-| Pages `experiments/` | 7 |
+| Pages `experiments/` | 8 |
 | Pages `reference/` | 7 |
 | Pages `research/` | 1 |
 
-**Activite par type :** note × 66, fix × 30, feat × 22, decision × 17, essai × 4, experiment × 2, setup × 1, lint × 1, audit × 1, refactor × 1
+**Activite par type :** note × 78, fix × 36, feat × 26, decision × 20, essai × 4, mesure × 4, experiment × 2, setup × 1, lint × 1, audit × 1, refactor × 1, perf × 1
 
 ## Experiences
 
@@ -40,19 +40,20 @@ generated: true
 | [[experiments/pbo-grille-sma-es-quotidien]] | `termine` | `negatif` | 16 | 2026-09-12 |
 | [[experiments/rsi-survendu-hors-lundi]] | `termine` | `non-conclusif` | 1 | 2026-09-11 |
 | [[experiments/sma-es-daily-walkforward]] | `termine` | `fragile` | 1 | 2026-09-12 |
+| [[experiments/zarattini-nq-intraday-60-30]] | `termine` | `negatif` | 3 | 2026-09-13 |
 
 Le total des essais alimente le Deflated Sharpe : un essai non enregistre gonfle le DSR de tous les autres.
 
 ## Derniere activite — 8 entree(s)
 
-- **2026-09-12** — note | Contre-intuitif et mesure : ajouter 462 essais CORRELES a fait BAISSER le maximum attendu sous H0, de 0,1600 a 0,0663 | le maximum attendu est proportionnel a l'ecart-type des Sharpe essayes, et 462 variantes du meme croisement sont homogenes. Remplir le compteur d'essais quasi identiques AFFAIBLIT le DSR au lieu de le durcir - l'hypothese d'independance des essais est violee. Lecon [[lessons]] L23
-- **2026-09-12** — fix | Le dossier `essais/` n'etait cree qu'en effet de bord de l'ecriture d'un rapport | un balayage n'en ecrit aucun (un seul artefact partage par N lignes), donc le premier archivage sur un depot neuf echouait a ouvrir le registre. Trouve par les tests du chemin de balayage, avant le premier usage reel
-- **2026-09-12** — fix | `rsl pbo` n'acceptait pas une grille de plusieurs centaines : 462 chemins depassent la ligne de commande admise (`Argument list too long`) | un REPERTOIRE est desormais developpe en ses fichiers .json, TRIES - l'ordre determine quelle configuration `argmax` designe en cas d'egalite
-- **2026-09-12** — note | Le retrait des inactives n'est pas neutre a grande echelle : 357 configurations sur 462 retirees a S=8, TOUTES sur la sous-periode 0 | une strategie de croisement entre sur un croisement, et les longues moyennes ne se croisent pas en 2017, annee calme. Le retrait elimine donc systematiquement les fenetres longues, et la PBO porte alors sur un sous-ensemble biaise. Arbitrage structurel : peu de blocs preservent la grille mais donnent peu de combinaisons ; beaucoup de blocs donnent des combinaisons mais decimant la grille
-- **2026-09-12** — essai | Grille SMA elargie a **462 configurations** (rapide 2-40 pas 2, lent 20-250 pas 10) : PBO **0,833** a S=4, ou la grille entiere survit | elargir a EMPIRE le chiffre - 0,80 sur seize configurations, 0,833 sur 462 - exactement comme la theorie l'annonce : le maximum d'un ensemble plus grand doit davantage a la chance. 462 backtests en 1021 s, tous archives. Voir [[experiments/pbo-grille-large-462-sma]]
-- **2026-09-12** — note | Deux problemes de METHODE trouves en lancant la premiere grille reelle | (1) une grille de fenetres inegales ne partage pas son echantillon - quatre longueurs pour seize configurations - donc la CSCV comparait des epoques ; le warmup est desormais aligne. (2) quatre configurations ne negocient pas du tout sur une sous-periode ; leur donner zero les classerait au-dessus des perdantes, elles sont retirees sur demande explicite
-- **2026-09-12** — essai | Grille SMA 4x4 sur ES quotidien, 16 configurations : PBO **0,70 a 0,80** | le processus de selection n'a pas montre de pouvoir predictif. Et une fois les 31 essais du registre comptes, le DSR de l'exemple phare `sma_es_daily` tombe de 0,9719 SIGNIFICATIF a **0,0000** - le maximum attendu sous H0 vaut 0,1600 contre un Sharpe observe de 0,0376. Voir [[experiments/pbo-grille-sma-es-quotidien]]
-- **2026-09-12** — feat | PBO par CSCV implementee (`rsl pbo`, `metrics/surapprentissage.py`) : le protocole fige le 2026-09-10 avait attendu deux ans de sessions | 45 tests, dont deux matrices dont la PBO se calcule de tete (1,0 et 0,0 exactement) plutot que des seuls tirages aleatoires
+- **2026-09-13** — note | RESERVE sur la comparaison des deux runs : les echantillons ne sont pas identiques | `min_warmup_bars` passe de 23 790 a 85 000, le warmup en seances ne pouvant pas se declarer en barres. Le run par seance porte donc sur 3 643 989 barres contre 3 705 199, soit **45 seances de moins** - environ deux mois sur 10,6 ans. L'ecart de performance est trop grand pour venir de la, mais il n'est pas mesure a echantillon egal
+- **2026-09-13** — note | Le +256,80 % ne passe toujours PAS le compteur d'essais : DSR **0,6148** contre 496 essais, non significatif | le Sharpe par periode (0,0715) depasse desormais le maximum attendu sous H0 (0,0668), ce qui n'etait pas le cas avant - DSR 0,1107 pour la version a `stride`. Corriger sigma a donc rapproche la strategie du seuil sans le franchir. Essai archive, registre a 496
+- **2026-09-13** — mesure | Zarattini a sigma ancre sur la SEANCE : **+256,80 %** contre +111,53 % avec `stride: 390`, Sharpe 1,26 contre 0,83 | 2 067 trades contre 1 241, exposition 11,98 % contre 4,51 %, zero rejet des deux cotes. Mecanisme : le nouveau sigma est PLUS PETIT dans 82,5 % des cas (mediane -25,4 %), l'ancien echantillonnant des barres de NUIT dont le rendement depuis l'ouverture a derive toute la seance. Bandes plus etroites, donc plus de cassures
+- **2026-09-13** — note | `_moule_universel` change d'empreinte, et c'est VOULU : il doit montrer chaque type de noeud | verifie terme a terme avant d'accepter - `equity`, `cash`, `exposure`, `trades` et `portfolio` sont bit-identiques ; seuls bougent les `order_id` et deux compteurs, le nouveau terme d'`exit_short` emettant 12 ordres ecartes faute de position a fermer. Effet economique NUL. Les six autres empreintes sont inchangees
+- **2026-09-13** — note | Choix assume : une seance ECOURTEE fait rendre `None` a la fenetre, sans substitution de barre voisine | substituer comparerait 15 h 59 d'un jour plein a 13 h 00 d'un demi-jour - le desalignement silencieux que ces formes existent pour supprimer. Mesure : 33 % des barres gardent une fenetre complete sur NQ, **88 % aux douze points de controle**. Une politique DECLAREE de moyennage sur les seances disponibles reste ouverte, faute d'un cas ou les 12 % changent une conclusion
+- **2026-09-13** — fix | La note « 3,4 % d'approximation » de la specification Zarattini etait fausse sur ses TROIS affirmations | les cotations NQ portent 1 362 barres par jour et non 390, donc le `stride: 390` ne tombait JAMAIS sur le rang voulu ; les seances courtes ne sont pas 94 accidents mais **les vendredis** (435 barres), une semaine sur une sur dix ans. Reecrit, `sigma[tau]` differe de l'ancien a **100 %** des points de controle, de **28,3 % en mediane** et jusqu'a 94,7 %. Lecon [[lessons]] L29
+- **2026-09-13** — feat | Les fenetres savent compter en SEANCES : `rolling.across: "sessions"` et le noeud `session_lag` | adosses au calendrier DECLARE, ils retrouvent le meme RANG dans les seances precedentes la ou `stride` comptait des barres. Reprise de la ligne du [[Failed Ideas/ledger]] du 2026-09-11, dont les deux conditions etaient remplies. 24 types de noeuds, 4190 tests, `ruff` et `mypy --strict` propres
+- **2026-09-13** — note | Le +111,53 % n'est PAS significatif : DSR 0,9981 -> **0,1107** une fois compte contre les 495 essais du registre | le Sharpe observe par periode (0,0469) est INFERIEUR au maximum attendu sous H0 (0,0667). Le rapport publiait 0,9981 parce que le run avait ete lance sans `--archive`, donc contre un seul essai. Les deux runs sont desormais au registre, le rate y compris. Essai : [[experiments/zarattini-nq-intraday-60-30]]
 
 ## Next Actions
 
@@ -60,13 +61,99 @@ Le total des essais alimente le Deflated Sharpe : un essai non enregistre gonfle
 > Bloc edite a la main. Le generateur le recopie tel quel a chaque passage :
 > c'est le seul endroit de ce fichier ou ecrire.
 
-Etat au 2026-09-11, l'audit d'architecture etant **entierement traite** (A-P0
-a A-P3) et la bibliotheque portee a 136 primitives : **3566 tests passent,
-aucun n'echoue** - dont 183 marques `slow`, qui tournent sur les donnees
-reelles et sautent proprement sans elles. ; `ruff` et `mypy --strict` sont propres sur `src` et `tests` ;
-les **7 empreintes d'exemples sont inchangees** depuis l'avant-derniere
-session. (L'audit du meme jour partait de 1179 tests dont 1 echouait ; cet
-echec est le P6 ci-dessous, corrige.)
+## Deux moteurs, et le contrat entre eux (2026-09-13)
+
+Branche `migration-nautilus`. `main` est intact.
+
+| | notre moteur | Nautilus |
+|---|---|---|
+| sert a | la RECHERCHE reproductible | la VALIDATION croisee, et le futur live |
+| remplit a | `open[t+1]` | `close[t+1]` |
+| porte | 7 empreintes, 493 essais, PBO, DSR | backtest et live partagent le meme noyau |
+
+**Ce qu'on ne compare JAMAIS** : les equity des deux moteurs. Elles divergent de
+0,5 % sur une strategie qui negocie dix fois et de 24 % sur une qui en negocie
+dix-huit, parce que l'ecart de convention se COMPOSE a chaque trade. Ce n'est
+pas une imprecision, c'est deux mesures differentes ([[lessons]] L24).
+
+**Ce qui est partage, et qui doit le rester** : le vocabulaire JSON. Un meme
+fichier decrit la meme strategie des deux cotes - c'est toute la valeur de la
+coexistence, et `tests/test_nautilus_coexistence.py` la garde.
+
+- [ ] **Alimenter Nautilus en TICKS plutot qu'en barres.** C'est le regime pour
+      lequel son moteur est fait, et la seule voie qui rendrait les deux
+      comparables : les fills retrouveraient un sens physique au lieu de tomber
+      sur une cloture de barre. Cout a mesurer - 33 M de barres minute
+      deviendraient des quotes.
+- [x] **Transversal porte (2026-09-13).** `panel_rules@1` et `ranking@1`
+      tournent sur Nautilus : la coupe est reconstituee en COMPTANT les barres
+      attendues, et traitee a la derniere. `momentum_12_1` rend 97 positions et
+      273 fills la ou notre moteur fait 107 trades.
+      **Deux defauts silencieux trouves en chemin**, tous deux rendant capital
+      intact et zero position : declencher a la premiere barre d'un instant
+      (684 ordres, 684 rejets) et l'agregation `MONTH` que le simulateur
+      n'execute pas. Un troisieme, dans ma propre garde, lisait `actives` sur la
+      specification ou il n'existe pas. Lecon [[lessons]] L25.
+      Ce que le pont transversal ne porte PAS, et qu'il refuse : le
+      `RiskManager` - dimensionnement, plafonds de portefeuille, allocation.
+- [x] **`cumulative` corrige (2026-09-13) : 1249 -> 36,5 us par barre, 34x.**
+      Les 7 empreintes sont INCHANGEES, ce qui etait la condition.
+      Le diagnostic de depart etait faux : le cout ne venait pas de la somme
+      recalculee mais de 400 creations de `BarContext` par barre - la memoire
+      etait consultee APRES la vue qu'elle devait eviter. Consulter d'abord
+      profite aussi a `rolling` et `bars_since`.
+      Et l'accumulateur courant envisage aurait CHANGE les derniers bits :
+      `np.sum` somme par paires ([[lessons]] L26).
+- [x] **`rolling` a `stride` : le probleme n'existait pas (2026-09-13).**
+      Les 539 us/barre etaient un artefact - mesure sur un noeud fraichement
+      construit, donc une memoisation VIDE. A chaud : **52,1 us**, douze fois
+      moins. Le run Zarattini a ete MESURE de bout en bout : **15 min 55 s**,
+      contre 6,7 h puis 3,05 h puis 22 min estimees. Les trois se trompaient par
+      la meme faute ([[lessons]] L27).
+      Consequence : la question « ce regime est-il hors perimetre » ne se pose
+      plus, et la reecriture en C# envisagee sur la foi des 3 h est ECARTEE,
+      motif chiffre au [[Failed Ideas/ledger]].
+- [ ] **Afficher le taux de REJET a cote du rendement.** Le run Zarattini rend
+      -25,62 % avec 2 trades parce que **5 080 ordres sur 5 084 sont refuses
+      pour marge** - `vol_target` sature a 4 contrats NQ, soit 108 000 de marge
+      sur un compte de 100 000. Le chiffre est dans le JSON
+      (`risk_stats.n_rejected_margin`) et NULLE PART dans le resume imprime, si
+      bien qu'un backtest empeche se lit comme une strategie perdante
+      ([[lessons]] L28, troisieme occurrence apres L18 et L25).
+      A trancher : seuil d'alerte, ou affichage systematique du ratio
+      `n_fills / n_orders_submitted` ?
+- [x] **`sigma` reecrit sur un ancrage de seance REEL (2026-09-13).**
+      Deux formes neuves, adossees au calendrier declare :
+      `rolling.across: "sessions"` compte `window` en SEANCES au meme rang, et
+      le noeud `session_lag` recule d'une seance. Reprise de la ligne du
+      [[Failed Ideas/ledger]] du 2026-09-11, dont les deux conditions etaient
+      remplies. 24 types de noeuds, 4190 tests, les 7 empreintes verifiees sur
+      donnees reelles.
+      **Ce n'etait pas une approximation** : reecrit, `sigma[tau]` differe de
+      l'ancien a **100 %** des points de controle ou tous deux sont definis, de
+      **28,3 % en mediane**. La note « 3,4 % » de la specification etait fausse
+      sur ses trois affirmations - les seances courtes ne sont pas 94 accidents
+      mais LES VENDREDIS, une semaine sur une ([[lessons]] L29).
+      Empreinte de `_moule_universel` changee A DESSEIN : il doit montrer chaque
+      type de noeud. Verifie terme a terme - equity, trades et portefeuille
+      bit-identiques, seuls les `order_id` et deux compteurs bougent.
+- [ ] **Rangs manquants : une politique DECLAREE plutot que `None`.**
+      Aujourd'hui une seance ecourtee fait tomber toute la fenetre : 88 % des
+      points de controle restent servis sur NQ, 12 % ne declenchent pas. Le
+      papier, lui, moyennerait sur les seances disponibles. Non fait faute d'un
+      cas ou ces 12 % changent une conclusion - et parce qu'un moyennage
+      silencieux sur un nombre variable d'observations est exactement ce que le
+      socle refuse. A trancher si un essai le rend genant.
+- [x] **Aucune autre specification du depot n'est touchee (verifie 2026-09-13).**
+      `grep stride examples/**/*.json` ne rend aucune declaration de pas : les
+      sept exemples utilisent tous le defaut `stride: 1`. La premisse fausse
+      etait propre a la specification Zarattini, qui vit hors du depot. Toute
+      spec EXTERIEURE qui declare un `stride` cense valoir « une seance » porte
+      la meme erreur.
+- [ ] **Decider du sort de la branche.** Fusionner `migration-nautilus` dans
+      `main` maintenant, ou attendre que le transversal passe ? Rien n'est
+      supprime, donc la fusion est sans risque ; c'est une question de lisibilite
+      de l'historique.
 
 ## Plan de l'audit d'architecture (2026-09-11)
 

@@ -31,7 +31,7 @@ from rsl.data.schema import (
     PositionState,
     ns_to_datetime,
 )
-from rsl.data.session import SessionField, read_session
+from rsl.data.session import SessionField, lags_meme_rang, read_session
 from rsl.errors import (
     ConfigurationError,
     InsufficientHistoryError,
@@ -338,6 +338,25 @@ class Context(Protocol):
         """
         ...
 
+    def lags_de_seance(self, depart: int, nombre: int) -> tuple[int, ...]:
+        """Decalages en BARRES vers le MEME RANG dans les seances precedentes.
+
+        Rend `nombre` decalages, du plus recent au plus ancien, pour les
+        seances `depart` a `depart + nombre - 1` en arriere. Un decalage, pas
+        une valeur : l'appelant s'en sert avec `shifted`, donc la garde de
+        causalite reste celle du socle, et tout decalage rendu est >= 1.
+
+        Existe parce qu'un pas FIXE en barres ne retrouve pas le meme rang des
+        que les seances ont des longueurs differentes - ce qui est le cas
+        general et non l'exception : sur NQ, la seance du vendredi compte 435
+        barres quand les autres en comptent 1 362.
+
+        Leve `InsufficientHistoryError` si une seance visee est trop courte
+        pour avoir une barre a ce rang, ou si l'echantillon ne remonte pas
+        assez loin.
+        """
+        ...
+
 
 class BarContext:
     """Vue a curseur sur un `BarStore`, mono-instrument.
@@ -561,6 +580,23 @@ class BarContext:
                 "`data` : le socle ne devine pas de frontiere de seance."
             )
         return read_session(index, self._require_index(0), field, lag)
+
+    def lags_de_seance(self, depart: int, nombre: int) -> tuple[int, ...]:
+        """Delegue a `lags_meme_rang`, qui porte les regles.
+
+        Meme dependance au calendrier que `session_value`, et meme refus quand
+        il n'est pas declare : sans frontiere de seance declaree, « le meme
+        rang la veille » ne veut rien dire.
+        """
+        index = self._store.sessions
+        if index is None:
+            raise ConfigurationError(
+                "seance : aucun calendrier declare pour "
+                f"'{self._store.symbol}'. Une fenetre comptee en SEANCES exige "
+                "un bloc `session` dans son entree `data` : le socle ne devine "
+                "pas de frontiere de seance."
+            )
+        return lags_meme_rang(index, self._require_index(0), depart, nombre)
 
     def shifted(self, lag: int) -> BarContext:
         """Vue du meme magasin, reculee de `lag` barres.

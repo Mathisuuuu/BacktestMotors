@@ -1846,6 +1846,15 @@
             "additionalProperties": false,
             "description": "Statistique glissante d'un sous-signal QUELCONQUE, pas d'un champ de prix.",
             "properties": {
+              "across": {
+                "default": "bars",
+                "description": "`bars` : `window` barres espacees de `stride`. `sessions` : la barre courante, puis celles de MEME RANG dans les seances precedentes. Exige `data[].session`.",
+                "enum": [
+                  "bars",
+                  "sessions"
+                ],
+                "type": "string"
+              },
               "inner": {
                 "$ref": "#/$defs/node"
               },
@@ -1956,6 +1965,48 @@
               "type"
             ],
             "title": "session@1",
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "description": "Evalue un sous-signal au MEME RANG, N seances en arriere.",
+            "properties": {
+              "inner": {
+                "$ref": "#/$defs/node"
+              },
+              "note": {
+                "description": "Commentaire libre, ignore par le moteur. Une liste vaut plusieurs lignes.",
+                "oneOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  }
+                ]
+              },
+              "sessions": {
+                "description": "Nombre de seances a reculer. Toujours vers le passe.",
+                "minimum": 1,
+                "type": "integer"
+              },
+              "type": {
+                "const": "session_lag"
+              },
+              "version": {
+                "const": 1,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "type",
+              "sessions",
+              "inner"
+            ],
+            "title": "session_lag@1",
             "type": "object"
           },
           {

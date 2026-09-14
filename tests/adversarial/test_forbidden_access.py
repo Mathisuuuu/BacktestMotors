@@ -14,8 +14,13 @@ from hypothesis import strategies as st
 
 from fixtures import synthetic
 from rsl.data.feed import BarContext, BarFeed
-from rsl.data.schema import ALL_FIELDS, BarStore, Field
-from rsl.errors import InsufficientHistoryError, LookAheadError
+from rsl.data.schema import ALL_FIELDS, BarStore, Field, Granularity
+from rsl.data.session import SessionCalendar, build_session_index
+from rsl.errors import (
+    ConfigurationError,
+    InsufficientHistoryError,
+    LookAheadError,
+)
 
 pytestmark = pytest.mark.adversarial
 
@@ -25,6 +30,50 @@ def advanced(store: BarStore, n: int) -> BarContext:
     for _ in range(n):
         ctx._advance()
     return ctx
+
+
+SEANCE = SessionCalendar(start="09:00", end="17:00", timezone="UTC")
+
+
+def _avec_seances(ts: np.ndarray) -> BarStore:
+    closes = synthetic.random_walk(ts.size, 100.0, sigma=0.5, seed=11)
+    o, h, low, c = synthetic.ohlc_from_closes(closes, wick=0.002)
+    store = BarStore.build(
+        symbol="SES.v.0", granularity=Granularity.minutes(1), ts_event=ts,
+        open_=o, high=h, low=low, close=c,
+        volume=np.full(ts.size, 10.0), source_hash="synthetic",
+    )
+    return store.with_sessions(
+        build_session_index(
+            store.ts_close, store.open, store.high, store.low,
+            store.close, store.volume, SEANCE,
+        )
+    )
+
+
+@pytest.fixture
+def session_store() -> BarStore:
+    """Six seances d'une minute, de LONGUEURS INEGALES.
+
+    Inegales a dessein : c'est tout le sujet de `lags_de_seance`. Des seances
+    egales rendraient les tests verts meme si la fonction comptait des barres
+    a pas fixe, c'est-a-dire meme si elle ne faisait rien de ce qu'on lui
+    demande.
+    """
+    import datetime as dt
+
+    ns = 1_000_000_000
+    base = int(dt.datetime(2020, 1, 6, 9, 0, tzinfo=dt.UTC).timestamp())
+    horodatages: list[int] = []
+    for jour, taille in enumerate([120, 90, 120, 60, 120, 120]):
+        debut = base + jour * 86400
+        horodatages.extend((debut + m * 60) * ns for m in range(taille))
+    return _avec_seances(np.asarray(horodatages, dtype=np.int64))
+
+
+def tronquer(store: BarStore, n: int) -> BarStore:
+    """Le meme magasin, coupe apres `n` barres, seances RECALCULEES."""
+    return _avec_seances(np.asarray(store.ts_event[:n], dtype=np.int64))
 
 
 class TestNegativeLagIsLookAhead:
@@ -180,7 +229,48 @@ class TestNoSampleLengthLeak:
             # possible est `token is autre_token`. Les trois tests qui suivent
             # l'attaquent explicitement.
             "data_token",
+            # `lags_de_seance` a rejoint la surface le 2026-09-13, pour les
+            # fenetres comptees en SEANCES (`rolling.across`, `lag.sessions`).
+            # Elle ne rend que des DECALAGES vers le passe, jamais de valeur,
+            # et son premier argument vaut au moins 1 : la seance EN COURS
+            # n'est pas interrogeable, ce qui compte - sa longueur n'est
+            # connue qu'une fois finie, donc la lire serait lire le futur.
+            # Les deux tests qui suivent l'attaquent sur ces deux points.
+            "lags_de_seance",
         }
+
+    def test_session_lags_cannot_reach_the_current_session(self, session_store: BarStore):
+        """La longueur de la seance EN COURS est un fait FUTUR.
+
+        Tant qu'elle n'est pas finie, personne ne sait combien de barres elle
+        comptera. Si `depart=0` etait accepte, une strategie apprendrait a la
+        premiere minute si la journee sera pleine ou ecourtee - c'est-a-dire
+        une information que le marche ne donne qu'a la cloture.
+        """
+        ctx = advanced(session_store, 401)
+        with pytest.raises(ConfigurationError, match="au moins 1 seance"):
+            ctx.lags_de_seance(0, 5)
+
+    def test_session_lags_only_ever_point_backwards(self, session_store: BarStore):
+        """Tout decalage rendu est >= 1, donc `shifted` reste dans le passe."""
+        ctx = advanced(session_store, 401)
+        # La barre 400 est dans la 5e seance : quatre la precedent.
+        for depart in (1, 2, 3, 4):
+            for recul in ctx.lags_de_seance(depart, 1):
+                assert recul >= 1, f"decalage {recul} : vise le present ou le futur"
+
+    def test_session_lags_do_not_leak_how_much_sample_remains(
+        self, session_store: BarStore
+    ):
+        """Meme reponse sur un magasin TRONQUE apres la barre courante.
+
+        C'est le test de corruption du futur applique a cette surface : si la
+        reponse dependait de ce qui suit la barre courante, elle porterait de
+        l'information sur l'avenir. Elle n'en porte pas.
+        """
+        entier = advanced(session_store, 401)
+        tronque = advanced(tronquer(session_store, 460), 401)
+        assert entier.lags_de_seance(1, 3) == tronque.lags_de_seance(1, 3)
 
     def test_le_jeton_de_donnees_ne_porte_aucune_donnee(self, ramp_store: BarStore):
         """La garde qui rend `data_token` acceptable sur la surface publique.

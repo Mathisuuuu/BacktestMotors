@@ -148,15 +148,107 @@ class BacktestReport:
             + ", ".join(f"{nom} {valeur}" for nom, valeur in sorted(declares.items()))
         ]
         stats = self.run.get("risk_stats")
-        if isinstance(stats, dict):
-            refus = [
-                f"{motif} {stats[f'n_rejected_{motif}']}"
-                for motif in LIMIT_MOTIFS
-                if stats.get(f"n_rejected_{motif}")
-            ]
-            detail = ", ".join(refus) if refus else "aucun"
-            lignes.append(f"Refus        {detail}")
+        if isinstance(stats, dict) and not any(
+            stats.get(f"n_rejected_{motif}") for motif in LIMIT_MOTIFS
+        ):
+            # « Zero refus » est une information : le plafond etait peut-etre
+            # trop large pour mordre. Quand il a MORDU, le detail est rendu
+            # par `_detail_des_refus`, qui couvre tous les motifs et non les
+            # seuls plafonds - le dire deux fois inviterait a lire deux
+            # chiffres differents comme s'ils comptaient la meme chose.
+            lignes.append("Refus        aucun plafond n'a mordu")
         return lignes
+
+    def _lignes_d_execution(self) -> list[str]:
+        """Combien d'ordres ont ete EXECUTES, et ce qui a arrete les autres.
+
+        Pourquoi cette ligne existe
+        ---------------------------
+        Le 2026-09-13, un run rendait **-25,62 % avec 2 trades** sur 10,6
+        ans. Lu comme un resultat, c'etait une strategie qui perd. Ce n'en
+        etait pas un : **5 080 ordres sur 5 084 avaient ete refuses pour
+        marge**, la strategie demandant 4 contrats NQ - 108 000 de marge -
+        sur un compte de 100 000. Le -25,62 % mesurait deux trades.
+
+        Le chiffre etait publie dans le JSON (`risk_stats.n_rejected_margin`)
+        et NULLE PART dans ce resume. C'etait la troisieme occurrence de la
+        meme famille - [[lessons]] L18, L25, L28 : un backtest empeche
+        produit un nombre LISIBLE, et rien ne distingue « la strategie n'a
+        pas gagne » de « la strategie n'a jamais joue ».
+
+        Ce que la ligne montre, et quand
+        --------------------------------
+        TOUJOURS, des qu'un ordre a ete emis - y compris a 100 %. Un taux
+        plein est une information ; une ligne absente ne se distingue pas
+        d'une fonctionnalite oubliee, ce qui est precisement l'erreur que
+        cette ligne repare.
+
+        Le detail par motif couvre TOUS les compteurs de refus, pas les
+        seuls plafonds de portefeuille : `margin` et `sizing` ne relevent
+        d'aucun plafond declare, et ce sont eux qui avaient mordu.
+        """
+        compteurs = self.run.get("counters")
+        if not isinstance(compteurs, dict):
+            return []
+
+        def entier(source: dict[str, object], cle: str) -> int:
+            """Zero si la cle manque ou n'est pas un entier.
+
+            Un rapport ancien peut ne pas porter ces compteurs ; le resume ne
+            doit pas lever pour autant.
+            """
+            valeur = source.get(cle)
+            return valeur if isinstance(valeur, int) and not isinstance(valeur, bool) else 0
+
+        emis = entier(compteurs, "n_orders_submitted")
+        if emis == 0:
+            return []
+
+        remplis = entier(self.run, "n_fills")
+        taux = remplis / emis
+        ligne = (
+            f"Execution    {remplis} fill(s) sur {emis} ordre(s) emis   "
+            f"taux {taux * 100:.1f} %"
+        )
+
+        lignes = [ligne]
+        lignes.extend(self._detail_des_refus())
+
+        # Le seuil est deliberement HAUT. Un run sain remplit la quasi-
+        # totalite de ce qu'il emet ; des qu'un ordre sur dix tombe, le
+        # rendement affiche ne mesure plus la strategie declaree.
+        if taux < 0.90:
+            lignes.append(
+                f"AVERTISSEMENT  {emis - remplis} ordre(s) sur {emis} "
+                f"n'ont pas ete executes ({(1 - taux) * 100:.1f} %). Le rendement "
+                f"ci-dessus ne mesure PAS la strategie declaree, mais ce qui "
+                f"a pu en passer."
+            )
+        return lignes
+
+    def _detail_des_refus(self) -> list[str]:
+        """Un motif par compteur non nul, du plus frequent au moins.
+
+        Trie par nombre : quand plusieurs motifs mordent, celui qui explique
+        le run est le premier, pas celui dont le nom vient en tete de
+        l'alphabet.
+        """
+        stats = self.run.get("risk_stats")
+        if not isinstance(stats, dict):
+            return []
+        motifs = [
+            (nom, int(valeur))
+            for nom, valeur in stats.items()
+            if isinstance(valeur, int) and valeur > 0 and nom != "n_warned_margin"
+        ]
+        if not motifs:
+            return []
+        motifs.sort(key=lambda paire: (-paire[1], paire[0]))
+        detail = ", ".join(
+            f"{nom.removeprefix('n_rejected_').removeprefix('n_')} {nombre}"
+            for nom, nombre in motifs
+        )
+        return [f"Refus        {detail}"]
 
     def render(self) -> str:
         rule = "-" * 72
@@ -175,6 +267,9 @@ class BacktestReport:
             *self._lignes_de_plafonds(),
             rule,
             self.metrics.render(),
+            # A COTE du rendement, et non dans un bloc separe : c'est
+            # ensemble que les deux se lisent.
+            *self._lignes_d_execution(),
             rule,
         ]
         if self.deflated_sharpe is not None:

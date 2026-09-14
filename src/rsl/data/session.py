@@ -36,7 +36,7 @@ rattachement des barres se fait ensuite par recherche dichotomique.
 from __future__ import annotations
 
 import datetime as dt
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import StrEnum
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
@@ -131,6 +131,39 @@ class SessionIndex:
     session_low: FloatArray
     session_close: FloatArray
     session_volume: FloatArray
+
+    # -- derives, calcules a la construction ------------------------------
+    # Indexes par `numero - premier_numero`, et non par le numero lui-meme :
+    # `slice()` rend un index dont les numeros ne repartent PAS de zero, et
+    # confondre les deux ferait lire la mauvaise seance en silence.
+    premier_numero: int = field(init=False, compare=False, repr=False)
+    debuts: IntArray = field(init=False, compare=False, repr=False)
+    tailles: IntArray = field(init=False, compare=False, repr=False)
+
+    def __post_init__(self) -> None:
+        """Tabule ou commence chaque seance, et combien de barres elle compte.
+
+        Calcule UNE fois par index plutot qu'a chaque lecture : une recherche
+        dichotomique par barre et par seance de fenetre coute, sur une fenetre
+        de soixante seances et 3,7 M de barres, bien plus que la table.
+
+        `slice()` reconstruit un `SessionIndex`, donc repasse ici : la table
+        decrit toujours les barres REELLEMENT presentes dans cet index.
+        """
+        numeros = self.session_number
+        if numeros.size == 0:
+            vide: IntArray = np.zeros(0, dtype=np.int64)
+            object.__setattr__(self, "premier_numero", 0)
+            object.__setattr__(self, "debuts", vide)
+            object.__setattr__(self, "tailles", vide)
+            return
+        premier = int(numeros[0])
+        presents = np.arange(premier, int(numeros[-1]) + 1, dtype=np.int64)
+        gauche = np.searchsorted(numeros, presents, side="left").astype(np.int64)
+        droite = np.searchsorted(numeros, presents, side="right").astype(np.int64)
+        object.__setattr__(self, "premier_numero", premier)
+        object.__setattr__(self, "debuts", gauche)
+        object.__setattr__(self, "tailles", droite - gauche)
 
     @property
     def n_sessions(self) -> int:
@@ -257,6 +290,85 @@ def build_session_index(
         session_close=np.append(close[coupes[1:] - 1], close[-1]),
         session_volume=np.add.reduceat(volume, coupes),
     )
+
+
+def lags_meme_rang(
+    index: SessionIndex, bar: int, depart: int, nombre: int
+) -> tuple[int, ...]:
+    """Decalages en BARRES vers le meme rang, dans `nombre` seances passees.
+
+    Ce que la fonction rend
+    ------------------------
+    Pour la barre `bar`, de rang `tau` dans sa seance, elle rend les decalages
+    `bar - j` ou `j` est la barre de rang `tau` des seances `depart`,
+    `depart + 1`, ... `depart + nombre - 1` en arriere. Le present d'abord,
+    comme partout ailleurs dans le socle.
+
+    Pourquoi elle existe : le pas fixe qu'elle remplace
+    ---------------------------------------------------
+    `rolling.stride` rendait deja ce service en comptant des BARRES - « une
+    barre sur 390 » pour une seance de 390 minutes. Le ledger l'avait retenu
+    contre la forme par seance, au motif que le socle n'avait pas de frontiere
+    de seance, et notait l'ecart assume : « avec des seances ecourtees, un pas
+    fixe se desaligne ».
+
+    Mesure du 2026-09-13 : l'ecart n'est pas marginal. Les cotations NQ portent
+    la seance ELECTRONIQUE, soit **1 362 barres par jour**, quand la
+    specification supposait 390. Un pas de 390 n'echantillonne alors pas « le
+    meme rang la veille » mais une heure arbitraire, tous les jours differente.
+    Le calendrier declare existant depuis le 2026-09-11, la condition de reprise
+    inscrite au ledger est remplie.
+
+    Deux refus, tous deux causaux
+    ------------------------------
+    - `depart < 1` : la seance EN COURS n'est pas comparable aux precedentes -
+      elle n'est pas finie, et son rang `tau` est justement celui qu'on mesure.
+      Autoriser 0 rendrait un decalage nul, donc la barre elle-meme.
+    - un rang qui n'existe pas dans une seance visee : `InsufficientHistoryError`.
+      Une seance ECOURTEE - demi-journee de veille de fete - n'a pas de barre de
+      rang 300. Rendre sa derniere barre a la place comparerait 15 h 59 d'un
+      jour plein a 13 h 00 d'un demi-jour, c'est-a-dire exactement le
+      desalignement silencieux que cette fonction existe pour supprimer. Le
+      socle prefere ne rien dire.
+
+    La fenetre entiere tombe alors, par la regle deja en vigueur : une seule
+    valeur indefinie rend toute la fenetre indefinie.
+    """
+    if depart < 1:
+        raise ConfigurationError(
+            f"lags_meme_rang : `depart` doit valoir au moins 1 seance, recu "
+            f"{depart}. La seance en cours n'est pas une seance passee."
+        )
+    if nombre < 1:
+        raise ConfigurationError(
+            f"lags_meme_rang : `nombre` doit valoir au moins 1, recu {nombre}"
+        )
+
+    tau = int(index.bar_in_session[bar])
+    courante = int(index.session_number[bar])
+    cibles = courante - np.arange(depart, depart + nombre, dtype=np.int64)
+    rangs = cibles - index.premier_numero
+
+    if int(rangs[-1]) < 0:
+        manquantes = int(-rangs[-1])
+        raise InsufficientHistoryError(
+            f"seance : {nombre} seance(s) demandee(s) a partir de la {depart}e "
+            f"en arriere ; il en manque {manquantes} avant le debut de "
+            f"l'echantillon"
+        )
+
+    tailles = index.tailles[rangs]
+    if int(tailles.min()) <= tau:
+        courte = int(cibles[int(np.argmin(tailles))])
+        raise InsufficientHistoryError(
+            f"seance : le rang {tau} n'existe pas dans la seance {courte} - "
+            f"elle ne compte que {int(tailles.min())} barre(s). Une seance "
+            f"ecourtee n'a pas de barre a ce rang, et le socle ne lui en "
+            f"substitue pas une autre."
+        )
+
+    decalages: list[int] = (bar - (index.debuts[rangs] + tau)).tolist()
+    return tuple(decalages)
 
 
 class SessionField(StrEnum):

@@ -86,6 +86,70 @@ la déclaration usuelle `17:00-16:00@America/Chicago`, il mord **74 fois sur
 16:01, après la fermeture déclarée. Sans lui, ces 74 barres agrégées seraient
 réputées disponibles avant la clôture d'une de leurs composantes — une fuite.
 
+#### Fenêtres comptées en séances, et non en barres
+
+Même problème, un cran plus loin : `rolling` peut vouloir comparer une barre à
+**celles de même rang dans les séances précédentes** — la 30ᵉ minute d'hier et
+d'avant-hier. Jusqu'au 2026-09-13, la seule façon de l'écrire était
+`rolling.stride`, qui compte des **barres** : « une barre sur 390 ».
+
+Cela ne retrouve le même rang que si toutes les séances ont la même longueur.
+**Les données réelles ne le vérifient pas.** Mesure sur `NQ_v0_1m.parquet` avec
+la déclaration `09:30-16:00@America/New_York` :
+
+| | barres par séance |
+|---|---|
+| jour plein | **1 362** |
+| vendredi | **435** |
+
+La séance ouverte le vendredi à 9 h 30 se ferme avant le week-end : elle est
+structurellement courte, une semaine sur une, sur les dix ans de l'échantillon.
+Un `stride` de 390 n'échantillonne donc pas « le même rang la veille » mais une
+heure arbitraire, différente chaque jour.
+
+Deux formes s'appuient sur le calendrier **déclaré** plutôt que sur une
+longueur supposée :
+
+| Forme | Sens |
+|---|---|
+| `rolling.across: "sessions"` | `window` compte des **séances** : la barre courante, puis celles de même rang dans les séances précédentes |
+| `session_lag` | recule de N **séances**, au même rang |
+
+Les deux exigent `data[].session` et **lèvent** sans lui. `across: "sessions"`
+et `stride` ensemble sont refusés : ils disent la même chose de deux façons qui
+se contredisent.
+
+`across: "bars"` reste le défaut, et le champ n'est publié dans la forme
+canonique que lorsqu'il s'en écarte — une spécification écrite avant cet ajout
+garde donc son `config_hash` au bit près.
+
+##### Ce que ces formes refusent
+
+Une séance **écourtée** n'a pas de barre au rang demandé. La fenêtre rend alors
+`None`, et ne substitue pas la dernière barre disponible : cela comparerait
+15 h 59 d'un jour plein à 13 h 00 d'un demi-jour, c'est-à-dire exactement le
+désalignement silencieux que ces formes existent pour supprimer.
+
+Conséquence mesurée, à connaître avant de s'en servir — sur NQ, `window: 60` :
+
+| | fenêtre définie |
+|---|---|
+| toutes les barres | **33 %** |
+| aux douze points de contrôle semi-horaires (10:00-15:30) | **88 %** |
+
+Les 67 % perdus sont les barres de nuit, dont le rang n'existe simplement pas
+un vendredi. Ce n'est pas une perte d'information : c'est le refus de comparer
+une barre à un marché fermé.
+
+##### Le warmup ne peut pas être déclaré en barres
+
+`warmup_bars` est une propriété statique de l'arbre de signaux. Combien de
+barres font soixante séances dépend des **données** : ~81 700 sur NQ à la
+minute, 60 sur du quotidien. Ces deux nœuds ne déclarent donc que le warmup de
+leur sous-arbre, et l'insuffisance réelle est signalée à l'évaluation —
+`None`, jamais une valeur prise au mauvais rang. Déclarer `min_warmup_bars` au
+niveau du run reste le moyen de faire réellement sauter ces barres au runner.
+
 #### Conséquence sur les panneaux
 
 Deux instruments dont les séances diffèrent n'ont **plus aucune frontière
