@@ -37,6 +37,7 @@ from rsl.data.instruments import get_instrument
 from rsl.data.schema import Bar
 from rsl.engine.portfolio import Portfolio
 from rsl.engine.runner import position_state, track_positions
+from rsl.errors import InsufficientHistoryError
 from rsl.orders import Fill, Side
 
 SPEC = get_instrument("ES")
@@ -155,3 +156,112 @@ class TestCeQuiNeChangePas:
     def test_une_position_absente_ne_declare_aucune_ouverture(self):
         pf = portefeuille()
         assert pf.opened_bar_of(SPEC.symbol) is None
+
+
+class TestDetecterLaFinDUnTrade:
+    """Ce que le correctif DEBLOQUE, et pourquoi il avait l'air de ne rien faire.
+
+    Une garde intraday courante - « arreter apres N pertes dans la seance » -
+    demande de reperer la fin d'un trade depuis une regle. Le vocabulaire n'a
+    pas d'acces aux trades fermes ; la seule voie est de voir `bars_held`
+    RECULER :
+
+        compare("<", position(bars_held), lag(1, position(bars_held)))
+
+    Pourquoi cette detection etait aveugle
+    ---------------------------------------
+    Elle suppose que `bars_held` monte pendant un trade. Tant que `is_last`
+    marquait 72 % des barres ([[lessons]] L31), la strategie sortait et
+    re-entrait a chaque barre : chaque trade durait UNE barre, `bars_held`
+    valait 0 en permanence, et `0 < 0` est faux.
+
+    Mesure du 2026-09-14, meme strategie, meme echantillon :
+
+    | | ancien `is_last` | apres correctif |
+    |---|---|---|
+    | trades fermes | 41 110 | 12 585 |
+    | `bars_held = 0` | **111 137 (88 %)** | 77 243 (61 %) |
+    | fin de trade DETECTEE | **3 995** | 12 497 |
+
+    Le detecteur voyait **9,7 %** des fins de trade. Le defaut cachait
+    exactement les trades qu'il creait.
+    """
+
+    def suite(self, durees: list[int]) -> list[float | None]:
+        """Evalue `bars_held < lag(1, bars_held)` sur une suite de trades.
+
+        `durees` donne le nombre de barres de chaque trade, dos a dos, sans
+        jamais passer a plat - le cas que le correctif a debloque.
+        """
+        import numpy as np
+
+        from rsl.data.feed import BarContext
+        from rsl.data.schema import BarStore, Granularity, PositionState
+        from rsl.strategies.signals import build_signal
+
+        n = sum(durees)
+        ts = np.arange(n, dtype=np.int64) * 60 * 10**9
+        prix = np.full(n, 100.0)
+        store = BarStore.build(
+            symbol="DET.v.0", granularity=Granularity.minutes(1), ts_event=ts,
+            open_=prix, high=prix, low=prix, close=prix,
+            volume=np.full(n, 1.0), source_hash="synthetic",
+        )
+        etats: list[PositionState] = []
+        for duree in durees:
+            etats.extend(
+                PositionState(quantity=1, bars_held=k, entry_price=100.0,
+                              high_since_entry=100.0, low_since_entry=100.0)
+                for k in range(duree)
+            )
+        signal = build_signal({
+            "type": "compare", "op": "<",
+            "left": {"type": "position", "field": "bars_held"},
+            "right": {"type": "lag", "bars": 1,
+                      "inner": {"type": "position", "field": "bars_held"}},
+        })
+        ctx = BarContext(store)
+        ctx._set_position_depth(10)
+        sortie: list[float | None] = []
+        for i in range(n):
+            ctx._seek(i)
+            ctx._set_position(etats[i])
+            try:
+                sortie.append(signal(ctx))
+            except InsufficientHistoryError:
+                # La barre 0 n'a pas de precedente. Dans un vrai run le runner
+                # ne fait pas decider la strategie pendant le prechauffage ;
+                # ici on garde l'alignement des indices.
+                sortie.append(None)
+        return sortie
+
+    def test_elle_repere_chaque_nouveau_trade(self):
+        """Trois trades de 4, 3 et 5 barres, dos a dos."""
+        sortie = self.suite([4, 3, 5])
+        # La premiere barre n'a pas de precedente ; les deux frontieres sont
+        # aux indices 4 et 7.
+        assert [i for i, v in enumerate(sortie) if v == 1.0] == [4, 7]
+
+    def test_elle_est_aveugle_aux_trades_d_une_seule_barre(self):
+        """Le regime que le defaut `is_last` produisait.
+
+        Huit trades d'une barre : `bars_held` vaut 0 partout, `0 < 0` est faux,
+        et la frontiere entre trades est INVISIBLE a la regle - alors qu'elle
+        existe bel et bien du point de vue du portefeuille.
+        """
+        sortie = self.suite([1] * 8)
+        assert all(v != 1.0 for v in sortie if v is not None), (
+            "un trade d'une barre ne peut pas etre repere ainsi"
+        )
+
+    def test_le_melange_ne_repere_que_les_trades_assez_longs(self):
+        """Consequence pratique : une garde batie dessus SOUS-COMPTE, et le
+        sous-comptage est invisible - elle mord moins, sans rien signaler.
+
+        Quatre trades de 3, 1, 1 et 3 barres : `bars_held` parcourt
+        `0,1,2 | 0 | 0 | 0,1,2`. Il y a TROIS frontieres - aux indices 3, 4 et
+        5 - et une seule est vue, celle qui suit un trade assez long pour avoir
+        fait monter le compteur.
+        """
+        sortie = self.suite([3, 1, 1, 3])
+        assert [i for i, v in enumerate(sortie) if v == 1.0] == [3]

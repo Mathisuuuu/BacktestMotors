@@ -1125,3 +1125,57 @@ redecouvrait la frontiere entre trades a sa maniere. Le correctif ne calcule pas
 mieux : il RECOPIE la frontiere de celui qui la connait.
 
 Fonde sur [[log]] (2026-09-14) · `tests/unit/test_frontiere_de_trade.py`
+
+---
+
+## L33 -- Le defaut cachait la preuve de lui-meme
+
+« Arreter apres N pertes dans la seance » ne mordait pas. J'ai cherche la cause
+dans trois directions, et les trois etaient fausses :
+
+- l'ordre du runner - `_set_position` precede bien `on_bar`, verifie ;
+- la borne de l'historique de position - elargie par `extra_warmup`, sans effet ;
+- `cumulative` sur un sous-arbre `position` - isole sur une trajectoire
+  controlee : **360/360 justes** avec le tampon vivant, a toutes les
+  profondeurs. Le chemin de reconstruction rend `None`, jamais une valeur
+  fausse.
+
+La cause etait [[lessons]] L31, le `is_last` qui marquait 72 % des barres.
+
+Le mecanisme, et pourquoi il est instructif
+--------------------------------------------
+Le vocabulaire n'a pas d'acces aux trades fermes. La seule facon de reperer la
+fin d'un trade depuis une regle est de voir `bars_held` RECULER. Or le defaut
+`is_last` faisait sortir et re-entrer a chaque barre : **chaque trade durait une
+barre**, `bars_held` valait 0 en permanence, et `0 < 0` est faux.
+
+Mesure, meme strategie, meme echantillon :
+
+| | ancien `is_last` | apres correctif |
+|---|---|---|
+| trades fermes | 41 110 | 12 585 |
+| `bars_held = 0` | **111 137 (88 %)** | 77 243 (61 %) |
+| fin de trade DETECTEE | **3 995** | 12 497 |
+| garde active, max pertes/seance | 33 | **4** |
+
+Le detecteur voyait **9,7 %** des fins de trade. Le defaut produisait des trades
+d'une barre, et les trades d'une barre sont precisement ceux qu'aucune regle ne
+peut reperer. **Il fabriquait l'angle mort dans lequel il se cachait.**
+
+Ce qu'il faut en retenir pour la prochaine fois
+------------------------------------------------
+Quand une garde ne mord pas, la tentation est de soupconner le mecanisme de la
+garde. Ici il fonctionnait : c'est son ENTREE qui etait corrompue. La question a
+poser en premier n'est pas « mon detecteur marche-t-il » mais **« que voit-il
+reellement »** - une seule mesure du signal brut, 6 020 declenchements contre
+1 838, aurait pointe la bonne direction en une minute.
+
+Un avertissement qui reste
+---------------------------
+`bars_held < lag(1, bars_held)` repere une fin de trade, pas une PERTE. Le
+vocabulaire ne voit ni les frais ni le prix du fill de sortie : `close <
+entry_price` a la derniere barre en position est une approximation. C'est
+pourquoi la garde « une perte » plafonne a quatre pertes par seance mesurees en
+P&L net, et non a une.
+
+Fonde sur [[log]] (2026-09-14) · `tests/unit/test_frontiere_de_trade.py`

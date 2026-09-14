@@ -17,7 +17,7 @@ generated: true
 | Indicateur | Valeur |
 |---|---|
 | Pages de wiki | 27 |
-| Entrees de log | 193 |
+| Entrees de log | 197 |
 | Derniere activite | 2026-09-14 |
 | Idees ecartees (ledger) | 22 |
 | Idees en attente (ledger) | 4 |
@@ -27,7 +27,7 @@ generated: true
 | Pages `reference/` | 7 |
 | Pages `research/` | 1 |
 
-**Activite par type :** note × 80, fix × 41, feat × 32, decision × 20, mesure × 8, essai × 4, experiment × 2, setup × 1, lint × 1, audit × 1, refactor × 1, perf × 1, bug × 1
+**Activite par type :** note × 82, fix × 42, feat × 32, decision × 20, mesure × 9, essai × 4, experiment × 2, setup × 1, lint × 1, audit × 1, refactor × 1, perf × 1, bug × 1
 
 ## Experiences
 
@@ -46,14 +46,14 @@ Le total des essais alimente le Deflated Sharpe : un essai non enregistre gonfle
 
 ## Derniere activite — 8 entree(s)
 
+- **2026-09-14** — note | Avertissement qui subsiste : `bars_held < lag(1, bars_held)` repere une FIN DE TRADE, pas une perte | le vocabulaire ne voit ni les frais ni le prix du fill de sortie. `close < entry_price` a la derniere barre en position est une approximation, d'ou une garde « une perte » qui plafonne a quatre pertes par seance mesurees en P&L net
+- **2026-09-14** — note | Trois pistes explorees et ECARTEES avant de trouver : l'ordre du runner (correct), la borne de l'historique de position (elargie, sans effet), et `cumulative` sur `position` | ce dernier isole sur trajectoire controlee : **360/360 justes** avec le tampon vivant, a toutes les profondeurs ; le chemin de reconstruction rend `None`, jamais une valeur fausse. Le tampon est donc sain sur les sous-arbres non memoisables
+- **2026-09-14** — mesure | Avec les deux correctifs : sans garde 12 585 trades et -5,36 % ; **stop apres 1 perte 5 966 trades et +3,60 %** ; stop apres 2 pertes 8 948 trades et +6,15 % | les seances a 3 pertes ou plus tombent de 1 094 a 25. Chiffres d'une sonde, PAS un essai : la strategie sondee est un momentum jetable, aucune archive
+- **2026-09-14** — fix | **La garde « apres N pertes » mord** : la cause n'etait pas elle, c'etait le `is_last` de [[lessons]] L31 | le defaut faisait sortir et re-entrer a chaque barre, donc chaque trade durait UNE barre, donc `bars_held` valait 0 en permanence - et `bars_held < lag(1, bars_held)`, seule facon de reperer une fin de trade depuis une regle, est alors toujours faux. Le detecteur voyait **9,7 %** des fins de trade (3 995 sur 41 110). Lecon [[lessons]] L33
 - **2026-09-14** — note | L'attribution horaire n'est PAS un outil d'optimisation | retenir les heures qui gagnent est du sur-ajustement, et les tranches ne sont pas des essais independants - memes seances, memes regimes, meme strategie. L'usage legitime est de constater une MECANIQUE, pas de choisir un seuil
 - **2026-09-14** — feat | **Attribution horaire** dans le rapport : trades, P&L net et hit par heure depuis l'ouverture declaree | premier diagnostic d'une strategie intraday, jusqu'ici inaccessible. Sur `intraday_opening_range` : -55 987 sur la tranche +2 h et -32 877 sur +4 h, gains partout ailleurs. Un garde-fou REFUSE un tableau dont les lignes ne totalisent pas les trades fermes - incomplet, il se lirait comme complet
 - **2026-09-14** — fix | **`is_last` marquait 71,9 % des barres** au lieu d'une par seance : 90 515 sur 125 806 sur ES en 30 minutes | l'ecriture etait `ts >= cloture`, vraie pour toutes les barres d'apres-cloture, qui appartiennent encore a la seance. Aucune des 7 empreintes ne bouge : elles sont toutes quotidiennes, regime ou une seance contient une barre et ou le defaut est invisible. Lecon [[lessons]] L31
 - **2026-09-14** — fix | **`bars_held` et `entry_price` decrivaient deux trades differents** ; le suivi recopie desormais la frontiere du portefeuille | `paire_es_nq` : 149 -> 33 trades, dont **121 sur 149 etaient des artefacts** d'une boucle sortie/re-entree. Empreinte de resultat changee, `config_hash` INCHANGE - la specification n'a pas bouge. Lecon [[lessons]] L32
-- **2026-09-14** — feat | **Marge de JOUR** : `execution.intraday_margin_ratio` allege la marge immobilisee | la table porte des marges OVERNIGHT (ES 17 000, NQ 27 000) qu'un intraday ne paie pas. Un RATIO declare plutot qu'une table de marges de jour : celle-ci est fixee par le COURTIER, aucun chiffre publie a recopier. Laisse a `null`, le champ est retire de la forme canonique - sans quoi les 7 `config_hash` changeaient
-- **2026-09-14** — note | Les marges declarees sont des marges OVERNIGHT (ES 17 000, NQ 27 000) | une strategie intraday paie chez un courtier une marge de jour, d'un ordre de grandeur plus faible. Tout dimensionnement intraday du depot est donc trop contraint - c'est ce qui a fait lire le run Zarattini comme une strategie perdante
-- **2026-09-14** — mesure | Consequence : « arreter apres N pertes dans la seance » n'est PAS exprimable, alors que « un seul trade par seance » l'est | le second ne demande que de compter des entrees - verifie, 12,54 -> 0,89 trade par seance. Le premier demande l'ISSUE d'un trade passe, donc sa frontiere. Deux formulations essayees (`position == 0`, puis remise a zero de `bars_held`) : aucune ne mord
-- **2026-09-14** — mesure | Ce n'est pas un cas de bord : sur un momentum ES 30 min, **30 119 barres sur 37 615 portent DEUX fills** - sortie et re-entree immediates | la position n'est observee a plat que 3 748 fois pour 33 867 trades fermes. Le portefeuille connait la frontiere entre trades ; le vocabulaire de signaux ne la voit pas
 
 ## Next Actions
 
@@ -131,13 +131,22 @@ coexistence, et `tests/test_nautilus_coexistence.py` la garde.
       empreintes parce qu'elles sont toutes quotidiennes, regime ou une seance
       contient une barre ([[lessons]] L31).
 
-- [ ] **« Arreter apres N pertes dans la seance » n'est TOUJOURS pas
-      exprimable.** C'etait la motivation du point 2, et le correctif n'a pas
-      suffi. Deux formulations essayees, aucune ne mord. Ce qui reste a
-      elucider : `cumulative` sur un sous-arbre qui lit `position` est-il juste ?
-      Son tampon de seance n'a jamais ete conditionne a la memoisabilite, et
-      l'historique de position est BORNE par le `warmup_bars` declare - deux
-      pistes, aucune verifiee.
+- [x] **« Arreter apres N pertes dans la seance » MORD (2026-09-14).** La
+      cause n'etait ni la garde ni `cumulative` : c'etait le `is_last` de
+      [[lessons]] L31. Le defaut faisait durer chaque trade UNE barre, donc
+      `bars_held` valait 0 en permanence, donc `bars_held < lag(1, bars_held)` -
+      seule facon de reperer une fin de trade depuis une regle - etait toujours
+      faux. Le detecteur voyait **9,7 %** des fins de trade.
+      **Le defaut fabriquait l'angle mort dans lequel il se cachait**
+      ([[lessons]] L33).
+      Les trois pistes ecartees en chemin sont consignees au log ; retenir que
+      `cumulative` sur `position` est SAIN - 360/360 justes sur trajectoire
+      controlee, le tampon vivant a toutes les profondeurs.
+- [ ] **Un detecteur de PERTE, et pas seulement de fin de trade.**
+      `close < entry_price` a la derniere barre en position ignore les frais et
+      le prix du fill de sortie. Mesure : une garde « une perte » plafonne a
+      QUATRE pertes par seance comptees en P&L net. Ce qu'il faudrait : un champ
+      `position` portant le P&L latent net, ou un acces au dernier trade ferme.
 - [ ] **Les trois exemples intraday n'ont pas ete rejoues** depuis les deux
       correctifs. Leurs chiffres publies au log du 2026-09-14 sont ceux d'AVANT.
 
