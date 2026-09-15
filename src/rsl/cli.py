@@ -30,7 +30,8 @@ from collections.abc import Sequence
 from pathlib import Path
 
 from rsl.composition import StrategyFile, compose, est_fichier_de_strategie
-from rsl.config import BacktestSpec
+from rsl.config import BacktestSpec, load_stores
+from rsl.controles import Gravite, controler, render
 from rsl.data.instruments import INSTRUMENTS, get_instrument
 from rsl.data.loader import validate_file
 from rsl.errors import ConfigurationError, RslError
@@ -206,6 +207,23 @@ def _build_parser() -> argparse.ArgumentParser:
         ),
     )
     example.set_defaults(handler=_cmd_example)
+
+    check = sub.add_parser(
+        "check",
+        help="confronte une specification a ses donnees, sans la lancer",
+    )
+    check.add_argument("config", type=Path)
+    check.add_argument(
+        "--settings",
+        type=Path,
+        help="reglages du run quand CONFIG est une strategie seule",
+    )
+    check.add_argument(
+        "--symbol",
+        help="instrument sur lequel appliquer une strategie mono-instrument",
+    )
+
+    check.set_defaults(handler=_cmd_check)
 
     run = sub.add_parser("run", help="execute un backtest")
     run.add_argument("config", type=Path)
@@ -518,6 +536,31 @@ def _cmd_example(args: argparse.Namespace) -> int:
     )
     print(json.dumps(charge, indent=2, ensure_ascii=False))
     return EXIT_OK
+
+
+def _cmd_check(args: argparse.Namespace) -> int:
+    """Confronte une specification a ses donnees, SANS la faire tourner.
+
+    Ce que cette commande attrape est la zone ou le socle ne peut ni refuser
+    ni deviner : une specification parfaitement valide dont les termes ne
+    veulent pas dire ce que leur nom suggere. `is_last` marque la premiere
+    barre atteignant l'heure DECLAREE, pas la derniere barre de la seance ;
+    `vol_target` compte sa fenetre en BARRES ; `minutes_from_open` ne vaut
+    jamais zero.
+
+    Le 2026-09-15, trois des cinq ecarts d'une replication venaient de la, et
+    chacun a coute une enquete apres un quart d'heure de calcul. Ils tiennent
+    ici en une seconde.
+
+    Code de sortie 2 des qu'un constat est de gravite ERREUR : un script
+    d'integration peut donc refuser de lancer le run.
+    """
+    spec = _load_spec(args.config, args.settings, args.symbol)
+    stores, _instruments, _sources = load_stores(spec)
+    constats = controler(spec, stores)
+    print(render(constats))
+    grave = any(c.gravite is Gravite.ERREUR for c in constats)
+    return EXIT_CHECK_FAILED if grave else EXIT_OK
 
 
 def _cmd_run(args: argparse.Namespace) -> int:
