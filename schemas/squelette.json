@@ -10,6 +10,421 @@
     "entry_stop",
     "exit_quantity"
   ],
+  "compositions": {
+    "cloture_forcee": {
+      "attention": "DEUX pieges. `is_last` ne marque pas la derniere barre de la seance mais la premiere a ATTEINDRE l'heure declaree : une demi-journee n'en porte AUCUNE, et la regle n'y declenche jamais - mesure a 90 seances sur 2 748 sur NQ. Et avec `lag_bars: 1`, l'ordre se remplit a l'ouverture de la barre SUIVANTE, donc la seance d'apres : declarer `execution.max_fill_gap_seconds` ou sortir une barre plus tot. `rsl check` signale les deux.",
+      "forme": {
+        "left": {
+          "field": "is_last",
+          "lag": 0,
+          "type": "session"
+        },
+        "op": "==",
+        "right": {
+          "type": "constant",
+          "value": 1.0
+        },
+        "type": "compare"
+      },
+      "quand": "Sortir avant la nuit - ce qui fait d'une strategie une intraday.",
+      "resume": "Vrai a la barre qui atteint l'heure de fermeture DECLAREE."
+    },
+    "dispersion_au_meme_rang": {
+      "attention": "`across: sessions` compte la fenetre en SEANCES au meme rang, par le calendrier declare - un `stride` en barres suppose des seances de longueur egale et ne tombe jamais sur le bon rang ([[lessons]] L29). `session_lag: 1` exclut la seance EN COURS, sans quoi on calibrerait sur le mouvement qu'on s'apprete a lui comparer. Une seance ECOURTEE n'a pas de barre au rang demande : la fenetre rend alors `None`.",
+      "forme": {
+        "across": "sessions",
+        "inner": {
+          "inner": {
+            "inner": {
+              "left": {
+                "left": {
+                  "field": "close",
+                  "lag": 0,
+                  "type": "price"
+                },
+                "op": "/",
+                "right": {
+                  "field": "open",
+                  "lag": 0,
+                  "type": "session"
+                },
+                "type": "arith"
+              },
+              "op": "-",
+              "right": {
+                "type": "constant",
+                "value": 1.0
+              },
+              "type": "arith"
+            },
+            "op": "abs",
+            "type": "math"
+          },
+          "sessions": 1,
+          "type": "session_lag"
+        },
+        "stat": "mean",
+        "type": "rolling",
+        "window": 60
+      },
+      "quand": "Enveloppe de volatilite intra-journaliere : de combien le prix s'ecarte-t-il de son ouverture, a cette heure-ci, un jour ordinaire ?",
+      "resume": "Moyenne, sur les N seances precedentes, d'une grandeur prise au MEME rang intra-seance."
+    },
+    "donnee_exogene_fraiche": {
+      "attention": "Le controle d'age n'est pas un confort : une serie qui cesse d'etre alimentee rend sa DERNIERE valeur indefiniment, et la strategie tourne sur un fossile sans que rien ne le signale.",
+      "forme": {
+        "operands": [
+          {
+            "left": {
+              "field": "age_minutes",
+              "name": "cot_net",
+              "type": "exogenous"
+            },
+            "op": "<",
+            "right": {
+              "type": "constant",
+              "value": 10080.0
+            },
+            "type": "compare"
+          },
+          {
+            "left": {
+              "name": "cot_net",
+              "type": "exogenous"
+            },
+            "op": ">",
+            "right": {
+              "type": "constant",
+              "value": 0.0
+            },
+            "type": "compare"
+          }
+        ],
+        "type": "all_of"
+      },
+      "quand": "COT, open interest, sentiment - tout ce qui ne vient pas du prix.",
+      "resume": "Lire une serie exogene declaree, en refusant une valeur perimee."
+    },
+    "etendue_d_ouverture": {
+      "attention": "Le `mask` est ce qui fige la valeur : passe la 30e minute, aucune barre neuve n'entre dans l'agregat. Ecrire la meme chose avec `if_then_else(..., sentinelle)` rendrait la sentinelle sur une tranche vide ([[lessons]] L30).",
+      "forme": {
+        "inner": {
+          "field": "high",
+          "lag": 0,
+          "type": "price"
+        },
+        "mask": {
+          "left": {
+            "field": "minutes_from_open",
+            "lag": 0,
+            "type": "session"
+          },
+          "op": "<=",
+          "right": {
+            "type": "constant",
+            "value": 30.0
+          },
+          "type": "compare"
+        },
+        "stat": "max",
+        "type": "cumulative"
+      },
+      "quand": "Opening range breakout.",
+      "resume": "Le plus haut atteint pendant les N premieres minutes de la seance, fige pour le reste de la journee."
+    },
+    "filtre_par_un_autre_instrument": {
+      "attention": "Exige que l'instrument soit declare dans `data[]` et que la strategie soit transversale (`panel_rules@1`). Un `peer` sous un noeud qui RECULE recule aussi le pair, par les regles du panneau.",
+      "forme": {
+        "inner": {
+          "field": "close",
+          "lag": 0,
+          "type": "price"
+        },
+        "symbol": "NQ.v.0",
+        "type": "peer"
+      },
+      "quand": "Filtre de regime, ou ratio de paire.",
+      "resume": "Lire une grandeur d'un AUTRE instrument du panneau."
+    },
+    "grille_semi_horaire": {
+      "attention": "`minutes_from_open` parcourt 1..N et ne vaut JAMAIS zero : une barre est horodatee a sa CLOTURE. Le point 30 minutes apres l'ouverture est la barre qui SE FERME a ce moment-la.",
+      "forme": {
+        "operands": [
+          {
+            "left": {
+              "field": "minutes_from_open",
+              "lag": 0,
+              "type": "session"
+            },
+            "op": ">=",
+            "right": {
+              "type": "constant",
+              "value": 30.0
+            },
+            "type": "compare"
+          },
+          {
+            "left": {
+              "field": "minutes_from_open",
+              "lag": 0,
+              "type": "session"
+            },
+            "op": "<=",
+            "right": {
+              "type": "constant",
+              "value": 360.0
+            },
+            "type": "compare"
+          },
+          {
+            "left": {
+              "left": {
+                "field": "minutes_from_open",
+                "lag": 0,
+                "type": "session"
+              },
+              "op": "%",
+              "right": {
+                "type": "constant",
+                "value": 30.0
+              },
+              "type": "arith"
+            },
+            "op": "==",
+            "right": {
+              "type": "constant",
+              "value": 0.0
+            },
+            "type": "compare"
+          }
+        ],
+        "type": "all_of"
+      },
+      "quand": "Strategies qui n'evaluent leurs signaux qu'a intervalles fixes plutot qu'a chaque barre.",
+      "resume": "Vrai aux points de controle toutes les 30 minutes, entre la 30e et la 360e minute de seance."
+    },
+    "pertes_nettes_de_la_seance": {
+      "attention": "Le `mask` est OBLIGATOIRE : `closed_pnl` vaut zero par remplissage sur les barres ou aucun trade ne se ferme, et sans `closed_trade` pour dire quand ce zero a un sens, ce serait une sentinelle. Ecrire la meme garde avec `close < entry_price` ignore les FRAIS et le prix du fill de sortie : mesure, une garde une garde a UNE perte plafonnait a QUATRE pertes par seance.",
+      "forme": {
+        "inner": {
+          "left": {
+            "field": "closed_pnl",
+            "type": "position"
+          },
+          "op": "<",
+          "right": {
+            "type": "constant",
+            "value": 0.0
+          },
+          "type": "compare"
+        },
+        "mask": {
+          "field": "closed_trade",
+          "type": "position"
+        },
+        "stat": "count_true",
+        "type": "cumulative"
+      },
+      "quand": "Garde : arreter apres N pertes dans la journee.",
+      "resume": "Combien d'allers-retours se sont fermes EN PERTE NETTE depuis l'ouverture de la seance."
+    },
+    "plus_haut_de_la_veille": {
+      "attention": "Le `lag: 1` n'est pas un confort. `session.high` au lag 0 est REFUSE : le plus haut de la seance en cours est un fait futur tant qu'elle n'est pas close.",
+      "forme": {
+        "field": "high",
+        "lag": 1,
+        "type": "session"
+      },
+      "quand": "Cassure de niveau : PDH / PDL.",
+      "resume": "Le plus haut de la seance PRECEDENTE."
+    },
+    "prix_typique": {
+      "forme": {
+        "left": {
+          "left": {
+            "left": {
+              "field": "high",
+              "lag": 0,
+              "type": "price"
+            },
+            "op": "+",
+            "right": {
+              "field": "low",
+              "lag": 0,
+              "type": "price"
+            },
+            "type": "arith"
+          },
+          "op": "+",
+          "right": {
+            "field": "close",
+            "lag": 0,
+            "type": "price"
+          },
+          "type": "arith"
+        },
+        "op": "/",
+        "right": {
+          "type": "constant",
+          "value": 3.0
+        },
+        "type": "arith"
+      },
+      "quand": "Brique du VWAP, et proxy du prix moyen d'une barre.",
+      "resume": "(haut + bas + cloture) / 3."
+    },
+    "rendement": {
+      "forme": {
+        "left": {
+          "left": {
+            "field": "close",
+            "lag": 0,
+            "type": "price"
+          },
+          "op": "/",
+          "right": {
+            "bars": 1,
+            "inner": {
+              "field": "close",
+              "lag": 0,
+              "type": "price"
+            },
+            "type": "lag"
+          },
+          "type": "arith"
+        },
+        "op": "-",
+        "right": {
+          "type": "constant",
+          "value": 1.0
+        },
+        "type": "arith"
+      },
+      "quand": "Des qu'on raisonne en pourcentage plutot qu'en points.",
+      "resume": "Rendement simple de la barre : close / close[-1] - 1."
+    },
+    "stop_suiveur_sur_extreme": {
+      "forme": {
+        "left": {
+          "field": "close",
+          "lag": 0,
+          "type": "price"
+        },
+        "op": "<",
+        "right": {
+          "left": {
+            "field": "high_since_entry",
+            "type": "position"
+          },
+          "op": "-",
+          "right": {
+            "left": {
+              "type": "constant",
+              "value": 2.0
+            },
+            "op": "*",
+            "right": {
+              "params": {
+                "window": 14
+              },
+              "ref": "atr@1",
+              "type": "primitive"
+            },
+            "type": "arith"
+          },
+          "type": "arith"
+        },
+        "type": "compare"
+      },
+      "quand": "Stop suiveur, evalue a la cloture.",
+      "resume": "Sortir quand la cloture retombe de N x ATR sous le plus haut atteint DEPUIS L'ENTREE."
+    },
+    "volume_en_dollars_moyen": {
+      "forme": {
+        "inner": {
+          "left": {
+            "field": "close",
+            "lag": 0,
+            "type": "price"
+          },
+          "op": "*",
+          "right": {
+            "field": "volume",
+            "lag": 0,
+            "type": "price"
+          },
+          "type": "arith"
+        },
+        "stat": "mean",
+        "type": "rolling",
+        "window": 20
+      },
+      "quand": "Filtre de liquidite : ne negocier que ce qui s'echange.",
+      "resume": "Moyenne sur N barres de cloture x volume - l'`adv{N}` usuel."
+    },
+    "vwap_de_seance": {
+      "attention": "Il n'existe AUCUN noeud `vwap`. `cumulative` remet a zero a chaque seance, ce qui donne l'ancrage sans qu'on ait a le demander - mais exige une `session` declaree dans `data[]`.",
+      "forme": {
+        "left": {
+          "inner": {
+            "left": {
+              "left": {
+                "left": {
+                  "left": {
+                    "field": "high",
+                    "lag": 0,
+                    "type": "price"
+                  },
+                  "op": "+",
+                  "right": {
+                    "field": "low",
+                    "lag": 0,
+                    "type": "price"
+                  },
+                  "type": "arith"
+                },
+                "op": "+",
+                "right": {
+                  "field": "close",
+                  "lag": 0,
+                  "type": "price"
+                },
+                "type": "arith"
+              },
+              "op": "/",
+              "right": {
+                "type": "constant",
+                "value": 3.0
+              },
+              "type": "arith"
+            },
+            "op": "*",
+            "right": {
+              "field": "volume",
+              "lag": 0,
+              "type": "price"
+            },
+            "type": "arith"
+          },
+          "stat": "sum",
+          "type": "cumulative"
+        },
+        "op": "/",
+        "right": {
+          "inner": {
+            "field": "volume",
+            "lag": 0,
+            "type": "price"
+          },
+          "stat": "sum",
+          "type": "cumulative"
+        },
+        "type": "arith"
+      },
+      "quand": "Filtre de sens du flux intra-journalier, et stop qui se resserre tout seul au fil de la seance.",
+      "resume": "VWAP ANCRE a l'ouverture de la seance : somme(prix typique x volume) / somme(volume), les deux depuis l'ouverture."
+    }
+  },
   "contraintes": [
     "TOUT bloc de cette specification et TOUT noeud de signal accepte un champ",
     "`note` : un texte, ou une liste de textes pour plusieurs lignes. Il est",
@@ -630,6 +1045,15 @@
           "type": "entier"
         }
       },
+      "pieges": [
+        {
+          "champ": "stat",
+          "controle": "rank-temporel",
+          "promesse": "`rank` classe la valeur parmi les instruments",
+          "quand": "on cherche a classer des instruments entre eux. Il n'existe AUCUN rang transversal dans le vocabulaire des signaux ; cela passe par le moule `ranking@1`.",
+          "realite": "`rank` est TEMPOREL : rang de la valeur courante dans sa propre fenetre de temps"
+        }
+      ],
       "resume": "Statistique glissante d'un sous-signal QUELCONQUE, pas d'un champ de prix."
     },
     "session": {
@@ -655,6 +1079,22 @@
           "type": "entier"
         }
       },
+      "pieges": [
+        {
+          "champ": "is_last",
+          "controle": "is_last-absent",
+          "promesse": "la derniere barre de la seance",
+          "quand": "une seance qui s'arrete avant l'heure declaree - demi-journee, trou de donnees - ne porte AUCUN `is_last`, et une regle qui le cite n'y declenche jamais. Mesure sur NQ le 2026-09-15 : 90 seances sur 2 748. Le nom ne PEUT pas etre corrige : la derniere barre d'une seance est un fait FUTUR, il faudrait regarder la barre suivante pour le savoir.",
+          "realite": "la PREMIERE barre a atteindre l'heure de fermeture DECLAREE"
+        },
+        {
+          "champ": "minutes_from_open",
+          "controle": "minutes-jamais-nulles",
+          "promesse": "minutes ecoulees depuis l'ouverture, donc 0 a l'ouverture",
+          "quand": "une barre est horodatee a sa CLOTURE : la premiere barre d'une seance d'une minute clot une minute apres l'ouverture. Comparer a zero donne une regle qui ne se declenche jamais.",
+          "realite": "parcourt 1..N et ne vaut JAMAIS zero"
+        }
+      ],
       "resume": "Feuille : une grandeur de la seance courante ou d'une seance close."
     },
     "session_lag": {

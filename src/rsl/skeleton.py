@@ -32,6 +32,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from rsl.compositions import describe_compositions
 from rsl.config import BacktestSpec
 from rsl.data.instruments import known_roots
 from rsl.primitives.registry import describe_registry
@@ -256,12 +257,14 @@ def _assembler() -> SpecDict:
             for entree in describe_strategies()
         },
         "noeuds": {
-            str(entree["type"]): {
-                "resume": entree["summary"],
-                "champs": _champs_de_noeud(_objet(entree["schema"])),
-            }
+            str(entree["type"]): _decrire_noeud(entree)
             for entree in describe_node_types()
         },
+        # Les grandeurs qui n'ont PAS de noeud - un VWAP ancre, un rendement,
+        # une enveloppe au meme rang de seance. Une liste de types ne dit pas
+        # comment on les ASSEMBLE, et c'est precisement ce qu'un auteur ne
+        # peut pas deviner.
+        "compositions": describe_compositions(),
         "primitives": {
             str(entree["ref"]): {
                 "resume": entree["summary"],
@@ -270,6 +273,28 @@ def _assembler() -> SpecDict:
             for entree in describe_registry()
         },
     }
+
+
+def _decrire_noeud(entree: SpecDict) -> SpecDict:
+    """Un noeud, ses champs, et ses PIEGES s'il en a.
+
+    Les pieges ne sont pas un ornement. Un auteur - humain ou machine - qui
+    lit `is_last` dans une liste de choix n'a aucun moyen de savoir que le
+    champ marque la premiere barre ATTEIGNANT l'heure declaree, ni qu'une
+    demi-journee n'en porte aucune. C'est le defaut qui a coute une matinee
+    le 2026-09-15.
+
+    Publies seulement quand il y en a : une cle vide partout ferait du bruit
+    la ou il n'y a rien a dire.
+    """
+    decrit: SpecDict = {
+        "resume": entree["summary"],
+        "champs": _champs_de_noeud(_objet(entree["schema"])),
+    }
+    pieges = entree.get("pieges")
+    if isinstance(pieges, list) and pieges:
+        decrit["pieges"] = pieges
+    return decrit
 
 
 def _champs_de_noeud(schema: SpecDict) -> SpecDict:

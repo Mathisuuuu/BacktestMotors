@@ -752,9 +752,9 @@ class Exogenous:
                 "une seance qui s'arrete avant l'heure declaree - demi-journee, "
                 "trou de donnees - ne porte AUCUN `is_last`, et une regle qui le "
                 "cite n'y declenche jamais. Mesure sur NQ le 2026-09-15 : 90 "
-                "seances sur 2 748. Le nom ne PEUT pas etre corrige : « la "
-                "derniere barre » est un fait futur, il faudrait regarder la "
-                "barre suivante pour le savoir."
+                "seances sur 2 748. Le nom ne PEUT pas etre corrige : la "
+                "derniere barre d'une seance est un fait FUTUR, il faudrait "
+                "regarder la barre suivante pour le savoir."
             ),
             controle="is_last-absent",
         ),
