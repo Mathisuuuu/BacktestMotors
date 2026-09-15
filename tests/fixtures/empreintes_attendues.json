@@ -13,6 +13,16 @@
     "result_fingerprint": "7757368f67d2f07ec6e8ddc6788042cb6e634b50c8c4ba7ff64dbcf82faf4969",
     "symbol": "ES.v.0"
   },
+  "intraday_opening_range.json": {
+    "config_hash": "3fa88b83cea7808e6488fe0ef72fcd7869f586ba7283a6c4e0e984f9a6451d6c",
+    "final_equity": 471391.85000017786,
+    "n_trades": 7639,
+    "result_fingerprint": "3f9ef2c84861f7aa3ac2906ecd686bdf9d7306e04a21c0e98638fa072db91d99",
+    "symbol": "ES.v.0"
+  },
+  "intraday_vwap_reversion.json": {
+    "symbol": "ES.v.0"
+  },
   "momentum_12_1_mensuel.json": {
     "config_hash": "776b703db6724b6709df84e3ea731c0b2296bde5979043c0180de5b63660ba5d",
     "final_equity": 1731615.600000003,
