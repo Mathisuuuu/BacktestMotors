@@ -1,6 +1,6 @@
 ---
 type: reference
-updated: 2026-09-14
+updated: 2026-09-15
 autorite: tests/couverture/recensement_intraday.py
 ---
 
@@ -23,10 +23,12 @@ Aucun verdict n'est donne de memoire.
 
 ## Deux comptages, et pourquoi il en faut deux
 
-| | 2026-09-14, premier jet | apres les ajouts du meme jour |
-|---|---|---|
-| **Elements** (71) | 63 OK — 88,7 % | **67 OK**, 2 partiels, 2 impossibles — **94,4 %** |
-| **Familles** (25) | 21 realisables — 84,0 % | **24 realisables**, 1 bloquee — **96,0 %** |
+| | 2026-09-14, premier jet | apres les ajouts du 14 | **2026-09-15** |
+|---|---|---|---|
+| **Elements** (71) | 63 OK — 88,7 % | 67 OK, 2 partiels, 2 impossibles — 94,4 % | **70 OK**, 0 partiel, 1 impossible — **98,6 %** |
+| **Familles** (25) | 21 realisables — 84,0 % | 24 realisables, 1 bloquee — 96,0 % | **24 realisables**, 1 bloquee — **96,0 %** |
+
+Le saut du 15 vient pour **deux tiers d'une correction, pas d'un ajout** : deux des quatre manques etaient des verdicts ECRITS A LA MAIN devenus faux ([[lessons]] L36). Le troisieme, lui, est un vrai ajout — la serie exogene.
 
 Le second est le chiffre honnete. Un pourcentage d'elements **surestime** la
 couverture : une strategie est une COMBINAISON, et un seul element manquant
@@ -45,16 +47,45 @@ comblees depuis.
 | Trading d'annonce macro | aucun canal de donnees exogene | **comble** — section `events` + noeud `event` |
 | Scalping sur carnet | le moteur est a la BARRE | **bloque**, et hors du perimetre declare |
 
+Le dernier element non couvert est le meme que la derniere famille bloquee :
+**le carnet d'ordres**. Il exige des TICKS, donc un autre moteur d'execution
+— c'est l'item ouvert cote Nautilus. Tant qu'il tient, **98,6 % est le
+plafond**, et c'est une information plus utile qu'un objectif de 99 %.
+
 Les trois combles touchaient chacun une idee que le ledger avait ecartee.
 Aucune n'a ete rouverte : chacune remplissait la condition de reprise que le
 ledger avait ECRITE ([[lessons]] L34).
 
-Et deux reserves, qui s'ecrivent mais pas exactement :
+### Les deux reserves etaient fausses (corrige le 2026-09-15)
 
-- **taille fonction de la force du signal** — possible par `ranking@1` (poids
-  `signal`), pas par les regles de dimensionnement de `rules@1` ;
-- **deux ancrages de seance differents** — accepte sur barres brutes, refuse en
-  intra-journalier reechantillonne, et ce refus est deliberé.
+Toutes deux vivaient dans le dictionnaire `HORS_SIGNAL` du recensement, commente
+« ce que le CODE ne peut pas trancher ». Un verdict que le code ne verifie pas
+ne vieillit pas avec le code.
+
+- **taille fonction de la force du signal** — la note disait « pas par les regles
+  de dimensionnement de `rules@1` ». Or `risk.sizing.kind = signal` prend une
+  expression arbitraire avec `max_contracts` obligatoire, et
+  [nq_zarattini_60_30_15](../../examples/reglages/nq_zarattini_60_30_15.json)
+  est un `rules@1` **mono-instrument** qui s'en sert — 923 trades a taille
+  variable. J'avais ajoute le mecanisme moi-meme la veille sans rouvrir le
+  recensement.
+- **deux ancrages de seance differents** — mesure : ES 09:30-16:00 New York en
+  15min et NQ 08:30-15:00 Chicago en 1m **coexistent**, chacun avec son index de
+  seance. Le seul cas refuse est DEUX series reechantillonnees en
+  intra-journalier a ancrages differents, et ce refus porte son propre motif
+  mesure : le panneau produirait **100 % de lignes a un seul instrument**. Ce
+  n'est pas un manque, c'est une garde.
+
+### Ce qui a ete AJOUTE le 2026-09-15
+
+- **donnees fondamentales ou de sentiment** — section `exogenous` + noeud
+  `exogenous` (`value`, `age_minutes`). `evenements.py` nommait lui-meme le
+  manque : « ce module ne sait rien dire d'un libelle ou d'une surprise
+  chiffree ». Le piege n'est PAS celui des evenements — lire la derniere valeur
+  connue est aussi causal qu'un `lag` — mais une donnee fondamentale porte DEUX
+  dates, ce qu'elle mesure et quand elle a paru. Le rapport COT du mardi parait
+  le vendredi. D'ou la signature exigee : `horodatee_a_la_publication` OU un
+  `publication_lag_minutes` strictement positif.
 
 ## Ce que le chiffre ne dit pas
 

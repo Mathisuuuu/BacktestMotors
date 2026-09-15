@@ -276,6 +276,23 @@
       },
       "resume": "Feuille : distance a un evenement d'un calendrier DECLARE."
     },
+    "exogenous": {
+      "champs": {
+        "field": {
+          "choix": [
+            "value",
+            "age_minutes"
+          ],
+          "defaut": "value",
+          "type": "choix"
+        },
+        "name": {
+          "requis": true,
+          "type": "texte"
+        }
+      },
+      "resume": "Feuille : derniere valeur connue d'une serie EXOGENE declaree."
+    },
     "if_then_else": {
       "champs": {
         "condition": {
@@ -3577,6 +3594,32 @@
       },
       "requis": true,
       "type": "objet"
+    },
+    "exogenous": {
+      "element": {
+        "champs": {
+          "horodatee_a_la_publication": {
+            "defaut": false,
+            "type": "booleen"
+          },
+          "name": {
+            "requis": true,
+            "type": "texte"
+          },
+          "path": {
+            "requis": true,
+            "type": "texte"
+          },
+          "publication_lag_minutes": {
+            "defaut": 0,
+            "min": 0,
+            "type": "entier"
+          }
+        },
+        "requis": true,
+        "type": "objet"
+      },
+      "type": "liste"
     },
     "initial_cash": {
       "min_exclu": 0.0,

@@ -287,6 +287,62 @@
         "title": "ExecutionSpec",
         "type": "object"
       },
+      "ExogenousSourceSpec": {
+        "additionalProperties": false,
+        "description": "Une serie EXOGENE declaree : COT, open interest, sentiment.\n\nLe fichier porte `ts_event` en nanosecondes UTC et `value` en\nflottant. Son contenu est hache et entre au manifeste, comme les\ncotations et les calendriers.",
+        "properties": {
+          "horodatee_a_la_publication": {
+            "default": false,
+            "description": "AFFIRME que `ts_event` est l'instant ou la donnee est devenue CONNAISSABLE, et non celui qu'elle mesure. Le rapport COT du mardi parait le vendredi : un fichier horodate a la mesure fait entrer trois jours de futur que rien dans le code ne peut voir.",
+            "title": "Horodatee A La Publication",
+            "type": "boolean"
+          },
+          "name": {
+            "description": "Nom lu par le noeud `exogenous`",
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Commentaire libre. Ignore par le moteur, EXCLU du config_hash. Une liste de chaines vaut plusieurs lignes.",
+            "title": "Note"
+          },
+          "path": {
+            "description": "Relatif a RSL_DATA_DIR, ou absolu",
+            "format": "path",
+            "title": "Path",
+            "type": "string"
+          },
+          "publication_lag_minutes": {
+            "default": 0,
+            "description": "Decalage applique a chaque valeur, en minutes. OBLIGATOIRE et strictement positif sans `horodatee_a_la_publication`. Mieux vaut un retard trop prudent qu'une avance invisible.",
+            "minimum": 0,
+            "title": "Publication Lag Minutes",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "name",
+          "path"
+        ],
+        "title": "ExogenousSourceSpec",
+        "type": "object"
+      },
       "FeeSpec": {
         "additionalProperties": false,
         "description": "Modele de frais. Aucun defaut : le choix doit etre ecrit.",
@@ -928,6 +984,14 @@
       "execution": {
         "$ref": "#/$defs/ExecutionSpec"
       },
+      "exogenous": {
+        "description": "Series exogenes, lues par le noeud `exogenous`",
+        "items": {
+          "$ref": "#/$defs/ExogenousSourceSpec"
+        },
+        "title": "Exogenous",
+        "type": "array"
+      },
       "initial_cash": {
         "exclusiveMinimum": 0.0,
         "title": "Initial Cash",
@@ -1546,6 +1610,51 @@
               "name"
             ],
             "title": "event@1",
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "description": "Feuille : derniere valeur connue d'une serie EXOGENE declaree.",
+            "properties": {
+              "field": {
+                "default": "value",
+                "enum": [
+                  "value",
+                  "age_minutes"
+                ],
+                "type": "string"
+              },
+              "name": {
+                "description": "Nom declare dans `exogenous`.",
+                "type": "string"
+              },
+              "note": {
+                "description": "Commentaire libre, ignore par le moteur. Une liste vaut plusieurs lignes.",
+                "oneOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  }
+                ]
+              },
+              "type": {
+                "const": "exogenous"
+              },
+              "version": {
+                "const": 1,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "type",
+              "name"
+            ],
+            "title": "exogenous@1",
             "type": "object"
           },
           {

@@ -495,6 +495,51 @@
         },
         {
           "additionalProperties": false,
+          "description": "Feuille : derniere valeur connue d'une serie EXOGENE declaree.",
+          "properties": {
+            "field": {
+              "default": "value",
+              "enum": [
+                "value",
+                "age_minutes"
+              ],
+              "type": "string"
+            },
+            "name": {
+              "description": "Nom declare dans `exogenous`.",
+              "type": "string"
+            },
+            "note": {
+              "description": "Commentaire libre, ignore par le moteur. Une liste vaut plusieurs lignes.",
+              "oneOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                }
+              ]
+            },
+            "type": {
+              "const": "exogenous"
+            },
+            "version": {
+              "const": 1,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "type",
+            "name"
+          ],
+          "title": "exogenous@1",
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
           "description": "Choisit entre deux sous-signaux selon une condition.",
           "properties": {
             "condition": {

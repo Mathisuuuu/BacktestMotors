@@ -18,6 +18,7 @@ from typing import Final, Protocol, runtime_checkable
 import numpy as np
 
 from rsl.data.evenements import EventCalendar, EventField
+from rsl.data.exogene import ChampExogene, SerieExogene
 from rsl.data.schema import (
     ABSENT,
     FLAT,
@@ -339,6 +340,17 @@ class Context(Protocol):
         """
         ...
 
+    def exogenous_value(self, name: str, field: ChampExogene) -> float | None:
+        """Derniere valeur connue d'une serie EXOGENE declaree.
+
+        Leve si aucune serie de ce nom n'est declaree, comme pour les
+        calendriers : le socle ne devine aucune source.
+
+        Rend `None` tant qu'aucune publication n'a eu lieu - jamais zero,
+        qui se lirait comme une mesure nulle.
+        """
+        ...
+
     def event_value(self, name: str, field: EventField) -> float | None:
         """Grandeur d'un calendrier d'EVENEMENTS declare.
 
@@ -387,6 +399,7 @@ class BarContext:
     __slots__ = (
         "_account",
         "_evenements",
+        "_exogenes",
         "_i",
         "_peers",
         "_positions",
@@ -402,6 +415,7 @@ class BarContext:
         # Les calendriers sont PARTAGES avec les vues reculees et les
         # pairs : ils ne dependent ni de la barre ni de l'instrument.
         self._evenements: Mapping[str, EventCalendar] = {}
+        self._exogenes: Mapping[str, SerieExogene] = {}
 
     # -- avancee du curseur : reserve au feed -----------------------------
 
@@ -411,6 +425,11 @@ class BarContext:
     def _seek(self, index: int) -> None:
         """Positionnement absolu, utilise par le feed multi-instruments."""
         self._i = index
+
+    def _set_exogenes(self, series: Mapping[str, SerieExogene]) -> None:
+        """Pose les series exogenes. Comme les calendriers : une fois, et
+        les vues reculees en heritent."""
+        self._exogenes = series
 
     def _set_events(self, calendriers: Mapping[str, EventCalendar]) -> None:
         """Branche les calendriers declares. Reserve au chargement."""
@@ -608,6 +627,24 @@ class BarContext:
             )
         return read_session(index, self._require_index(0), field, lag)
 
+    def exogenous_value(self, name: str, field: ChampExogene) -> float | None:
+        """Lit une serie exogene declaree, a la CLOTURE de la barre.
+
+        Meme instant de reference que les calendriers, et pour la meme
+        raison : c'est le seul dont la strategie dispose quand elle decide.
+        """
+        serie = self._exogenes.get(name)
+        if serie is None:
+            connues = sorted(self._exogenes) or ["aucune"]
+            raise ConfigurationError(
+                f"exogenous : aucune serie '{name}' declaree. Declarees : "
+                f"{', '.join(connues)}. Ajouter une entree a `exogenous` : le "
+                f"socle ne devine aucune source."
+            )
+        return serie.valeur(
+            int(self._store.ts_close[self._require_index(0)]), field
+        )
+
     def event_value(self, name: str, field: EventField) -> float | None:
         """Lit un calendrier declare, a l'instant de CLOTURE de la barre.
 
@@ -658,6 +695,7 @@ class BarContext:
         sub = BarContext(self._store)
         sub._seek(index)
         sub._set_events(self._evenements)
+        sub._set_exogenes(self._exogenes)
         # La vue PARTAGE l'historique de positions, et son propre curseur y
         # designe sa barre : `position` y lit donc l'etat qu'avait la position
         # a ce moment-la. Recopier l'etat courant, comme jusqu'au 2026-09-11,

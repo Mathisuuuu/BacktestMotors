@@ -16,6 +16,7 @@ from dataclasses import dataclass
 from typing import ClassVar
 
 from rsl.data.evenements import EventField
+from rsl.data.exogene import ChampExogene
 from rsl.data.feed import Context
 from rsl.data.schema import (
     ACCOUNT_FIELDS,
@@ -631,6 +632,109 @@ class Event:
                 f"{', '.join(f.value for f in EventField)}"
             )
         return cls(nom, EventField(brut))
+
+
+@signal_node(
+    "exogenous",
+    summary="Feuille : derniere valeur connue d'une serie EXOGENE declaree.",
+    fields=(
+        NodeField("name", FieldKind.STRING,
+                  description="Nom declare dans `exogenous`."),
+        NodeField(
+            "field",
+            FieldKind.STRING,
+            required=False,
+            default=ChampExogene.VALUE.value,
+            choices=tuple(f.value for f in ChampExogene),
+        ),
+    ),
+)
+@dataclass(frozen=True, slots=True)
+class Exogenous:
+    """Une grandeur qui ne vient pas du prix : COT, open interest, sentiment.
+
+    Exige une entree `exogenous` dans la specification. Sans elle le noeud
+    leve : le socle ne devine aucune source, pas plus qu'une seance ou un
+    calendrier d'annonces.
+
+    Ce que chaque champ lit
+    ------------------------
+    | Champ | Sens |
+    |---|---|
+    | `value` | derniere valeur publiee a ou avant la cloture |
+    | `age_minutes` | anciennete de cette publication |
+
+    Pourquoi `age_minutes` existe, et pourquoi il faut s'en servir
+    ---------------------------------------------------------------
+    Une serie qui cesse d'etre alimentee continue de rendre sa DERNIERE valeur
+    indefiniment. La strategie tournerait alors sur un fossile sans que rien
+    ne le signale - meme famille que [[lessons]] L30, ou une valeur neutre
+    passait pour une mesure. Composer avec `age_minutes` permet de refuser une
+    donnee perimee :
+
+        all_of(
+          compare(<, exogenous("cot_net", "age_minutes"), 10080),
+          compare(>, exogenous("cot_net"), 0)
+        )
+
+    Ce que le noeud rend quand il n'a rien a dire : `None`
+    ------------------------------------------------------
+    Aucune publication avant la barre. Et non zero, qui se lirait comme une
+    mesure nulle - un positionnement net de zero est une information, son
+    absence n'en est pas une.
+
+    La causalite, et ou elle se joue
+    ----------------------------------
+    PAS dans ce noeud : lire la derniere valeur connue est aussi causal qu'un
+    `lag`. Elle se joue dans le FICHIER, qui doit etre horodate a la
+    PUBLICATION et non a la mesure. Voir `rsl.data.exogene` : la source signe
+    `horodatee_a_la_publication`, ou declare un `publication_lag_minutes`
+    strictement positif.
+    """
+
+    NODE_TYPE: ClassVar[str] = "exogenous"
+    NODE_VERSION: ClassVar[int] = 1
+
+    name: str
+    field: ChampExogene = ChampExogene.VALUE
+
+    def __post_init__(self) -> None:
+        if not self.name:
+            raise ConfigurationError(
+                "'exogenous' exige un `name` non vide : celui declare dans "
+                "`exogenous`"
+            )
+
+    @property
+    def warmup_bars(self) -> int:
+        """Une barre suffit : la serie ne depend pas de l'historique de prix."""
+        return 1
+
+    def __call__(self, ctx: Context) -> float | None:
+        return ctx.exogenous_value(self.name, self.field)
+
+    def describe(self) -> SpecDict:
+        return {
+            "type": self.NODE_TYPE,
+            "version": self.NODE_VERSION,
+            "name": self.name,
+            "field": self.field.value,
+        }
+
+    @classmethod
+    def from_spec(cls, spec: SpecDict, build: Builder) -> Signal:
+        nom = spec.get("name")
+        if not isinstance(nom, str) or not nom:
+            raise ConfigurationError(
+                f"'exogenous' exige un `name` texte non vide, recu {nom!r}"
+            )
+        brut = spec.get("field", ChampExogene.VALUE.value)
+        if not isinstance(brut, str) or brut not in set(ChampExogene):
+            raise ConfigurationError(
+                f"'exogenous' : champ invalide {brut!r}. Attendu l'un de "
+                f"{', '.join(f.value for f in ChampExogene)}"
+            )
+        return cls(nom, ChampExogene(brut))
 
 
 @signal_node(

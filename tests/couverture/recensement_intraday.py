@@ -287,12 +287,20 @@ HORS_SIGNAL: dict[str, tuple[str, str]] = {
     "serie de pertes sur PLUSIEURS seances": (
         "IMPOSSIBLE", "`cumulative` remet a zero a chaque seance ; `reset: never` est au ledger"),
     "taille fonction de la force du signal": (
-        "PARTIEL", "possible via `ranking@1` (poids `signal`) ; les regles de "
-        "dimensionnement de `rules@1` ne voient pas le signal"),
+        "OK", "risk.sizing.kind = signal - une expression arbitraire avec "
+        "`max_contracts` obligatoire. Verdict corrige le 2026-09-15 : il "
+        "disait PARTIEL sur la foi d'une note, alors que "
+        "`nq_zarattini_60_30_15` est un `rules@1` MONO-INSTRUMENT dont la "
+        "taille vient d'un noeud - 923 trades a taille variable le prouvent"),
     "granularites 1min a 4h ancrees sur la seance": ("OK", "2026-09-12"),
     "deux granularites de la meme serie": ("OK", "alias + panel.allow_mixed_granularity, mesure 100 %"),
     "deux ancrages de seance differents": (
-        "PARTIEL", "accepte sur barres BRUTES, refuse en intra-journalier reechantillonne"),
+        "OK", "mesure le 2026-09-15 : ES 09:30-16:00 New York en 15min et NQ "
+        "08:30-15:00 Chicago en 1m coexistent, chacun avec son index de "
+        "seance. SEUL cas refuse - deux series REECHANTILLONNEES en "
+        "intra-journalier a ancrages differents - et ce refus est motive par "
+        "une mesure : le panneau produirait 100 % de lignes a un seul "
+        "instrument. Ce n'est donc pas un manque mais une garde"),
     "un autre instrument en filtre": ("OK", "noeud `peer` + panel_rules@1"),
     "carnet d'ordres / ticks": ("IMPOSSIBLE", "le moteur est a la BARRE ; item ouvert cote Nautilus"),
     "calendrier d'evenements (FOMC, NFP)": (
@@ -300,7 +308,13 @@ HORS_SIGNAL: dict[str, tuple[str, str]] = {
         "section `events` + noeud `event`, 2026-09-14 ; `minutes_until` exige "
         "que la source declare `known_in_advance`",
     ),
-    "donnees fondamentales ou de sentiment": ("IMPOSSIBLE", "meme raison"),
+    "donnees fondamentales ou de sentiment": (
+        "OK",
+        "section `exogenous` + noeud `exogenous`, 2026-09-15. La source doit "
+        "affirmer `horodatee_a_la_publication` OU declarer un "
+        "`publication_lag_minutes` strictement positif : une donnee "
+        "fondamentale est connue APRES ce qu'elle mesure, et un fichier "
+        "horodate a la mesure ferait entrer du futur invisible"),
 }
 
 

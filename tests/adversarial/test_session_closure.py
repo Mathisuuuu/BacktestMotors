@@ -161,6 +161,15 @@ class TestSurfacePublique:
             # regarde l'avenir - `minutes_until` - exige que la source affirme
             # `known_in_advance`. Sans calendrier declare, elle LEVE.
             "event_value",
+            # `exogenous_value` l'a rejointe le 2026-09-15, pour les series
+            # EXOGENES declarees (`exogenous`) : COT, open interest,
+            # sentiment. Elle ne lit que la derniere valeur PUBLIEE a ou
+            # avant la cloture de la barre - aussi causal qu'un `lag`. Le
+            # risque n'est pas dans la lecture mais dans le FICHIER, dont la
+            # source doit affirmer `horodatee_a_la_publication` ou declarer
+            # un `publication_lag_minutes` strictement positif. Sans serie
+            # declaree, elle LEVE.
+            "exogenous_value",
         }
 
     def test_sans_calendrier_le_noeud_leve_au_lieu_de_deviner(self):

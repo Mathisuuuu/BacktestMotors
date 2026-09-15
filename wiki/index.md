@@ -1,6 +1,6 @@
 ---
 type: hub
-updated: 2026-09-12
+updated: 2026-09-15
 ---
 
 # Index
@@ -71,7 +71,8 @@ Ces pages ne font autorite sur rien : elles disent ou est l'autorite.
 - [[reference/vocabulaire-signaux]] — schemas engendres, `rsl catalogue`, moules `rules@1` / `panel_rules@1` / `ranking@1`.
 - [[reference/donnees]] — 33,4 M barres a la MINUTE, agregeables de `5min` a `year`, series non ajustees au roulement, trous par defaut. **Contient un avertissement bloquant sur `rsl.data`.**
 - [[reference/cli]] — commandes, codes de sortie `0/1/2`, boucle de developpement.
-- [[reference/couverture-intraday]] — **ce qu'on sait ecrire en intraday, mesure** : 63 elements sur 71 et 21 familles sur 25. Quatre causes de blocage, aucune redondante. Le denominateur est explicite et rejouable.
+- [[reference/couverture-intraday]] — **ce qu'on sait ecrire en intraday, mesure** : **70 elements sur 71 (98,6 %)** et 24 familles sur 25. Le seul manque restant exige des TICKS, donc un autre moteur : 98,6 % est le PLAFOND, pas une etape. Deux des quatre manques d'hier etaient des verdicts perimes ([[lessons]] L36).
+- [[reference/silences]] — **ce qui se passait sans que le rapport le dise** : franchissements de nuit, seances sans cloture forcee, exposition perdue par la troncature. Trois compteurs nes de la replication Zarattini, hors `result_fingerprint`.
 - [[reference/seances]] — calendrier de seance **declare** (`data[].session`), noeuds `session` et `cumulative`, et depuis le 2026-09-12 l'ANCRAGE des granularites intra-journalieres. Le socle ne devine toujours aucune frontiere.
 - [[reference/tableau-de-bord]] — fenetre de resultats (`rsl gui`). **Contient la distinction MESUREE / RECONSTRUITE, a lire avant d'interpreter un chiffre filtre.**
 

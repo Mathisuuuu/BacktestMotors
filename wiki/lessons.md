@@ -1232,3 +1232,62 @@ La seule famille encore bloquee est le scalping sur CARNET, que le perimetre
 declare - une position a la fois, decisions a la barre - rend sans objet.
 
 Fonde sur [[log]] (2026-09-14) · [[reference/couverture-intraday]]
+
+## L35 -- Un ecart se DECOMPOSE ; il ne se raconte pas
+
+Zarattini 60/30/1,5, ecrit depuis la specification, a rendu **Sharpe 0,99
+contre 1,472 annonce**. La tentation est d'expliquer : « les couts », « le
+differe », « les donnees ». Chacune de ces phrases est plausible, aucune n'est
+une mesure, et trois heures ont suffi a en eliminer deux et a en chiffrer une.
+
+| Cause | Verdict | Comment |
+|---|---|---|
+| troncature en contrats | **+0,15 de Sharpe** | capital, cible et plafond x10 : le Sharpe est invariant d'echelle, donc seule la troncature bouge - 26,4 % -> 2,6 % |
+| couts de transaction | ecartee | 3,9 % du profit brut a x10, 4,35 % a x1 |
+| decalage d'execution | ecartee | **1 820 $ sur 4 575 000**, mesure sur les 2 889 vraies barres de signal |
+| residu | **0,33 inexplique** | |
+
+Le point de methode est le x10. On ne pouvait pas « desactiver la troncature » :
+un contrat est entier, et le socle ne ment pas la-dessus. Mais **le Sharpe ne
+depend pas de l'echelle**, alors multiplier tout par dix laisse la strategie
+identique - memes entrees, memes sorties, memes dates - en ne changeant qu'une
+chose. C'est une experience controlee, pas une variante.
+
+Le second point est la mesure qui ne passe par aucun moteur. `lag_bars: 0` est
+refuse par le socle ; plutot que de lever la garde, on a compare `close[t]` a
+`open[t+1]` sur les barres de signal reelles. Mediane NULLE, moyenne 0,031
+point. Un backtest de moins, une certitude de plus.
+
+**Ce qu'on ne savait pas et qu'on sait maintenant** : « le backtest est-il
+juste ? » n'a pas de reponse. « De quoi l'ecart est-il fait ? » en a une, et
+elle se construit terme a terme jusqu'a ce qu'il ne reste rien d'inexplique.
+
+## L36 -- Un verdict ecrit a la main se perime sans prevenir
+
+Le recensement de couverture portait quatre manques. **Deux etaient faux.**
+
+- « Taille fonction de la force du signal » : classe `PARTIEL`, motif « les
+  regles de dimensionnement de `rules@1` ne voient pas le signal ». Or
+  `risk.sizing.kind = signal` existe, prend une expression arbitraire avec
+  `max_contracts` obligatoire, et **Zarattini s'en sert** - un `rules@1`
+  mono-instrument, 923 trades a taille variable.
+- « Deux ancrages de seance differents » : classe `PARTIEL`, motif « refuse en
+  intra-journalier reechantillonne ». Mesure : ES 09:30-16:00 New York en
+  15min et NQ 08:30-15:00 Chicago en 1m **coexistent sans difficulte**. Seul le
+  cas de DEUX series reechantillonnees a ancrages differents est refuse, et ce
+  refus porte son propre motif mesure - le panneau produirait 100 % de lignes a
+  un seul instrument. Ce n'est pas un manque, c'est une garde.
+
+La cause est structurelle : ces verdicts vivaient dans un dictionnaire
+`HORS_SIGNAL`, commente « ce que le CODE ne peut pas trancher ». Un verdict que
+le code ne verifie pas ne vieillit pas avec le code. Il devient faux le jour ou
+quelqu'un comble le manque sans penser a rouvrir le recensement - ce que j'ai
+fait moi-meme le 2026-09-14 en ajoutant `kind: signal`.
+
+C'est la regle d'immuabilite du wiki appliquee a un fichier de TEST : les
+sources font foi, et une note qui contredit le code a tort. La parade n'est pas
+« mieux relire » ; c'est de mesurer ce qui peut l'etre, et de dater ce qui ne
+le peut pas.
+
+Meme famille que [[lessons]] L29, ou une note annoncait « 3,4 % d'approximation »
+et se trompait sur ses trois affirmations a la fois.

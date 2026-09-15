@@ -120,6 +120,8 @@ class TestSchemaAcceptsRealSpecifications:
             "session_lag": {"type": "session_lag", "sessions": 1, "inner": leaf},
             "event": {"type": "event", "name": "fomc",
                       "field": "minutes_since"},
+            "exogenous": {"type": "exogenous", "name": "cot_net",
+                          "field": "value"},
             "value_when": {"type": "value_when", "lookback": 10,
                            "when": leaf, "inner": leaf},
         }

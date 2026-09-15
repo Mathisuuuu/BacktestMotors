@@ -55,7 +55,7 @@ def regles(moule: dict[str, object]) -> dict[str, object]:
 
 
 class TestCouverture:
-    HORS_MOULE: ClassVar[frozenset[str]] = frozenset({"event"})
+    HORS_MOULE: ClassVar[frozenset[str]] = frozenset({"event", "exogenous"})
     """Les noeuds qu'on ne peut pas mettre dans le moule, et pourquoi.
 
     `event` exige un CALENDRIER declare - un fichier externe, hache au
@@ -64,9 +64,16 @@ class TestCouverture:
     tout le monde en ait un au meme endroit. Le noeud leve sans, et c'est
     voulu : le socle ne devine pas plus un calendrier d'annonces qu'une seance.
 
-    Cette exemption n'affaiblit pas la couverture : `event` est exerce par
-    `tests/unit/test_evenements.py` et par l'instance du test de schema, qui
-    verifie qu'il se construit depuis sa description publiee.
+    `exogenous` est exempte le 2026-09-15 pour la MEME raison, et elle est
+    la seule qui vaille : il exige une SERIE declaree, fichier externe hache
+    au manifeste. Ce n'est pas que le noeud soit secondaire - c'est que le
+    moule doit tourner partout, et qu'un fichier de donnees exogenes n'est
+    pas quelque chose que tout le monde possede.
+
+    Cette exemption n'affaiblit pas la couverture : les deux sont exerces
+    par `tests/unit/test_evenements.py` et `tests/unit/test_exogene.py`, et
+    par l'instance du test de schema, qui verifie qu'ils se construisent
+    depuis leur description publiee.
     """
 
     def test_chaque_type_de_noeud_enregistre_est_utilise(self, moule):

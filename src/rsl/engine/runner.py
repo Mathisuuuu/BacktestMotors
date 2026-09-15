@@ -28,6 +28,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 
 from rsl.data.evenements import EventCalendar
+from rsl.data.exogene import SerieExogene
 from rsl.data.feed import BarContext, BarFeed
 from rsl.data.schema import (
     FLAT,
@@ -311,6 +312,7 @@ class SingleAssetRunner:
         "_next_order_id",
         "config",
         "events",
+        "exogenes",
         "risk",
         "spec",
         "store",
@@ -324,6 +326,7 @@ class SingleAssetRunner:
         *,
         risk: RiskManager | None = None,
         events: Mapping[str, EventCalendar] | None = None,
+        exogenes: Mapping[str, SerieExogene] | None = None,
     ) -> None:
         if store.symbol != spec.symbol:
             raise ConfigurationError(
@@ -333,6 +336,7 @@ class SingleAssetRunner:
         # Les calendriers ne dependent ni de la barre ni de l'instrument :
         # le contexte les recoit une fois, et ses vues reculees en heritent.
         self.events: Mapping[str, EventCalendar] = events or {}
+        self.exogenes: Mapping[str, SerieExogene] = exogenes or {}
         self.spec = spec
         self.config = config
         self.risk = risk or RiskManager()
@@ -377,6 +381,7 @@ class SingleAssetRunner:
                 # pour ce que personne n'a dit vouloir lire.
                 ctx._set_position_depth(warmup)
                 ctx._set_events(self.events)
+                ctx._set_exogenes(self.exogenes)
                 ctx._account.set_initial(self.config.initial_cash)
                 profondeur_dite = True
             index = ctx.n_bars_seen - 1

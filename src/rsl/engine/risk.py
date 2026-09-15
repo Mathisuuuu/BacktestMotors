@@ -53,6 +53,20 @@ class SizingRule(Protocol):
     def describe(self) -> SpecDict: ...
 
 
+@runtime_checkable
+class RegleQuiTronque(Protocol):
+    """Regle capable de dire sa taille AVANT troncature.
+
+    Toutes les regles qui DIVISENT l'implementent ; `FixedContracts` non,
+    parce qu'elle ne tronque rien. C'est ce qui permet a la mesure de
+    distinguer « aucune perte » de « regle qui ne sait pas repondre ».
+    """
+
+    def taille_brute(
+        self, ctx: Context, spec: InstrumentSpec, equity: float, reference_price: float
+    ) -> float | None: ...
+
+
 @dataclass(frozen=True, slots=True)
 class FixedContracts:
     """Taille constante. La regle la plus simple, et la seule qui ne depende
@@ -98,13 +112,19 @@ class EquityFraction:
     def warmup_bars(self) -> int:
         return 0
 
+    def taille_brute(
+        self, ctx: Context, spec: InstrumentSpec, equity: float, reference_price: float
+    ) -> float | None:
+        notional_per_contract = abs(reference_price) * spec.multiplier
+        if notional_per_contract <= 0.0:
+            return None
+        return equity * self.fraction / notional_per_contract
+
     def contracts(
         self, ctx: Context, spec: InstrumentSpec, equity: float, reference_price: float
     ) -> int:
-        notional_per_contract = abs(reference_price) * spec.multiplier
-        if notional_per_contract <= 0.0:
-            return 0
-        return int(equity * self.fraction / notional_per_contract)
+        brute = self.taille_brute(ctx, spec, equity, reference_price)
+        return 0 if brute is None else int(brute)
 
     def describe(self) -> SpecDict:
         return {"rule": "equity_fraction", "fraction": self.fraction}
@@ -142,16 +162,22 @@ class RiskFraction:
     def warmup_bars(self) -> int:
         return self.atr_window + 1
 
+    def taille_brute(
+        self, ctx: Context, spec: InstrumentSpec, equity: float, reference_price: float
+    ) -> float | None:
+        atr = bind_primitive("atr@1", window=self.atr_window)(ctx)
+        if atr is None or atr <= 0.0:
+            return None
+        risk_per_contract = self.atr_multiple * atr * spec.multiplier
+        if risk_per_contract <= 0.0:
+            return None
+        return equity * self.fraction / risk_per_contract
+
     def contracts(
         self, ctx: Context, spec: InstrumentSpec, equity: float, reference_price: float
     ) -> int:
-        atr = bind_primitive("atr@1", window=self.atr_window)(ctx)
-        if atr is None or atr <= 0.0:
-            return 0
-        risk_per_contract = self.atr_multiple * atr * spec.multiplier
-        if risk_per_contract <= 0.0:
-            return 0
-        return int(equity * self.fraction / risk_per_contract)
+        brute = self.taille_brute(ctx, spec, equity, reference_price)
+        return 0 if brute is None else int(brute)
 
     def describe(self) -> SpecDict:
         return {
@@ -229,11 +255,17 @@ class VolatilityTarget:
         devient pas une taille par defaut. Le compteur `n_dropped_sizing` rend
         l'evenement visible plutot que silencieux.
         """
+        brute = self.taille_brute(ctx, spec, equity, reference_price)
+        return 0 if brute is None else int(brute)
+
+    def taille_brute(
+        self, ctx: Context, spec: InstrumentSpec, equity: float, reference_price: float
+    ) -> float | None:
         realisee = bind_primitive("volatility@1", window=self.vol_window, log=True)(ctx)
         if realisee is None or realisee <= 0.0:
-            return 0
+            return None
         facteur = min(self.vol_max_multiple, self.vol_target / realisee)
-        return int(self.contracts_base * facteur)
+        return self.contracts_base * facteur
 
     def describe(self) -> SpecDict:
         return {
@@ -294,10 +326,23 @@ class SignalSizing:
     def contracts(
         self, ctx: Context, spec: InstrumentSpec, equity: float, reference_price: float
     ) -> int:
+        brute = self.taille_brute(ctx, spec, equity, reference_price)
+        return 0 if brute is None else int(brute)
+
+    def taille_brute(
+        self, ctx: Context, spec: InstrumentSpec, equity: float, reference_price: float
+    ) -> float | None:
+        """Le plafond s'applique AVANT la troncature.
+
+        `min(int(v), plafond)` et `int(min(v, plafond))` coincident tant que
+        le plafond est entier - il l'est, `max_contracts` etant un `int`. La
+        mesure compare donc bien deux tailles PLAFONNEES, et n'impute pas au
+        plafond ce que la troncature coute.
+        """
         valeur = self.signal(ctx)
         if valeur is None or not math.isfinite(valeur) or valeur <= 0.0:
-            return 0
-        return min(int(valeur), self.max_contracts)
+            return None
+        return min(valeur, float(self.max_contracts))
 
     def describe(self) -> SpecDict:
         decrire = getattr(self.signal, "describe", None)
@@ -323,6 +368,9 @@ class RiskStats:
     n_warned_margin: int = 0
     n_rejected_gross_cap: int = 0
     n_reduce_only_dropped: int = 0
+    taille_brute_cumulee: float = 0.0
+    taille_entiere_cumulee: float = 0.0
+    n_tailles_mesurees: int = 0
     n_rejected_gross_exposure: int = 0
     n_rejected_net_exposure: int = 0
     n_rejected_positions: int = 0
@@ -341,6 +389,19 @@ class RiskStats:
         setattr(self, nom, int(getattr(self, nom)) + 1)
 
     @property
+    def perte_par_troncature(self) -> float | None:
+        """Part de l'exposition demandee que la troncature a supprimee.
+
+        `None` quand aucune taille n'a ete mesuree - soit qu'aucune regle ne
+        divise, soit qu'aucun ordre n'ait ete dimensionne. Zero voudrait dire
+        « rien perdu », ce qui n'est pas la meme affirmation.
+        """
+        if self.n_tailles_mesurees == 0 or self.taille_brute_cumulee <= 0.0:
+            return None
+        reste = self.taille_entiere_cumulee / self.taille_brute_cumulee
+        return 1.0 - reste
+
+    @property
     def n_rejected_portfolio(self) -> int:
         """Total des refus de plafond de portefeuille, tous motifs confondus."""
         return sum(int(getattr(self, f"n_rejected_{motif}")) for motif in MOTIFS)
@@ -355,6 +416,13 @@ class RiskStats:
         }
         for motif in MOTIFS:
             decrit[f"n_rejected_{motif}"] = getattr(self, f"n_rejected_{motif}")
+        # Publiee SEULEMENT quand une regle qui tronque a repondu. Emettre
+        # `null` partout ajouterait une cle a des rapports ou elle ne veut rien
+        # dire, et `0.0` y mentirait.
+        perte = self.perte_par_troncature
+        if perte is not None:
+            decrit["perte_par_troncature"] = perte
+            decrit["n_tailles_mesurees"] = self.n_tailles_mesurees
         return decrit
 
 
@@ -521,6 +589,16 @@ class RiskManager:
             return order
         equity = portfolio.equity(marks)
         quantity = self.sizing.contracts(ctx, spec, equity, ctx.bar.close)
+        # Mesure de la troncature, au seul endroit ou les deux tailles
+        # coexistent. Une regle qui ne divise pas n'expose pas la methode,
+        # et ne fausse donc pas la moyenne en y versant des zeros.
+        brute = getattr(self.sizing, "taille_brute", None)
+        if callable(brute):
+            demandee = brute(ctx, spec, equity, ctx.bar.close)
+            if demandee is not None:
+                self.stats.taille_brute_cumulee += float(demandee)
+                self.stats.taille_entiere_cumulee += float(quantity)
+                self.stats.n_tailles_mesurees += 1
         if quantity < 1:
             self.stats.n_dropped_sizing += 1
             return None

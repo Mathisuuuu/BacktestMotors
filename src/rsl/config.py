@@ -21,6 +21,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from rsl.data.evenements import EventCalendar, charger_calendrier
+from rsl.data.exogene import SerieExogene, charger_serie_exogene
 from rsl.data.instruments import get_instrument
 from rsl.data.loader import build_panel, load_bar_store
 from rsl.data.resample import CloseStamp, Period, resample
@@ -147,6 +148,8 @@ def _sans_calendriers_muets(payload: SpecDict) -> None:
     """
     if not payload.get("events"):
         payload.pop("events", None)
+    if not payload.get("exogenous"):
+        payload.pop("exogenous", None)
 
 
 def _sans_allegement_muet(payload: SpecDict) -> None:
@@ -596,6 +599,42 @@ class EventSourceSpec(StrictModel):
         return self.path.as_posix()
 
 
+class ExogenousSourceSpec(StrictModel):
+    """Une serie EXOGENE declaree : COT, open interest, sentiment.
+
+    Le fichier porte `ts_event` en nanosecondes UTC et `value` en
+    flottant. Son contenu est hache et entre au manifeste, comme les
+    cotations et les calendriers.
+    """
+
+    name: str = Field(min_length=1, description="Nom lu par le noeud `exogenous`")
+    path: Path = Field(description="Relatif a RSL_DATA_DIR, ou absolu")
+    horodatee_a_la_publication: bool = Field(
+        default=False,
+        description=(
+            "AFFIRME que `ts_event` est l'instant ou la donnee est devenue "
+            "CONNAISSABLE, et non celui qu'elle mesure. Le rapport COT du "
+            "mardi parait le vendredi : un fichier horodate a la mesure fait "
+            "entrer trois jours de futur que rien dans le code ne peut voir."
+        ),
+    )
+    publication_lag_minutes: int = Field(
+        default=0,
+        ge=0,
+        description=(
+            "Decalage applique a chaque valeur, en minutes. OBLIGATOIRE et "
+            "strictement positif sans `horodatee_a_la_publication`. Mieux "
+            "vaut un retard trop prudent qu'une avance invisible."
+        ),
+    )
+
+    def canonical_path(self) -> str:
+        """Meme regle que pour les cotations : relatif reste relatif."""
+        if self.path.is_absolute():
+            return str(self.path.resolve())
+        return self.path.as_posix()
+
+
 class RebalanceSpec(StrictModel):
     kind: Literal["every_row", "every_n_rows"] = "every_row"
     n: int = Field(default=1, ge=1)
@@ -633,6 +672,10 @@ class BacktestSpec(StrictModel):
     events: list[EventSourceSpec] = Field(
         default_factory=list,
         description="Calendriers d'annonces, lus par le noeud `event`",
+    )
+    exogenous: list[ExogenousSourceSpec] = Field(
+        default_factory=list,
+        description="Series exogenes, lues par le noeud `exogenous`",
     )
     execution: ExecutionSpec
     strategy: StrategySpec
@@ -819,6 +862,25 @@ def load_events(spec: BacktestSpec) -> dict[str, EventCalendar]:
             with_hash=spec.with_data_hash,
         )
     return calendriers
+
+
+def load_exogenes(spec: BacktestSpec) -> dict[str, SerieExogene]:
+    """Charge les series exogenes declarees, et refuse deux fois le meme nom."""
+    series: dict[str, SerieExogene] = {}
+    for source in spec.exogenous:
+        if source.name in series:
+            raise ConfigurationError(
+                f"deux series exogenes portent le nom '{source.name}' : le "
+                f"noeud `exogenous` ne saurait laquelle lire."
+            )
+        series[source.name] = charger_serie_exogene(
+            resolve_data_path(source.path),
+            name=source.name,
+            horodatee_a_la_publication=source.horodatee_a_la_publication,
+            publication_lag_minutes=source.publication_lag_minutes,
+            with_hash=spec.with_data_hash,
+        )
+    return series
 
 
 def load_stores(

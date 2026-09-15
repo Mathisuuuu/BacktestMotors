@@ -22,7 +22,13 @@ import json
 from dataclasses import dataclass
 from pathlib import Path
 
-from rsl.config import BacktestSpec, build_panel_from, load_events, load_stores
+from rsl.config import (
+    BacktestSpec,
+    build_panel_from,
+    load_events,
+    load_exogenes,
+    load_stores,
+)
 from rsl.data.schema import BarStore, InstrumentSpec
 from rsl.engine.cross_sectional import CrossSectionalRunner, CrossSectionalRunResult
 from rsl.engine.limites import MOTIFS as LIMIT_MOTIFS
@@ -35,6 +41,7 @@ from rsl.metrics.intraday import (
     verifier_coherence,
 )
 from rsl.metrics.performance import PerformanceMetrics, compute_performance
+from rsl.metrics.silences import Silences, mesurer_les_silences
 from rsl.metrics.statistics import DeflatedSharpeResult, TrialLog, deflated_sharpe_ratio
 from rsl.primitives.registry import RegistrySnapshot
 from rsl.strategies.base import (
@@ -105,6 +112,12 @@ class BacktestReport:
     deflated_sharpe: DeflatedSharpeResult | None
     symbols: tuple[str, ...]
     cross_sectional: bool
+    silences: Silences | None = None
+    """Ce qui s'est passe sans qu'aucun compteur du moteur le dise.
+
+    Hors `result_fingerprint` comme l'attribution, et pour la meme
+    raison : un diagnostic decrit un run, il ne le definit pas.
+    """
     attribution: AttributionHoraire | None = None
     """Repartition des trades par heure de seance. `None` sans calendrier.
 
@@ -123,6 +136,11 @@ class BacktestReport:
                 {}
                 if self.attribution is None
                 else {"attribution_horaire": self.attribution.describe()}
+            ),
+            **(
+                {}
+                if self.silences is None or self.silences.est_vide
+                else {"silences": self.silences.describe()}
             ),
             "manifest": self.manifest.describe(),
             "specification": self.spec.canonical(),
@@ -289,6 +307,10 @@ class BacktestReport:
             *self._lignes_d_execution(),
             rule,
         ]
+        if self.silences is not None:
+            muets = self.silences.render()
+            if muets:
+                lines.extend([*muets, rule])
         if self.attribution is not None:
             horaires = self.attribution.render()
             if horaires:
@@ -383,6 +405,10 @@ def run_backtest_detailed(
         # qu'absent : il aurait l'air complet.
         verifier_coherence(attribution, len(fermes))
 
+    silences = mesurer_les_silences(
+        stores, result.fills, spec.execution.lag_bars
+    )
+
     report = BacktestReport(
         spec=spec,
         manifest=manifest,
@@ -393,6 +419,7 @@ def run_backtest_detailed(
         symbols=symbols,
         cross_sectional=entry.cross_sectional,
         attribution=attribution,
+        silences=silences,
     )
     return RunArtifacts(
         report=report, result=result, stores=stores, instruments=instruments
@@ -443,6 +470,7 @@ def _run_single(
         spec.build_run_config(),
         risk=spec.build_risk(),
         events=load_events(spec),
+        exogenes=load_exogenes(spec),
     )
     return runner.run(strategy)
 
@@ -462,5 +490,6 @@ def _run_cross_sectional(
         risk=spec.build_risk(),
         schedule=spec.rebalance.build(),
         events=load_events(spec),
+        exogenes=load_exogenes(spec),
     )
     return runner.run(strategy)
