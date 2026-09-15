@@ -37,6 +37,7 @@ from rsl.strategies.noeuds.contrat import (
     Builder,
     FieldKind,
     NodeField,
+    Piege,
     Signal,
     SpecDict,
     _child,
@@ -740,6 +741,35 @@ class Exogenous:
 @signal_node(
     "session",
     summary="Feuille : une grandeur de la seance courante ou d'une seance close.",
+    pieges=(
+        Piege(
+            champ="is_last",
+            promesse="la derniere barre de la seance",
+            realite=(
+                "la PREMIERE barre a atteindre l'heure de fermeture DECLAREE"
+            ),
+            quand=(
+                "une seance qui s'arrete avant l'heure declaree - demi-journee, "
+                "trou de donnees - ne porte AUCUN `is_last`, et une regle qui le "
+                "cite n'y declenche jamais. Mesure sur NQ le 2026-09-15 : 90 "
+                "seances sur 2 748. Le nom ne PEUT pas etre corrige : « la "
+                "derniere barre » est un fait futur, il faudrait regarder la "
+                "barre suivante pour le savoir."
+            ),
+            controle="is_last-absent",
+        ),
+        Piege(
+            champ="minutes_from_open",
+            promesse="minutes ecoulees depuis l'ouverture, donc 0 a l'ouverture",
+            realite="parcourt 1..N et ne vaut JAMAIS zero",
+            quand=(
+                "une barre est horodatee a sa CLOTURE : la premiere barre d'une "
+                "seance d'une minute clot une minute apres l'ouverture. Comparer "
+                "a zero donne une regle qui ne se declenche jamais."
+            ),
+            controle="minutes-jamais-nulles",
+        ),
+    ),
     fields=(
         NodeField(
             "field",

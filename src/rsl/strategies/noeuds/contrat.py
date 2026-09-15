@@ -88,6 +88,60 @@ class FieldKind(StrEnum):
 
 
 @dataclass(frozen=True, slots=True)
+class Piege:
+    """Un ecart entre ce que le NOM d'un terme suggere et ce que sa DEFINITION fait.
+
+    Pourquoi ce type existe
+    ------------------------
+    Le 2026-09-15, trois des cinq ecarts d'une replication venaient du meme
+    defaut : `session.is_last` ne veut pas dire « la derniere barre de la
+    seance » mais « la premiere barre a atteindre l'heure DECLAREE ». Sur une
+    seance ecourtee, aucune barre n'est marquee, et une regle de securite
+    adossee a ce champ n'y declenche jamais.
+
+    Ces ecarts ne sont pas des bugs : chaque definition est necessaire, le plus
+    souvent pour une raison de CAUSALITE. « La derniere barre » est un fait
+    futur - pour le savoir il faudrait regarder la barre suivante. Le terme ne
+    peut donc pas tenir la promesse de son nom, quel que soit le nom.
+
+    Ce que ce type change
+    ----------------------
+    Le piege est declare **a cote de la definition qu'il decrit**, pas dans une
+    liste tenue ailleurs. Une liste tenue ailleurs se perime sans prevenir -
+    c'est exactement ce qui est arrive au recensement de couverture, dont deux
+    verdicts sur quatre etaient devenus faux ([[lessons]] L36).
+
+    `controle` nomme, quand il existe, le code du controle de `rsl check` qui
+    l'attrape. Les pieges sans controle ne sont pas moins reels : ils ne sont
+    simplement pas decidables depuis la specification seule.
+    """
+
+    champ: str | None
+    """Le champ concerne, ou `None` quand le piege vise le noeud entier."""
+
+    promesse: str
+    """Ce que le nom laisse croire."""
+
+    realite: str
+    """Ce que la definition fait."""
+
+    quand: str
+    """La situation ou les deux divergent. Une phrase, pas une theorie."""
+
+    controle: str | None = None
+    """Code du controle de `rsl check`, si le piege est decidable avant le run."""
+
+    def describe(self) -> SpecDict:
+        return {
+            "champ": self.champ,
+            "promesse": self.promesse,
+            "realite": self.realite,
+            "quand": self.quand,
+            "controle": self.controle,
+        }
+
+
+@dataclass(frozen=True, slots=True)
 class NodeField:
     """Un champ d'un type de noeud, decrit une seule fois.
 
@@ -134,6 +188,14 @@ class NodeType:
     from_spec: FromSpec
     summary: str
     fields: tuple[NodeField, ...] = ()
+    pieges: tuple[Piege, ...] = ()
+    """Les ecarts nom / definition de ce noeud. Vide = AUDITE, sans ecart.
+
+    Un tuple vide est une AFFIRMATION, pas un oubli : `test_pieges.py`
+    exige que chaque type enregistre ait ete audite et refuse tout noeud
+    neuf absent de sa liste. On ne peut donc pas ajouter un terme au
+    vocabulaire sans avoir tranche la question.
+    """
 
     @property
     def ref(self) -> str:
@@ -180,6 +242,7 @@ def signal_node(
     version: int = 1,
     summary: str = "",
     fields: tuple[NodeField, ...] = (),
+    pieges: tuple[Piege, ...] = (),
 ) -> Callable[[type[Signal]], type[Signal]]:
     """Enregistre un type de noeud sous `(name, version)`.
 
@@ -212,6 +275,7 @@ def signal_node(
             from_spec=builder,
             summary=summary or (cls.__doc__ or "").strip().split("\n")[0],
             fields=fields,
+            pieges=pieges,
         )
         # Les classes declarent deja NODE_TYPE / NODE_VERSION ; on les
         # reaffirme depuis le decorateur pour qu'une divergence entre les deux
@@ -253,6 +317,7 @@ def describe_node_types() -> list[SpecDict]:
             "version": n.version,
             "summary": n.summary,
             "schema": n.json_schema(),
+            "pieges": [p.describe() for p in n.pieges],
         }
         for n in list_node_types()
     ]

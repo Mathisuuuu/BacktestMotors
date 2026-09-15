@@ -81,6 +81,36 @@ ATTN [fill-de-nuit]   exit_long, exit_short sort sur la derniere barre ;
      avec `lag_bars: 1`, l'ordre se remplira la seance d'apres.
 ```
 
+## L'audit est obligatoire depuis le 2026-09-15
+
+Les six controles ci-dessus sont ecrits a la main. C'est leur faiblesse :
+**ils ne connaissent que les pieges deja payes**, et une liste tenue a cote du
+code se perime sans prevenir — c'est exactement ce qui est arrive au
+recensement de couverture, dont deux verdicts sur quatre etaient devenus faux
+([[lessons]] L36).
+
+D'ou le second dispositif, pose le meme jour :
+
+- le type `Piege` (promesse / realite / quand / controle) se declare **sur le
+  noeud**, dans `@signal_node`, a cote de la definition qu'il decrit ;
+- `rsl catalogue` le publie — un piege connu du seul code source ne previent
+  personne ;
+- [tests/unit/test_pieges.py](../../tests/unit/test_pieges.py) **refuse tout
+  type enregistre absent de sa liste `AUDITES`**.
+
+Consequence : on ne peut plus ajouter un terme au vocabulaire sans avoir
+tranche la question « son nom promet-il autre chose que ce que sa definition
+fait ? ». Le garde-fou a ete verifie en simulant un noeud neuf : la suite
+echoue, avec le message qui dit quoi faire.
+
+`pieges=()` n'est pas un oubli : c'est l'affirmation « j'ai regarde, le nom
+tient sa promesse ». La difference entre les deux ne se lit pas dans le code,
+d'ou la liste `AUDITES` qui EST cette affirmation, datee par git.
+
+**Ce que ce test ne fait pas** : verifier que les pieges declares sont justes.
+Aucun test ne le peut. Il verifie qu'on s'est pose la question — la seule
+chose mecanisable.
+
 ## Ce qu'elle n'est pas, et ne sera pas
 
 - **Pas un validateur.** Ce qui est invalide LEVE deja, par pydantic et par le

@@ -35,6 +35,7 @@ from rsl.strategies.noeuds.contrat import (
     Builder,
     FieldKind,
     NodeField,
+    Piege,
     Signal,
     SpecDict,
     _child,
@@ -86,6 +87,22 @@ class RollingAcross(StrEnum):
 
 @signal_node(
     "rolling",
+    pieges=(
+        Piege(
+            champ="stat",
+            promesse="`rank` classe la valeur parmi les instruments",
+            realite=(
+                "`rank` est TEMPOREL : rang de la valeur courante dans sa "
+                "propre fenetre de temps"
+            ),
+            quand=(
+                "on cherche a classer des instruments entre eux. Il n'existe "
+                "AUCUN rang transversal dans le vocabulaire des signaux ; cela "
+                "passe par le moule `ranking@1`."
+            ),
+            controle="rank-temporel",
+        ),
+    ),
     summary="Statistique glissante d'un sous-signal QUELCONQUE, pas d'un champ de prix.",
     fields=(
         NodeField(
