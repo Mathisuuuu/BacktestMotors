@@ -16,18 +16,18 @@ generated: true
 
 | Indicateur | Valeur |
 |---|---|
-| Pages de wiki | 29 |
-| Entrees de log | 215 |
+| Pages de wiki | 30 |
+| Entrees de log | 218 |
 | Derniere activite | 2026-09-15 |
 | Idees ecartees (ledger) | 25 |
-| Idees en attente (ledger) | 6 |
+| Idees en attente (ledger) | 7 |
 | Pages `Failed Ideas/` | 1 |
 | Pages `concepts/` | 6 |
 | Pages `experiments/` | 8 |
-| Pages `reference/` | 9 |
+| Pages `reference/` | 10 |
 | Pages `research/` | 1 |
 
-**Activite par type :** note × 86, fix × 45, feat × 37, decision × 20, mesure × 14, essai × 4, experiment × 2, setup × 1, lint × 1, audit × 1, refactor × 1, perf × 1, bug × 1, correction × 1
+**Activite par type :** note × 87, fix × 45, feat × 38, decision × 20, mesure × 15, essai × 4, experiment × 2, setup × 1, lint × 1, audit × 1, refactor × 1, perf × 1, bug × 1, correction × 1
 
 ## Experiences
 
@@ -46,14 +46,14 @@ Le total des essais alimente le Deflated Sharpe : un essai non enregistre gonfle
 
 ## Derniere activite — 8 entree(s)
 
+- **2026-09-15** — mesure | **Chasse au residu de 0,33 de Sharpe : six pistes ouvertes, cinq fermees, le residu TIENT** | ecartees par la mesure : couts (3,9 % du profit), differe d'execution sur les ENTREES (+0,031 pt, mediane nulle) et sur les SORTIES (+0,0073 pt, cinq fois moins), exposition nocturne (17 fills, 4,6 %), roulements de contrat (39 % des gros gaps en mois de roulement contre 33 % au hasard). FALSIFIEES : `sigma` = ecart-type (Sharpe TOMBE a 0,84) et VWAP hors du stop (0,81). **Etabli en positif au passage** : le rapport MAD/ecart-type vaut 0,7304, mais la frequence d'entree tranche - **0,3643 trade/seance contre 0,3562 au papier, soit +2,3 %**. Les ENTREES sont justes, `sigma` = ecart absolu moyen est la bonne lecture. Toutes les variantes essayees sont PIRES que la publiee, et le multiplicateur 1,5 est pres du sommet sur nos donnees aussi
+- **2026-09-15** — note | **Le diagnostic de la journee, formule par l'utilisateur : « le probleme est dans la comprehension du vocabulaire »** | exact, et verifie sur quatre termes. `is_last` ne veut pas dire « la derniere barre de la seance » mais « la premiere barre a atteindre l'heure DECLAREE » ; `rolling.rank` est TEMPOREL ; `minutes_from_open` parcourt 1..N et jamais 0 ; `vol_target.vol_window` compte des BARRES. Aucun n'est un bug : chacun est un nom qui promet plus que sa definition ne livre. Lecon [[lessons]] L37
+- **2026-09-15** — feat | **`rsl check`** : confronte une specification a ses donnees SANS la lancer | six controles, chacun tracant une erreur datee - `is_last-absent` et `minutes-jamais-nulles` en ERREUR (code de sortie 2), `fill-de-nuit`, `vol-target-en-barres` et `seance-electronique` en avertissement, `rank-temporel` en note. Sur Zarattini : **1,7 seconde**, et les DEUX defauts qui avaient coute la matinee. Chaque constat porte un remede - un constat sans geste a faire se lit deux fois puis s'ignore
 - **2026-09-15** — fix | `n_tailles_mesurees` s'affichait sous « Refus » comme « tailles_mesurees 1148 » | un DENOMINATEUR lu comme 1 148 ordres refuses, alors que c'est le nombre d'ordres DIMENSIONNES. Exclu de l'enumeration des refus, et la perte par troncature a desormais sa propre ligne - elle n'etait imprimee nulle part
 - **2026-09-15** — correction | **La ligne « la cloture forcee dormait dehors toutes les nuits » ci-dessus annonce 2 658 franchissements. C'est FAUX : il y en a 17.** | j'avais mesure le gap sur les 2 658 dernieres barres de seance en SUPPOSANT qu'une position y etait ouverte. Le compteur, des sa premiere execution reelle, en compte **17 sur 1 846 fills (0,9 %)** - la quasi-totalite des trades sort AVANT la fin de seance, sur la bande opposee ou le VWAP, et la cloture forcee n'est qu'un filet. Gap subi reel : 31,00 points de moyenne, 14,00 de mediane, 179,00 au maximum. Exposition nocturne ~14 500 $ sur 312 445 $ de profit, soit 4,6 %. Le mecanisme decrit reste exact ; son AMPLEUR etait surestimee d'un facteur 156. Le log etant append-only, la ligne fausse reste, et celle-ci la corrige. Le compteur a donc attrape son auteur avant tout le monde - c'est precisement ce pour quoi il existe
 - **2026-09-15** — mesure | Couverture intraday : **67/71 -> 70/71 elements (98,6 %)**, familles inchangees a 24/25 | DEUX des quatre manques etaient des verdicts ECRITS A LA MAIN devenus faux. « Taille fonction de la force du signal » : `risk.sizing.kind = signal` existe et Zarattini est un `rules@1` MONO-INSTRUMENT qui s'en sert. « Deux ancrages de seance differents » : mesure, ES 15min New York et NQ 1m Chicago coexistent ; seul le cas DEUX series reechantillonnees a ancrages differents est refuse, et ce refus est motive par une mesure (100 % de lignes a un seul instrument). Le seul element restant exige des TICKS
 - **2026-09-15** — feat | **Serie exogene declaree** : section `exogenous` + noeud `exogenous` (`value`, `age_minutes`) | dernier canal ferme du recensement, et `evenements.py` nommait lui-meme le manque. Le piege n'est PAS celui des evenements : lire la derniere valeur connue est aussi causal qu'un `lag`, mais une donnee fondamentale porte DEUX dates - ce qu'elle mesure, et quand elle a paru. Le rapport COT du mardi parait le vendredi. La source doit donc affirmer `horodatee_a_la_publication` OU declarer un `publication_lag_minutes` strictement positif ; il n'y a pas de troisieme possibilite
 - **2026-09-15** — feat | **Trois compteurs de SILENCE au rapport** : franchissements de nuit, seances sans cloture, perte par troncature | quatrieme occurrence de [[lessons]] L18/L25/L28/L30 - un defaut qui produit un nombre parfaitement lisible - et meme remede : faire IMPRIMER le chiffre. Places hors `result_fingerprint` (qui ne hache que `counters` et `portfolio`), comme `attribution_horaire` et pour la meme raison : un diagnostic decrit un run, il ne le definit pas. Les sept empreintes sont intactes
-- **2026-09-15** — fix | **90 seances sur 2 748 n'ont AUCUNE barre `is_last`** | les demi-journees (13:00 x68, 13:15 x21, 13:01 x1) s'arretent avant la fermeture DECLAREE de 16:00. Comportement documente et voulu - la regle est causale, elle ne regarde jamais la barre suivante - mais une regle de securite adossee a `is_last` n'y declenche jamais, et rien ne le signalait
-- **2026-09-15** — fix | **La cloture forcee de Zarattini dormait dehors toutes les nuits** | `exit == is_last` decide a la derniere barre de seance ; avec `lag_bars: 1` et `session_only`, la barre suivante est la PREMIERE DU LENDEMAIN. Gap mesure : **74,165 points de moyenne contre 0,280 sur une barre ordinaire, soit 265 fois**. Pas un bug du moteur - `lag_bars: 1` est normatif et `max_fill_gap_seconds` existe comme garde - mais une omission de MA specification, qui declarait « rien ne passe la nuit »
-- **2026-09-15** — note | **271 seances muettes sur 2 687, concentrees sur 2020 (72), 2022 (123) et 2025 (57)** | `0,02 / sigma < 1` exige `sigma > 2 %` : la strategie est ABSENTE des regimes agites et sous-dimensionnee de 26,4 % ailleurs. Zero seance muette en 2016, 2017, 2021, 2024. L'omission est systematique, pas aleatoire - et elle retire les DEUX queues, donc son effet sur le Sharpe n'est pas signe a priori
 
 ## Next Actions
 

@@ -1291,3 +1291,63 @@ le peut pas.
 
 Meme famille que [[lessons]] L29, ou une note annoncait « 3,4 % d'approximation »
 et se trompait sur ses trois affirmations a la fois.
+
+## L37 -- Un nom qui promet plus que sa definition, et qui ne peut pas etre corrige
+
+La replication de Zarattini a coute une matinee. Trois des cinq ecarts venaient
+du meme defaut, et il n'est ni un bug du moteur ni une negligence de lecture :
+
+> **plusieurs termes du vocabulaire ont un NOM qui promet plus que leur
+> DEFINITION ne livre.**
+
+| Terme | Le nom dit | La definition fait | Quand ca diverge |
+|---|---|---|---|
+| `session.is_last` | la derniere barre de la seance | la **premiere barre a atteindre l'heure DECLAREE** | seance ecourtee : **aucune** barre marquee |
+| `rolling.rank` | un rang | un rang **temporel**, dans sa propre fenetre | on croit classer des instruments |
+| `session.minutes_from_open` | minutes depuis l'ouverture | parcourt **1..N**, jamais zero | la barre « a +30 min » est celle qui CLOT a 10:00 |
+| `vol_target.vol_window` | fenetre de volatilite | comptee en **BARRES** | sur du 1 min : une volatilite par MINUTE, facteur ~20 |
+
+Aucun n'est faux. Chacun est documente, teste, et correct. Et chacun se lit de
+travers par quiconque ecrit une specification en faisant confiance aux noms —
+ce que tout le monde fait, y compris l'auteur du vocabulaire.
+
+### La partie qui n'etait pas prevue
+
+La reaction naturelle est de renommer. **On ne peut pas**, et la raison est
+plus interessante que le probleme :
+
+> « La derniere barre de la seance » est un fait **FUTUR**. Pour savoir que la
+> barre `i` est la derniere, il faut regarder la barre `i+1`.
+
+Le champ ne peut donc PAS tenir la promesse de son nom, quel que soit le nom
+qu'on lui donne. Ce n'est pas un accident de nommage : c'est la garantie
+anti-look-ahead qui remonte a la surface du vocabulaire. Le socle offre ce
+qu'il peut offrir causalement — l'heure DECLAREE — et l'utilisateur, lui,
+pense a la seance REELLE.
+
+Meme structure pour `minutes_from_open` : une barre est horodatee a sa
+cloture, donc la premiere d'une seance vaut 1 et non 0. Le decalage vient de
+la convention causale, pas d'un choix d'ergonomie.
+
+### Ce qu'on en tire, et ce qu'on n'en tire pas
+
+**On n'en tire PAS qu'il faut simplifier le vocabulaire.** Ces definitions sont
+necessaires, chacune pour une raison de causalite ou de generalite. Les cacher
+derriere des noms plus avenants les rendrait plus trompeuses, pas moins. Le
+vocabulaire n'est pas trop complexe : il est trop **implicite**.
+
+**On en tire qu'il faut le rendre bavard au bon moment.** [[reference/controles]]
+(`rsl check`) confronte la specification a ses donnees avant le run : sur
+Zarattini, 1,7 seconde pour dire ce qui avait pris une matinee.
+
+C'est le pendant AMONT de [[reference/silences]], qui mesure les memes defauts
+APRES le run. Les deux existent parce qu'aucun des deux ne suffit : `check` ne
+voit que les pieges deja payes, les compteurs ne parlent qu'une fois le calcul
+fait.
+
+### Le critere d'admission d'un controle
+
+Chaque nouveau controle doit citer **la trace datee qui l'a motive**. Sans
+elle, il decrit une peur et non un fait — et une commande qui parle trop
+n'alerte plus, exactement comme un compteur qui parle toujours ([[lessons]]
+L30).

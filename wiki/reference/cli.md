@@ -1,6 +1,6 @@
 ---
 type: reference
-updated: 2026-09-12
+updated: 2026-09-15
 autorite: src/rsl/cli.py + README.md
 ---
 
@@ -20,6 +20,7 @@ autorite: src/rsl/cli.py + README.md
 | `rsl run STRATEGIE --settings MONTAGE [--symbol ES.v.0]` | forme NORMALE depuis le 2026-09-12 : `examples/` ne contient plus de specification complete. `walkforward` et `verify` prennent les memes options |
 | `rsl walkforward CONFIG --train N --test N` | fenetres successives |
 | `rsl verify CONFIG` | execute DEUX fois et compare les empreintes |
+| `rsl check STRATEGIE --settings MONTAGE` | confronte la specification a ses donnees **sans la lancer**. Code de sortie **2** sur toute gravite `ERREUR`. Attrape les termes dont le nom promet plus que la definition — voir [[reference/controles]] |
 | `rsl squelette [--out F]` | squelette a trous : tout ce qu'on peut ecrire, engendre depuis les registres |
 | `rsl run CONFIG --archive [--note T]` | execute ET enregistre l'essai dans `essais/`. Le Deflated Sharpe est alors calcule contre TOUS les essais du depot, pas contre celui-la seul |
 | `rsl walkforward CONFIG --archive [--note T]` | evalue par fenetres ET enregistre **UN** essai. Un pli n'est pas un essai : c'est la meme configuration sur d'autres donnees. Le Sharpe retenu est celui de la serie GROUPEE, pas la moyenne des plis |

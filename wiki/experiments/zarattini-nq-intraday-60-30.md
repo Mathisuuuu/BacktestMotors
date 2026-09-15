@@ -298,3 +298,73 @@ ce que le rapport signale lui-meme en avertissement.
   reproductible du tout.
 - **Que le residu de 0,33 est un defaut du moteur.** Il n'est pas non plus
   prouve que non. Il est borne et localise, c'est tout.
+
+---
+
+## La chasse au residu (2026-09-15)
+
+Apres la troncature (+0,15 de Sharpe), il restait **0,33 inexplique** entre
+notre 1,14 et le 1,472 annonce. Six pistes ont ete ouvertes ; cinq sont
+fermees.
+
+| Piste | Verdict | Mesure |
+|---|---|---|
+| couts de transaction | **ecartee** | 3,9 % du profit brut a x10, 4,35 % a x1 |
+| differe d'execution, ENTREES | **ecartee** | +0,031 pt de moyenne, mediane NULLE — 1 820 $ sur 4 575 000 |
+| differe d'execution, SORTIES | **ecartee** | +0,0073 pt — cinq fois MOINS que les entrees |
+| exposition nocturne | **ecartee** | 17 fills sur 1 846, ~14 500 $ soit 4,6 % du profit |
+| `sigma` = ecart-type | **falsifiee** | Sharpe TOMBE a 0,84, trades a 598 |
+| VWAP hors du stop | **falsifiee** | Sharpe TOMBE a 0,81, exposition a 68 % |
+| roulements de contrat | **ecartee** | 39 % des gros gaps en mois de roulement, contre 33 % attendus au hasard |
+
+### Ce que la falsification de `sigma` a etabli EN POSITIF
+
+En cherchant a montrer que notre `sigma` etait trop petit, on a montre
+l'inverse. Le rapport ecart absolu moyen / ecart-type vaut **0,7304** sur NQ,
+stable aux douze rangs de controle — nos bandes seraient 27 % plus etroites si
+« sigma » designait un ecart-type. Mais la frequence d'entree tranche :
+
+| | trades / seance | ecart au papier |
+|---|---|---|
+| papier | 0,3562 | — |
+| **nous, ecart absolu moyen** | **0,3643** | **+2,3 %** |
+| nous, ecart-type | 0,2176 | -38,9 % |
+
+**Les entrees sont justes.** `sigma` = ecart absolu moyen est la bonne lecture,
+et c'est l'observable la plus directe de la regle d'entree.
+
+### Les variantes essayees, toutes pires
+
+| | Sharpe | trades | hit | exposition |
+|---|---|---|---|---|
+| **publiee** (MAD + stop VWAP) | **1,14** | 1 001 | 40,16 % | 17,1 % |
+| `sigma` = ecart-type | 0,84 | 598 | 42,14 % | 10,6 % |
+| stop = bande seule | 0,81 | 613 | 46,98 % | 68,1 % |
+| multiplicateur 1,0 | 0,88 | 1 774 | 34,33 % | 27,0 % |
+
+Chaque deviation degrade. Ce n'est pas ce qu'on observe quand on a mal
+specifie quelque chose — et le multiplicateur 1,5 se trouve **pres du sommet
+sur nos donnees aussi**, ce qui retire du poids a l'hypothese « 1,472 est le
+maximum d'un balayage tombe ailleurs ».
+
+### Un effet de bord instructif
+
+La variante « stop = bande seule » monte a **68 % d'exposition**, soit environ
+1 144 barres par trade — pres de trois seances. Sans le VWAP la bande ne mord
+presque jamais, la cloture forcee devient la seule sortie, et sur les **90
+seances sans `is_last`** la position court pendant des semaines. Le compteur
+pose le matin meme ([[reference/silences]]) a demontre son utilite sur un cas
+que personne n'avait prevu.
+
+### Etat
+
+Le residu **n'est pas explique**. Il est borne, et six causes plausibles sont
+eliminees par la mesure. Ce qui reste n'est plus une liste d'hypotheses mais
+deux possibilites qu'aucun run ne tranchera : une difference de DONNEES entre
+notre serie continue non ajustee et la leur, ou un 1,472 qui n'est pas
+reproductible parce qu'il est lui-meme le maximum d'un balayage sur
+l'echantillon entier — ce que la specification annonce explicitement.
+
+Notre DSR de **0,3942** dit la meme chose autrement : le Sharpe observe est
+SOUS le maximum qu'on attendrait par chance apres 497 essais.
+
