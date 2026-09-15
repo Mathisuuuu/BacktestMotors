@@ -40,6 +40,10 @@ class Porteur:
 
     _lignes_d_execution = BacktestReport._lignes_d_execution
     _detail_des_refus = BacktestReport._detail_des_refus
+    # Appelee par `_lignes_d_execution` depuis le 2026-09-15 : la perte
+    # par troncature se lit A COTE du taux d'execution, les deux disant
+    # ensemble ce que le rendement affiche ne mesure pas.
+    _ligne_de_troncature = BacktestReport._ligne_de_troncature
 
 
 def run(

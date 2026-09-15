@@ -17,7 +17,7 @@ generated: true
 | Indicateur | Valeur |
 |---|---|
 | Pages de wiki | 29 |
-| Entrees de log | 213 |
+| Entrees de log | 215 |
 | Derniere activite | 2026-09-15 |
 | Idees ecartees (ledger) | 25 |
 | Idees en attente (ledger) | 6 |
@@ -27,7 +27,7 @@ generated: true
 | Pages `reference/` | 9 |
 | Pages `research/` | 1 |
 
-**Activite par type :** note × 86, fix × 44, feat × 37, decision × 20, mesure × 14, essai × 4, experiment × 2, setup × 1, lint × 1, audit × 1, refactor × 1, perf × 1, bug × 1
+**Activite par type :** note × 86, fix × 45, feat × 37, decision × 20, mesure × 14, essai × 4, experiment × 2, setup × 1, lint × 1, audit × 1, refactor × 1, perf × 1, bug × 1, correction × 1
 
 ## Experiences
 
@@ -46,14 +46,14 @@ Le total des essais alimente le Deflated Sharpe : un essai non enregistre gonfle
 
 ## Derniere activite — 8 entree(s)
 
+- **2026-09-15** — fix | `n_tailles_mesurees` s'affichait sous « Refus » comme « tailles_mesurees 1148 » | un DENOMINATEUR lu comme 1 148 ordres refuses, alors que c'est le nombre d'ordres DIMENSIONNES. Exclu de l'enumeration des refus, et la perte par troncature a desormais sa propre ligne - elle n'etait imprimee nulle part
+- **2026-09-15** — correction | **La ligne « la cloture forcee dormait dehors toutes les nuits » ci-dessus annonce 2 658 franchissements. C'est FAUX : il y en a 17.** | j'avais mesure le gap sur les 2 658 dernieres barres de seance en SUPPOSANT qu'une position y etait ouverte. Le compteur, des sa premiere execution reelle, en compte **17 sur 1 846 fills (0,9 %)** - la quasi-totalite des trades sort AVANT la fin de seance, sur la bande opposee ou le VWAP, et la cloture forcee n'est qu'un filet. Gap subi reel : 31,00 points de moyenne, 14,00 de mediane, 179,00 au maximum. Exposition nocturne ~14 500 $ sur 312 445 $ de profit, soit 4,6 %. Le mecanisme decrit reste exact ; son AMPLEUR etait surestimee d'un facteur 156. Le log etant append-only, la ligne fausse reste, et celle-ci la corrige. Le compteur a donc attrape son auteur avant tout le monde - c'est precisement ce pour quoi il existe
 - **2026-09-15** — mesure | Couverture intraday : **67/71 -> 70/71 elements (98,6 %)**, familles inchangees a 24/25 | DEUX des quatre manques etaient des verdicts ECRITS A LA MAIN devenus faux. « Taille fonction de la force du signal » : `risk.sizing.kind = signal` existe et Zarattini est un `rules@1` MONO-INSTRUMENT qui s'en sert. « Deux ancrages de seance differents » : mesure, ES 15min New York et NQ 1m Chicago coexistent ; seul le cas DEUX series reechantillonnees a ancrages differents est refuse, et ce refus est motive par une mesure (100 % de lignes a un seul instrument). Le seul element restant exige des TICKS
 - **2026-09-15** — feat | **Serie exogene declaree** : section `exogenous` + noeud `exogenous` (`value`, `age_minutes`) | dernier canal ferme du recensement, et `evenements.py` nommait lui-meme le manque. Le piege n'est PAS celui des evenements : lire la derniere valeur connue est aussi causal qu'un `lag`, mais une donnee fondamentale porte DEUX dates - ce qu'elle mesure, et quand elle a paru. Le rapport COT du mardi parait le vendredi. La source doit donc affirmer `horodatee_a_la_publication` OU declarer un `publication_lag_minutes` strictement positif ; il n'y a pas de troisieme possibilite
 - **2026-09-15** — feat | **Trois compteurs de SILENCE au rapport** : franchissements de nuit, seances sans cloture, perte par troncature | quatrieme occurrence de [[lessons]] L18/L25/L28/L30 - un defaut qui produit un nombre parfaitement lisible - et meme remede : faire IMPRIMER le chiffre. Places hors `result_fingerprint` (qui ne hache que `counters` et `portfolio`), comme `attribution_horaire` et pour la meme raison : un diagnostic decrit un run, il ne le definit pas. Les sept empreintes sont intactes
 - **2026-09-15** — fix | **90 seances sur 2 748 n'ont AUCUNE barre `is_last`** | les demi-journees (13:00 x68, 13:15 x21, 13:01 x1) s'arretent avant la fermeture DECLAREE de 16:00. Comportement documente et voulu - la regle est causale, elle ne regarde jamais la barre suivante - mais une regle de securite adossee a `is_last` n'y declenche jamais, et rien ne le signalait
 - **2026-09-15** — fix | **La cloture forcee de Zarattini dormait dehors toutes les nuits** | `exit == is_last` decide a la derniere barre de seance ; avec `lag_bars: 1` et `session_only`, la barre suivante est la PREMIERE DU LENDEMAIN. Gap mesure : **74,165 points de moyenne contre 0,280 sur une barre ordinaire, soit 265 fois**. Pas un bug du moteur - `lag_bars: 1` est normatif et `max_fill_gap_seconds` existe comme garde - mais une omission de MA specification, qui declarait « rien ne passe la nuit »
 - **2026-09-15** — note | **271 seances muettes sur 2 687, concentrees sur 2020 (72), 2022 (123) et 2025 (57)** | `0,02 / sigma < 1` exige `sigma > 2 %` : la strategie est ABSENTE des regimes agites et sous-dimensionnee de 26,4 % ailleurs. Zero seance muette en 2016, 2017, 2021, 2024. L'omission est systematique, pas aleatoire - et elle retire les DEUX queues, donc son effet sur le Sharpe n'est pas signe a priori
-- **2026-09-15** — mesure | **L'ecart au papier decompose, cause par cause, plutot que suppose** | (1) troncature en contrats : **+0,15 de Sharpe**, mesure en multipliant capital, cible et plafond par DIX - le Sharpe etant invariant d'echelle, la troncature passe de 26,4 % a 2,6 % et rien d'autre ne bouge ; 0,99 -> 1,14, et 923 -> 1 001 trades qui ENCADRENT desormais les 957 du papier. (2) coats : ECARTES, 3,9 % du profit brut. (3) decalage d'execution : ECARTE, **1 820 $ sur 4 575 000**, mesure sur les 2 889 vraies barres de signal - 0,031 point de moyenne, mediane NULLE. Residu de 0,33 toujours inexplique
-- **2026-09-15** — mesure | **Zarattini 60/30/1,5 ecrit depuis la specification markdown** : +62,49 %, Sharpe 0,99, 923 trades contre 957 annonces | premier run avec `session_only` (RTH seul, 2 748 seances, 1 030 755 barres) et dimensionnement par EXPRESSION plutot que `vol_target` - dont la fenetre se compte en BARRES et mesurerait une volatilite par minute. DSR 0,3942 NON significatif contre les 497 essais du registre, alors que le rapport imprimait 0,9996 faute d'`--archive`
 
 ## Next Actions
 

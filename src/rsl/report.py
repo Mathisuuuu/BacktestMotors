@@ -248,6 +248,7 @@ class BacktestReport:
 
         lignes = [ligne]
         lignes.extend(self._detail_des_refus())
+        lignes.extend(self._ligne_de_troncature())
 
         # Le seuil est deliberement HAUT. Un run sain remplit la quasi-
         # totalite de ce qu'il emet ; des qu'un ordre sur dix tombe, le
@@ -271,10 +272,16 @@ class BacktestReport:
         stats = self.run.get("risk_stats")
         if not isinstance(stats, dict):
             return []
+        # `n_tailles_mesurees` est un DENOMINATEUR, pas un refus. Il s'est
+        # affiche une fois sous « Refus » - « tailles_mesurees 1148 » se
+        # lisait comme 1 148 ordres refuses alors que c'est le nombre
+        # d'ordres DIMENSIONNES. Exactement le nombre lisible et faux que
+        # ces compteurs existent pour supprimer.
+        pas_des_refus = {"n_warned_margin", "n_tailles_mesurees"}
         motifs = [
             (nom, int(valeur))
             for nom, valeur in stats.items()
-            if isinstance(valeur, int) and valeur > 0 and nom != "n_warned_margin"
+            if isinstance(valeur, int) and valeur > 0 and nom not in pas_des_refus
         ]
         if not motifs:
             return []
@@ -284,6 +291,39 @@ class BacktestReport:
             for nom, nombre in motifs
         )
         return [f"Refus        {detail}"]
+
+    def _ligne_de_troncature(self) -> list[str]:
+        """L'exposition supprimee par l'arrondi aux contrats entiers.
+
+        Un contrat est entier, et le socle ne ment pas la-dessus. Mais la
+        strategie, elle, a demande autre chose - et l'ecart n'est pas un bruit
+        d'arrondi. Mesure sur Zarattini le 2026-09-15 : **26,4 % d'exposition
+        supprimee**, dont **271 seances entierement muettes** concentrees sur
+        2020, 2022 et 2025, ou `0,02 / sigma` tombait sous UN.
+
+        Absente quand aucune regle qui divise n'a repondu : « rien perdu » et
+        « personne n'a divise » ne sont pas la meme affirmation.
+        """
+        stats = self.run.get("risk_stats")
+        if not isinstance(stats, dict):
+            return []
+        perte = stats.get("perte_par_troncature")
+        mesurees = stats.get("n_tailles_mesurees")
+        if not isinstance(perte, float) or not isinstance(mesurees, int):
+            return []
+        ligne = (
+            f"Troncature   {perte * 100:.1f} % de l'exposition demandee "
+            f"supprimee par l'arrondi aux contrats entiers "
+            f"({mesurees:,} dimensionnement(s))"
+        )
+        if perte < 0.05:
+            return [ligne]
+        return [
+            ligne,
+            "             la strategie negociee n'est pas celle qui est "
+            "declaree : verifier si les tailles nulles se concentrent sur "
+            "certains regimes",
+        ]
 
     def render(self) -> str:
         rule = "-" * 72

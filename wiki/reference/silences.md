@@ -39,10 +39,19 @@ seule seance sans cloture forcee suffit a laisser une position ouverte.
 
 ## Ce que chacune a trouve sur Zarattini
 
-- **2 658 sorties remplies apres un gap de nuit.** `exit == is_last` decide a la
-  derniere barre de seance ; avec `lag_bars: 1` et `session_only`, la barre
-  suivante est la premiere du LENDEMAIN. Gap mesure : **74,165 points de
-  moyenne contre 0,280 sur une barre ordinaire — 265 fois**.
+- **17 sorties sur 1 846 fills remplies apres un gap de nuit (0,9 %).**
+  `exit == is_last` decide a la derniere barre de seance ; avec `lag_bars: 1`
+  et `session_only`, la barre suivante est la premiere du LENDEMAIN. Gap subi :
+  **31,00 points de moyenne, 14,00 de mediane, 179,00 au maximum** — contre
+  0,280 sur une barre ordinaire. Ordre de grandeur de l'exposition nocturne
+  subie : ~14 500 $ sur 312 445 $ de profit, soit **4,6 %**.
+
+  **Le compteur a corrige son auteur des sa premiere execution.** J'avais
+  annonce 2 658 franchissements : j'avais mesure le gap sur les 2 658 dernieres
+  barres de seance en SUPPOSANT qu'une position y etait ouverte. Elle ne l'est
+  que 17 fois — la quasi-totalite des trades sort avant la fin de seance, sur
+  la bande opposee ou le VWAP. C'est exactement ce pour quoi le compteur
+  existe : un proxy plausible avait remplace la mesure.
 - **90 seances sur 2 748 sans aucune cloture forcee.** Les demi-journees
   (13:00 x68, 13:15 x21, 13:01 x1) s'arretent avant la fermeture DECLAREE.
 - **26,4 % d'exposition supprimee par la troncature**, dont **271 seances

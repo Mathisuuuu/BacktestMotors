@@ -256,10 +256,18 @@ d'exposition perdue**.
 Aucun n'est un bug du moteur ; tous deux sont desormais imprimes
 ([[reference/silences]]).
 
-1. **La cloture forcee dormait dehors toutes les nuits.** `exit == is_last`
-   decide a la derniere barre de seance ; la barre suivante est la premiere du
-   lendemain. Gap moyen **74,165 points contre 0,280 — 265 fois**. La note de
-   la strategie affirme pourtant « rien ne passe la nuit ».
+1. **La cloture forcee dort dehors — 17 fois sur 1 846 fills (0,9 %).**
+   `exit == is_last` decide a la derniere barre de seance ; la barre suivante
+   est la premiere du lendemain. Gap subi : **31,00 points de moyenne, 14,00 de
+   mediane, 179,00 au maximum**, contre 0,280 sur une barre ordinaire.
+   Exposition nocturne ~14 500 $ sur 312 445 $ de profit, soit **4,6 %**.
+
+   J'avais d'abord annonce **2 658** franchissements, en mesurant le gap sur
+   les 2 658 dernieres barres de seance et en supposant qu'une position y etait
+   ouverte. Elle ne l'est que 17 fois : la quasi-totalite des trades sort avant
+   la fin de seance, sur la bande opposee ou le VWAP. Le mecanisme etait exact,
+   son ampleur surestimee d'un facteur **156**. Le compteur a corrige son auteur
+   des sa premiere execution.
 2. **90 seances sur 2 748 n'ont AUCUNE barre `is_last`** — les demi-journees
    (13:00, 13:15). La cloture forcee ne s'y declenche jamais.
 

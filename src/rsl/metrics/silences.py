@@ -8,10 +8,18 @@ d'entre eux etaient deja imprimes - `dropped_sizing`, `reduce_only_dropped` -
 et ont ete diagnostiques en quelques minutes. Les trois autres etaient
 SILENCIEUX, et ont coute le reste de la matinee :
 
-- **2 658 sorties remplies apres un gap de nuit.** La cloture forcee decide a
-  la derniere barre de seance ; avec `lag_bars: 1` et `session_only: true`, la
-  barre suivante est la premiere du LENDEMAIN. Ecart mesure sur NQ :
-  74,165 points de moyenne contre 0,280 sur une barre ordinaire - **265 fois**.
+- **17 sorties sur 1 846 fills remplies apres un gap de nuit (0,9 %).** La
+  cloture forcee decide a la derniere barre de seance ; avec `lag_bars: 1` et
+  `session_only: true`, la barre suivante est la premiere du LENDEMAIN. Gap
+  subi : 31,00 points de moyenne, 14,00 de mediane, 179,00 au maximum - contre
+  0,280 de moyenne sur une barre ordinaire.
+
+  **Ce compteur a immediatement corrige son auteur.** J'avais annonce 2 658
+  franchissements, en mesurant le gap sur les 2 658 dernieres barres de seance
+  et en SUPPOSANT qu'une position y etait ouverte. Elle ne l'est que 17 fois :
+  la quasi-totalite des trades sort avant la fin de seance, sur la bande
+  opposee ou le VWAP, et la cloture forcee n'est qu'un filet. Un proxy
+  plausible avait remplace la mesure ([[lessons]] L35).
 - **90 seances sur 2 748 sans aucune cloture forcee.** Les demi-journees
   (13:00, 13:15) n'ont pas de barre a l'heure de fermeture DECLAREE, donc
   aucune barre n'y porte `is_last`. Le comportement est documente et voulu ;
