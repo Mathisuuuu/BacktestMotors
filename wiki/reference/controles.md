@@ -15,6 +15,17 @@ autorite: src/rsl/controles.py
 rsl check STRATEGIE --settings REGLAGES [--symbol NQ.v.0]
 ```
 
+**Elle tourne aussi d'office au debut de `rsl run`** (depuis le 2026-09-15).
+Un garde qu'on n'invoque pas n'existe pas : les constats paraissent AVANT le
+calcul, ce qui permet d'abandonner un run de quinze minutes avant qu'il ne
+commence. `--sans-controles` les tait.
+
+Ils n'y BLOQUENT pas, et l'exemple qui le justifie est dans le depot :
+`nq_zarattini_60_30_15` porte une ERREUR reelle - sa cloture forcee ne se
+declenche pas sur 90 seances - et refuser de le lancer casserait un exemple
+pour un defaut que son auteur a choisi d'assumer. Seule `rsl check` invoquee
+directement rend le code de sortie 2.
+
 Code de sortie **2** des qu'un constat est de gravite `ERREUR`, comme
 `rsl verify`. Un script d'integration peut donc refuser de lancer le run.
 

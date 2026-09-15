@@ -11,10 +11,20 @@ $ErrorActionPreference = 'Continue'
 # $true  : ne commite que wiki/ (+ les fichiers de config du wiki).
 # $false : commite tout l'arbre de travail (`git add -A`).
 #
-# Par defaut $false, conformement au comportement demande : synchronisation
-# complete entre machines. A basculer a $true si des travaux en cours sur
-# src/ ne doivent pas partir sur `main` a chaque fin de session.
-$WikiOnly = $false
+# Bascule a $true le 2026-09-15, sur incident. Le `git add -A` a commite
+# tests/fixtures/empreintes_attendues.json EN COURS D'ECRITURE par un run de
+# fond : l'entree Zarattini ne portait que son symbole, et test_composition
+# echouait sur un clone frais. Le hook ne peut pas savoir qu'un fichier est a
+# moitie ecrit, et une session qui lance des runs en arriere-plan en produit
+# regulierement.
+#
+# Ce qui change : src/, tests/ et examples/ ne partent plus tout seuls. Ils se
+# commitent a la main, avec un message qui dit ce qui a ete fait - ce que les
+# douze `sync automatique` du 2026-09-15 ne faisaient pas.
+#
+# Remettre a $false pour retrouver la synchronisation complete entre machines,
+# en sachant que l'incident ci-dessus redeviendra possible.
+$WikiOnly = $true
 # ---------------------------------------------------------------------------
 
 function Get-PythonCommand {
