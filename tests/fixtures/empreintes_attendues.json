@@ -42,6 +42,10 @@
     "symbol": null
   },
   "nq_zarattini_60_30_15.json": {
+    "config_hash": "61b318a98ce9862df3b532c9093e471485c8b3284ef0f8cd9f45540e19bc8589",
+    "final_equity": 812445.0999999653,
+    "n_trades": 923,
+    "result_fingerprint": "a331f886c82d3c552e67ddea71b57b1f1fc0dfede95842c3d26e5c080a023efb",
     "symbol": "NQ.v.0"
   },
   "paire_es_nq.json": {
