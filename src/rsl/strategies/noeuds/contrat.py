@@ -18,7 +18,7 @@ from __future__ import annotations
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from enum import StrEnum
-from typing import Final, Protocol, runtime_checkable
+from typing import Any, Final, Protocol, runtime_checkable
 
 from rsl.data.feed import Context
 from rsl.errors import ConfigurationError, RegistryError
@@ -139,6 +139,31 @@ class Piege:
             "quand": self.quand,
             "controle": self.controle,
         }
+
+
+def piege_de_champ(
+    *, promesse: str, realite: str, quand: str, controle: str | None = None
+) -> dict[str, Any]:
+    """Un `Piege` pose sur un champ de SPECIFICATION, pas sur un noeud.
+
+    Les noeuds declarent leurs pieges dans `@signal_node`. Les modeles pydantic
+    - `SizingSpec`, `ExecutionSpec`, `DataSpec` - n'ont pas de decorateur ou les
+    mettre ; ils passent donc par le `json_schema_extra` de leur `Field`, qui a
+    la propriete qui compte : **le piege vit a cote de la definition qu'il
+    decrit**, et bouge avec elle.
+
+    Effet de bord voulu : le piege entre dans le JSON Schema publie. Un piege
+    connu du seul code source ne previent personne, et le schema est ce que lit
+    une machine qui ecrit une specification.
+    """
+    return {
+        "piege": {
+            "promesse": promesse,
+            "realite": realite,
+            "quand": quand,
+            "controle": controle,
+        }
+    }
 
 
 @dataclass(frozen=True, slots=True)

@@ -111,6 +111,33 @@ d'ou la liste `AUDITES` qui EST cette affirmation, datee par git.
 Aucun test ne le peut. Il verifie qu'on s'est pose la question — la seule
 chose mecanisable.
 
+### Et l'autre moitie du vocabulaire
+
+Les noeuds ne sont qu'une moitie de ce qu'on ecrit. L'autre — `risk.sizing`,
+`execution`, `data[]`, **32 champs** — n'etait couverte par rien, et c'est
+pourtant la que vit le piege le plus couteux de la journee : `vol_window`
+compte des **BARRES**.
+
+[tests/unit/test_pieges_de_champ.py](../../tests/unit/test_pieges_de_champ.py)
+ferme ce trou par le meme mecanisme. Les modeles pydantic n'ont pas de
+decorateur ou declarer un piege ; ils passent par le `json_schema_extra` de
+leur `Field`, ce qui conserve la propriete qui compte : **le piege vit a cote
+de la definition**, et bouge avec elle.
+
+| Champ | Le nom dit | La definition fait |
+|---|---|---|
+| `risk.sizing.vol_window` | une fenetre de volatilite | comptee en **BARRES** — `sqrt(390)` d'ecart sur du minute |
+| `data[].session_only` | declarer une `session` suffit | sans lui, la seance court jusqu'a l'**ouverture suivante** — 548 seances de dimanche sur NQ |
+| `risk.sizing.contracts` | le nombre de contrats | sous `vol_target`, une **BASE** multipliee puis **tronquee** — `int(1 x 0.9) = 0` |
+
+Le dernier n'a **pas** de controle `rsl check` : il depend d'une valeur
+calculee au run, donc indecidable depuis la specification seule. Un piege sans
+controle n'est pas moins reel.
+
+Les pieges entrent dans le **JSON Schema publie**. C'est voulu : le schema est
+ce que lit une machine qui ecrit une specification, et un piege connu du seul
+code source ne previent personne.
+
 ## Ce qu'elle n'est pas, et ne sera pas
 
 - **Pas un validateur.** Ce qui est invalide LEVE deja, par pydantic et par le

@@ -136,6 +136,12 @@
           "session_only": {
             "default": false,
             "description": "Ne garder que les barres dont la cloture tombe dans la seance DECLAREE. Sans lui, une seance court jusqu'a l'ouverture suivante et contient les barres de nuit. Exige `session`.",
+            "piege": {
+              "controle": "seance-electronique",
+              "promesse": "declarer une `session` suffit a negocier la seance reguliere",
+              "quand": "mesure sur NQ le 2026-09-14 : 1 362 barres par seance au lieu de 390, et **548 seances de DIMANCHE sur 3 314** nees de la reouverture du dimanche 18 h. Dix des soixante seances de `sigma` etaient des soirees de dimanche",
+              "realite": "sans ce champ, la seance declaree court jusqu'a l'OUVERTURE SUIVANTE et contient toutes les barres de nuit"
+            },
             "title": "Session Only",
             "type": "boolean"
           },
@@ -746,6 +752,12 @@
               }
             ],
             "default": null,
+            "piege": {
+              "controle": null,
+              "promesse": "le nombre de contrats a negocier",
+              "quand": "`contracts: 1` avec un facteur inferieur a un donne `int(1 * 0.9) = 0` : la strategie ne prend JAMAIS position, sans lever. Choisir une base assez grande pour que la troncature ne mange pas tout le signal - `contracts: 10` donne dix paliers. Documente dans `engine/risk.py` depuis l'origine du champ",
+              "realite": "avec `kind: vol_target`, c'est une BASE que le facteur d'echelle multiplie, et le produit est TRONQUE"
+            },
             "title": "Contracts"
           },
           "fraction": {
@@ -844,6 +856,12 @@
           "vol_window": {
             "default": 20,
             "minimum": 2,
+            "piege": {
+              "controle": "vol-target-en-barres",
+              "promesse": "une fenetre de volatilite, donc en jours ou en seances",
+              "quand": "sur des barres d'une minute, `vol_window: 60` mesure une volatilite PAR MINUTE. L'ecart avec une volatilite de seance vaut `sqrt(390)`, soit pres de vingt. Consigne au ledger le 2026-09-15, apres avoir fait ecarter `vol_target` de la replication Zarattini",
+              "realite": "une fenetre comptee en BARRES"
+            },
             "title": "Vol Window",
             "type": "integer"
           }

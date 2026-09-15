@@ -67,6 +67,7 @@ from rsl.engine.runner import RunConfig
 from rsl.env import resolve_data_path
 from rsl.errors import ConfigurationError
 from rsl.manifest import DataSource
+from rsl.strategies.noeuds.contrat import piege_de_champ
 from rsl.strategies.signals import build_signal
 
 SpecDict = dict[str, object]
@@ -252,6 +253,20 @@ class DataSpec(StrictModel):
             "DECLAREE. Sans lui, une seance court jusqu'a l'ouverture "
             "suivante et contient les barres de nuit. Exige `session`."
         ),
+        json_schema_extra=piege_de_champ(
+            promesse="declarer une `session` suffit a negocier la seance reguliere",
+            realite=(
+                "sans ce champ, la seance declaree court jusqu'a l'OUVERTURE "
+                "SUIVANTE et contient toutes les barres de nuit"
+            ),
+            quand=(
+                "mesure sur NQ le 2026-09-14 : 1 362 barres par seance au lieu "
+                "de 390, et **548 seances de DIMANCHE sur 3 314** nees de la "
+                "reouverture du dimanche 18 h. Dix des soixante seances de "
+                "`sigma` etaient des soirees de dimanche"
+            ),
+            controle="seance-electronique",
+        ),
     )
     session: SessionSpec | None = Field(
         default=None,
@@ -432,7 +447,25 @@ class SizingSpec(StrictModel):
     kind: Literal[
         "none", "fixed", "equity_fraction", "risk_fraction", "vol_target", "signal"
     ] = "none"
-    contracts: int | None = Field(default=None, ge=1)
+    contracts: int | None = Field(
+        default=None,
+        ge=1,
+        json_schema_extra=piege_de_champ(
+            promesse="le nombre de contrats a negocier",
+            realite=(
+                "avec `kind: vol_target`, c'est une BASE que le facteur "
+                "d'echelle multiplie, et le produit est TRONQUE"
+            ),
+            quand=(
+                "`contracts: 1` avec un facteur inferieur a un donne "
+                "`int(1 * 0.9) = 0` : la strategie ne prend JAMAIS position, "
+                "sans lever. Choisir une base assez grande pour que la "
+                "troncature ne mange pas tout le signal - `contracts: 10` "
+                "donne dix paliers. Documente dans `engine/risk.py` depuis "
+                "l'origine du champ"
+            ),
+        ),
+    )
     fraction: float | None = Field(default=None, gt=0.0)
     atr_window: int = Field(default=14, ge=1)
     atr_multiple: float = Field(default=2.0, gt=0.0)
@@ -441,7 +474,22 @@ class SizingSpec(StrictModel):
         gt=0.0,
         description="Ecart-type cible des rendements PAR BARRE, jamais annualise.",
     )
-    vol_window: int = Field(default=20, ge=2)
+    vol_window: int = Field(
+        default=20,
+        ge=2,
+        json_schema_extra=piege_de_champ(
+            promesse="une fenetre de volatilite, donc en jours ou en seances",
+            realite="une fenetre comptee en BARRES",
+            quand=(
+                "sur des barres d'une minute, `vol_window: 60` mesure une "
+                "volatilite PAR MINUTE. L'ecart avec une volatilite de seance "
+                "vaut `sqrt(390)`, soit pres de vingt. Consigne au ledger le "
+                "2026-09-15, apres avoir fait ecarter `vol_target` de la "
+                "replication Zarattini"
+            ),
+            controle="vol-target-en-barres",
+        ),
+    )
     vol_max_multiple: float = Field(default=4.0, gt=0.0)
     signal: SpecDict | None = Field(
         default=None,
