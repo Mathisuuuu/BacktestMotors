@@ -239,6 +239,16 @@ def _build_parser() -> argparse.ArgumentParser:
         "--symbol",
         help="instrument sur lequel appliquer une strategie mono-instrument",
     )
+    run.add_argument(
+        "--sans-controles",
+        action="store_true",
+        help=(
+            "ne pas jouer les controles de `rsl check` avant le run. Ils "
+            "coutent un second chargement des cotations ; les taire fait "
+            "gagner deux secondes et perdre le seul avertissement qui arrive "
+            "a temps."
+        ),
+    )
     run.add_argument("--out", type=Path, help="ecrit le rapport JSON dans ce fichier")
     run.add_argument("--json", action="store_true", help="affiche le rapport JSON")
     run.add_argument(
@@ -563,6 +573,52 @@ def _cmd_check(args: argparse.Namespace) -> int:
     return EXIT_CHECK_FAILED if grave else EXIT_OK
 
 
+def _controler_avant_le_run(spec: BacktestSpec, *, tu: bool) -> None:
+    """Les controles de `rsl check`, joues AVANT le calcul.
+
+    Pourquoi ils tournent d'office
+    -------------------------------
+    Un garde qu'on n'invoque pas n'existe pas. `rsl check`, posee le
+    2026-09-15, attrape en 1,7 s des defauts qui avaient coute une matinee -
+    mais seulement si quelqu'un y pense. Les jouer ici les rend inevitables,
+    et le prix est un second chargement des cotations : deux secondes contre
+    les minutes d'un run.
+
+    Ils ne BLOQUENT pas, et ce n'est pas un oubli. Le ledger du 2026-09-15
+    ecarte le refus, et l'exemple qui le justifie est dans le depot :
+    `nq_zarattini_60_30_15` porte une ERREUR reelle - sa cloture forcee ne se
+    declenche pas sur 90 seances - et refuser de le lancer casserait un
+    exemple pour un defaut que son auteur a choisi d'assumer. Le constat
+    parait, la decision reste humaine.
+
+    Ce qu'ils permettent, et qui vaut le detour a lui seul : abandonner un run
+    de quinze minutes AVANT qu'il ne commence, pas apres.
+    """
+    if tu:
+        return
+    stores, _instruments, _sources = load_stores(spec)
+    constats = controler(spec, stores)
+    if not constats:
+        return
+    print(render(constats))
+    if any(c.gravite is Gravite.ERREUR for c in constats):
+        print()
+        print(
+            "Le run demarre QUAND MEME : un constat decrit un ecart entre ce "
+            "que la specification"
+        )
+        print(
+            "dit et ce qu'elle a l'air de dire, pas une erreur de validation. "
+            "Interrompre"
+        )
+        print(
+            "maintenant coute moins cher que de lire le resultat plus tard. "
+            "`rsl check` seule"
+        )
+        print("rend le code de sortie 2.")
+    print("-" * 72)
+
+
 def _cmd_run(args: argparse.Namespace) -> int:
     """Execute un backtest, et - avec `--archive` - le compte comme un essai.
 
@@ -577,6 +633,7 @@ def _cmd_run(args: argparse.Namespace) -> int:
     comparer ferait qu'un premier essai se trouverait deja un predecesseur.
     """
     spec = _load_spec(args.config, args.settings, args.symbol)
+    _controler_avant_le_run(spec, tu=args.sans_controles)
     registre = registre_par_defaut() if args.archive else None
     report = run_backtest(
         spec, trial_log=None if registre is None else registre.journal()
