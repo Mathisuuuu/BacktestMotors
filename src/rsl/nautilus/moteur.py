@@ -34,6 +34,7 @@ from nautilus_trader.model.objects import Money
 
 from rsl.config import RiskSpec
 from rsl.data.schema import BarStore, InstrumentSpec
+from rsl.engine.execution import IntrabarPriority
 from rsl.errors import ConfigurationError
 from rsl.nautilus.pont import (
     VENUE,
@@ -43,6 +44,7 @@ from rsl.nautilus.pont import (
     precision_de,
     type_de_barre,
 )
+from rsl.nautilus.ticks import ticks_nautilus
 
 SpecDict = dict[str, object]
 
@@ -61,6 +63,20 @@ class Montage:
     capital: float
     quantite: int = 1
     frais_actifs: bool = True
+    en_ticks: bool = False
+    """Alimenter le simulateur en TICKS synthetiques, en plus des barres.
+
+    Repare la seule divergence de convention connue entre les deux
+    moteurs : sans ticks, Nautilus remplit un ordre au marche a la CLOTURE
+    de la barre suivante, quand nous servons a son OUVERTURE. Une barre
+    entiere d'ecart, qui se compose a chaque trade - `_moule` divergeait de
+    23,84 %.
+
+    Reste `False` par defaut : le basculement change les chiffres de tous
+    les runs Nautilus, et il doit etre demande.
+    """
+    priorite: IntrabarPriority = IntrabarPriority.PESSIMISTIC
+    """Ordre des deux extremes dans les ticks. Sans effet sans `en_ticks`."""
 
 
 def monter(store: BarStore, montage: Montage) -> BacktestEngine:
@@ -103,15 +119,40 @@ def monter(store: BarStore, montage: Montage) -> BacktestEngine:
         fee_model=FixedFeeModel(
             Money(frais_par_contrat(montage.root) if montage.frais_actifs else 0.0, USD)
         ),
+        # QUI apparie. Les deux defauts de Nautilus sont `bar_execution=True`
+        # et `trade_execution=False` : sans ces deux lignes, les ticks ajoutes
+        # plus bas sont ignores par le simulateur et le remplissage reste a la
+        # CLOTURE de la barre suivante - mesure le 2026-09-15, l'equity ne
+        # bougeait pas d'un centime avec ou sans ticks.
+        #
+        # Les deux sont exclusifs ici, et c'est voulu : les BARRES portent les
+        # signaux, les TICKS portent l'execution. Laisser les deux apparier
+        # melangerait deux conventions dans le meme run.
+        bar_execution=not montage.en_ticks,
+        trade_execution=montage.en_ticks,
     )
     moteur.add_instrument(instrument)
 
+    precision = precision_de(float(instrument.price_increment))
     bar_type = type_de_barre(montage.root, montage.agregation)
-    moteur.add_data(
-        barres_nautilus(
-            store, bar_type, precision=precision_de(float(instrument.price_increment))
+    # Les BARRES portent les signaux : la strategie decide dessus, et elles
+    # lui sont livrees a leur cloture.
+    moteur.add_data(barres_nautilus(store, bar_type, precision=precision))
+    if montage.en_ticks:
+        # Les TICKS portent l'execution. Les deux flux se melent par
+        # horodatage, et leur chronologie suffit a tenir la garantie : les
+        # quatre ticks d'une barre tombent STRICTEMENT AVANT sa livraison,
+        # donc un ordre soumis dans `on_bar` ne peut rencontrer aucun tick
+        # avant l'ouverture de la barre SUIVANTE. C'est `open[t+1]`, notre
+        # semantique, obtenue sans regle a faire respecter.
+        moteur.add_data(
+            ticks_nautilus(
+                store,
+                instrument.id,
+                precision=precision,
+                priorite=montage.priorite,
+            )
         )
-    )
     return moteur
 
 

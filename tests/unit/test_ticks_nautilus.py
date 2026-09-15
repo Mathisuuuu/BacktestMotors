@@ -88,15 +88,33 @@ class TestLaMonotonieDesHorodatages:
             ouverture_suivante = ticks[(i + 1) * TICKS_PAR_BARRE].ts_event
             assert ouverture_suivante > cloture
 
-    def test_la_cloture_tombe_exactement_sur_ts_close(self):
-        """C'est l'instant ou la barre est CONNUE ; la strategie doit la voir
-        la, pas avant."""
+    def test_la_cloture_tombe_juste_avant_ts_close(self):
+        """Le piege grave du dispositif, et la raison de sa forme.
+
+        Ticks et barres circulent dans le MEME flux. Si le tick de cloture et
+        la barre portaient le meme instant, l'ordre dans lequel Nautilus les
+        traite deciderait si un ordre soumis dans `on_bar` peut se remplir au
+        tick de cloture de la barre qui vient de le declencher - l'execution
+        que `docs/execution-model.md` 2.1 declare inexprimable.
+
+        A `ts_close - 1`, la barre arrive APRES son dernier tick, et le
+        prochain tick disponible est l'ouverture de la barre suivante.
+        """
         store = magasin(4)
         ticks = ticks_nautilus(store, IID, precision=2)
-        attendus = list(np.asarray(store.ts_close, dtype=np.int64))
+        attendus = [int(t) - 1 for t in np.asarray(store.ts_close, dtype=np.int64)]
         obtenus = [ticks[i * TICKS_PAR_BARRE + 3].ts_event
                    for i in range(store.n_bars)]
         assert obtenus == attendus
+
+    def test_aucun_tick_ne_coincide_avec_la_livraison_d_une_barre(self):
+        """La formulation directe de la garantie : un ordre soumis sur la barre
+        `t` ne peut rencontrer aucun tick avant l'ouverture de `t+1`."""
+        store = magasin(6)
+        ticks = ticks_nautilus(store, IID, precision=2)
+        livraisons = {int(t) for t in np.asarray(store.ts_close, dtype=np.int64)}
+        for tick in ticks:
+            assert tick.ts_event not in livraisons
 
     def test_tous_les_ticks_tiennent_dans_leur_barre(self):
         store = magasin(6)
@@ -106,7 +124,8 @@ class TestLaMonotonieDesHorodatages:
         for i in range(store.n_bars):
             for rang in range(TICKS_PAR_BARRE):
                 instant = ticks[i * TICKS_PAR_BARRE + rang].ts_event
-                assert debuts[i] < instant <= fins[i]
+                # Les DEUX bornes sont exclues : voir les deux tests ci-dessus.
+                assert debuts[i] < instant < fins[i]
 
     def test_ts_init_vaut_ts_event(self):
         """Un tick est connu quand il a lieu - contrairement a une barre, qui
@@ -192,13 +211,13 @@ class TestCeQueLeModuleRefuse:
         """Quatre ticks distincts exigent quatre nanosecondes. Aucune
         granularite reelle n'en est loin, mais le refus vaut mieux que deux
         ticks au meme instant."""
-        ts = np.asarray([0, 2], dtype=np.int64)
+        ts = np.asarray([0, 3], dtype=np.int64)
         store = BarStore.build(
             symbol="ES.v.0", granularity=Granularity.minutes(1), ts_event=ts,
             open_=np.asarray([1.0, 1.0]), high=np.asarray([1.0, 1.0]),
             low=np.asarray([1.0, 1.0]), close=np.asarray([1.0, 1.0]),
             volume=np.asarray([1.0, 1.0]), source_hash="court",
-            ts_close=np.asarray([2, 4], dtype=np.int64),
+            ts_close=np.asarray([3, 6], dtype=np.int64),
         )
         with pytest.raises(ConfigurationError, match="trop courte"):
             ticks_nautilus(store, IID, precision=2)

@@ -67,6 +67,20 @@ class VocabulaireConfig(StrategyConfig, frozen=True):
     instrument_id: InstrumentId
     bar_type: BarType
     strategie: dict[str, object]
+    sur_ticks: bool = False
+    """Vider la file au premier TICK de la barre suivante, et non a sa cloture.
+
+    C'est ce qui fait passer le remplissage de `close[t+1]` a `open[t+1]`,
+    notre convention. Sans ce basculement, la file se vide dans `on_bar`,
+    et Nautilus remplit l'ordre au marche immediatement - donc au dernier
+    prix connu, la cloture de la barre qui vient d'arriver.
+
+    Exige que le moteur ait ete monte avec `Montage(en_ticks=True)`, qui
+    ajoute les ticks au flux ET bascule l'appariement dessus.
+
+    Reste `False` par defaut : le basculement change les chiffres de tous
+    les runs Nautilus, et il doit etre demande.
+    """
 
 
 class VocabulaireNautilus(StrategyNautilus):
@@ -123,6 +137,11 @@ class VocabulaireNautilus(StrategyNautilus):
         self._position = 0
         self._en_attente.clear()
         self.subscribe_bars(self.config.bar_type)
+        if self.config.sur_ticks:
+            # Les BARRES portent les signaux, les TICKS portent l'execution.
+            # La strategie a besoin des deux, et pour deux raisons
+            # differentes.
+            self.subscribe_trade_ticks(self.config.instrument_id)
 
     def on_bar(self, bar: Bar) -> None:
         """Une barre close : d'abord executer ce qui a ete decide HIER.
@@ -139,9 +158,8 @@ class VocabulaireNautilus(StrategyNautilus):
         nanosecondes, pas en barres. La file est ici, elle ne depend d'aucun
         defaut de la bibliotheque.
         """
-        a_soumettre, self._en_attente = self._en_attente, []
-        for ordre in a_soumettre:
-            self._soumettre(ordre)
+        if not self.config.sur_ticks:
+            self._vider_la_file()
 
         ctx = self._avancer(bar)
         if ctx.n_bars_seen <= self._regles.warmup_bars:
@@ -150,6 +168,33 @@ class VocabulaireNautilus(StrategyNautilus):
             # qu'avec notre runner : avant, la strategie ne decide pas.
             return
         self._en_attente.extend(self._regles.on_bar(ctx))
+
+    def _vider_la_file(self) -> None:
+        """Soumet ce qui a ete decide avant, puis oublie.
+
+        Extraite pour que les deux moments possibles - la barre suivante ou
+        son premier tick - partagent le meme code. Deux copies auraient
+        diverge, et la divergence ne se serait vue que dans un chiffre.
+        """
+        a_soumettre, self._en_attente = self._en_attente, []
+        for ordre in a_soumettre:
+            self._soumettre(ordre)
+
+    def on_trade_tick(self, tick: object) -> None:
+        """Le premier tick apres une decision l'execute.
+
+        C'est ici que `open[t+1]` se produit. Les quatre ticks d'une barre
+        tombent STRICTEMENT AVANT sa livraison ; une decision prise sur la
+        barre `t` ne rencontre donc son premier tick qu'a l'ouverture de
+        `t+1`. La chronologie suffit - aucune regle n'est a faire
+        respecter, et c'est pour cela que les ticks sont horodates comme
+        ils le sont (voir `rsl/nautilus/ticks.py`).
+
+        Sans `sur_ticks`, cette methode ne fait rien : la file se vide dans
+        `on_bar` comme avant, et les comparaisons archivees ne bougent pas.
+        """
+        if self.config.sur_ticks and self._en_attente:
+            self._vider_la_file()
 
     def on_order_filled(self, event: object) -> None:
         """Rend la position a la strategie, comme le ferait notre runner.

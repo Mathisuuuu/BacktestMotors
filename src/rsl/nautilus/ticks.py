@@ -53,17 +53,38 @@ hypothese nouvelle n'est introduite ici :
   moteur pour un long.
 - `OPTIMISTIC` : `high` puis `low`. A n'utiliser qu'en sensibilite.
 
-Les horodatages et le piege qu'ils evitent
--------------------------------------------
-Avec `close_stamp: period_end`, la cloture d'une barre et l'ouverture de la
-suivante portent le MEME instant. Poser le tick d'ouverture a cet instant
-rendrait l'ordre des deux ambigu, et une strategie pourrait se voir remplie a
-l'ouverture de `t+1` par une decision prise... au meme nanoseconde.
+Les horodatages, et les DEUX pieges qu'ils evitent
+---------------------------------------------------
+**Premier piege.** Avec `close_stamp: period_end`, la cloture d'une barre et
+l'ouverture de la suivante portent le MEME instant. Poser le tick d'ouverture
+la rendrait l'ordre des deux ambigu. Il est donc pose a `ts_event + 1 ns`,
+strictement APRES la barre precedente.
 
-Le tick d'ouverture est donc pose a `ts_event + 1 ns`, strictement APRES la
-cloture de la barre precedente. Le tick de cloture, lui, tombe exactement sur
-`ts_close` : c'est l'instant ou la barre est connue, et celui qui doit
-gouverner la livraison a la strategie.
+**Second piege, et c'est le grave.** Les ticks et les barres circulent dans le
+MEME flux : la strategie decide sur les barres, le simulateur remplit sur les
+ticks. Si le tick de cloture et la barre portaient le meme instant, l'ordre
+dans lequel Nautilus les traite deciderait si un ordre soumis dans `on_bar`
+peut se remplir **au tick de cloture de la barre qui vient de le declencher**.
+
+Ce serait exactement l'execution que `docs/execution-model.md` §2.1 declare
+inexprimable :
+
+    « Il n'existe aucun mode, aucun flag, aucun chemin de code permettant
+      d'executer a la cloture de la barre qui a produit le signal. »
+
+Le tick de cloture est donc pose a `ts_close - 1 ns`, strictement AVANT la
+barre. La suite devient, pour chaque barre :
+
+    ticks O, extreme, extreme, C   puis   la BARRE   puis   tick O suivant
+    a+1    ...             b-1           b                 b+1
+
+Un ordre soumis sur la barre a `b` ne peut donc rencontrer aucun tick avant
+`b+1`, c'est-a-dire l'ouverture de la barre suivante. C'est notre semantique,
+obtenue par la seule chronologie - pas par une regle qu'il faudrait faire
+respecter.
+
+Accessoirement c'est plus juste physiquement : la derniere transaction d'une
+barre a lieu JUSTE AVANT sa cloture, pas a l'instant meme ou elle se ferme.
 """
 
 from __future__ import annotations
@@ -87,20 +108,21 @@ pas."""
 
 
 def _instants(ts_event: int, ts_close: int) -> tuple[int, int, int, int]:
-    """Quatre instants strictement croissants dans `]ts_event, ts_close]`.
+    """Quatre instants strictement croissants dans `]ts_event, ts_close[`.
 
-    L'ouverture est decalee d'une nanoseconde pour ne jamais coincider avec la
-    cloture de la barre precedente - voir l'en-tete du module.
+    Les DEUX bornes sont exclues, et chacune pour une raison differente :
+    l'ouverture pour ne pas coincider avec la barre precedente, la cloture pour
+    que la BARRE arrive apres son dernier tick. Voir l'en-tete du module.
     """
     duree = ts_close - ts_event
-    if duree < TICKS_PAR_BARRE:
+    if duree < TICKS_PAR_BARRE + 1:
         raise ConfigurationError(
-            f"barre trop courte pour porter {TICKS_PAR_BARRE} ticks distincts : "
-            f"{duree} ns. Les ticks synthetiques exigent des barres d'au moins "
-            f"{TICKS_PAR_BARRE} ns, ce que toute granularite reelle depasse."
+            f"barre trop courte pour porter {TICKS_PAR_BARRE} ticks distincts "
+            f"strictement entre ses bornes : {duree} ns. Il en faut au moins "
+            f"{TICKS_PAR_BARRE + 1}, ce que toute granularite reelle depasse."
         )
     pas = duree // 3
-    return (ts_event + 1, ts_event + pas, ts_event + 2 * pas, ts_close)
+    return (ts_event + 1, ts_event + pas, ts_event + 2 * pas, ts_close - 1)
 
 
 def ordre_des_extremes(
