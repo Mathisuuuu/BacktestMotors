@@ -13,6 +13,13 @@
     "result_fingerprint": "7757368f67d2f07ec6e8ddc6788042cb6e634b50c8c4ba7ff64dbcf82faf4969",
     "symbol": "ES.v.0"
   },
+  "intraday_momentum_filtre_quotidien.json": {
+    "config_hash": "481a33b039b2d90d3a926fb838629c135fbb22b85c23a2be0a7f64e6735373a3",
+    "final_equity": 530215.4000000202,
+    "n_trades": 2051,
+    "result_fingerprint": "306e83c7b96d87aa943f1bb2d53958a4d8a8261ab298bde405ffd037136a206d",
+    "symbol": "ES.v.0"
+  },
   "intraday_opening_range.json": {
     "config_hash": "3fa88b83cea7808e6488fe0ef72fcd7869f586ba7283a6c4e0e984f9a6451d6c",
     "final_equity": 471391.85000017786,
@@ -21,6 +28,10 @@
     "symbol": "ES.v.0"
   },
   "intraday_vwap_reversion.json": {
+    "config_hash": "7f77ff1a98bb2126c1899da2b67d84e68977f6ec3bac1f4de351ed5d8ae30399",
+    "final_equity": 455211.45000003173,
+    "n_trades": 1363,
+    "result_fingerprint": "09aa37d35f672559e260ef5edc6888168256500e5f325bbd1f8556c02b7f63ef",
     "symbol": "ES.v.0"
   },
   "momentum_12_1_mensuel.json": {
@@ -29,6 +40,9 @@
     "n_trades": 107,
     "result_fingerprint": "0cbc24bade482f2b0c9c4a4f15f01318fc8c2718b76ed99c9f8a5fc16e4c9b6b",
     "symbol": null
+  },
+  "nq_zarattini_60_30_15.json": {
+    "symbol": "NQ.v.0"
   },
   "paire_es_nq.json": {
     "config_hash": "c686c31fa61e36d2b739f8dd97d183cb26a6666c55f90b27c0baead2f7680184",

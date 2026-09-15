@@ -498,6 +498,41 @@ class PositionState:
     high_since_entry: float = 0.0
     low_since_entry: float = 0.0
 
+    closed_trade: bool = False
+    """Un aller-retour s'est-il FERME sur cette barre ?
+
+    Le compagnon obligatoire de `closed_pnl`, et la raison pour laquelle
+    les deux existent plutot qu'un seul champ rendant `None`. Une seule
+    valeur absente empoisonne toute une fenetre de `cumulative`, qui rend
+    alors `None` sur chaque barre - le champ serait inutilisable pour ce a
+    quoi il sert.
+
+    Il se lit comme masque : `cumulative(count_true,
+    mask=position("closed_trade"), inner=position("closed_pnl") < 0)`
+    compte les pertes NETTES de la seance.
+    """
+
+    closed_pnl: float = 0.0
+    """P&L NET - frais deduits - du trade ferme sur cette barre. Zero sinon.
+
+    Zero est ici une valeur de REMPLISSAGE, pas une mesure, et c'est
+    exactement ce que [[lessons]] L30 interdit de laisser seul. D'ou
+    `closed_trade` : la valeur ne doit JAMAIS etre lue sans lui.
+
+    Ce qu'il repare
+    ----------------
+    Jusqu'au 2026-09-15, la seule facon de reperer une perte depuis une
+    regle etait `close < entry_price` a la derniere barre en position. Cette
+    ecriture ignore les FRAIS et le prix du fill de SORTIE, qui tombe a la
+    barre suivante. Mesure : une garde « une seule perte » plafonnait en
+    realite a QUATRE pertes par seance comptees en P&L net.
+
+    Ce qu'il ne dit pas : si DEUX trades se ferment sur la meme barre, seul
+    le DERNIER est visible. C'est la meme limite de granularite que partout
+    ailleurs, et elle est reelle - 30 119 barres sur 37 615 portaient deux
+    fills sur un momentum ES 30 minutes ([[lessons]] L32).
+    """
+
     @property
     def is_flat(self) -> bool:
         return self.quantity == 0
@@ -522,6 +557,10 @@ class PositionState:
                 return self.low_since_entry
             case "direction":
                 return float(self.direction)
+            case "closed_trade":
+                return 1.0 if self.closed_trade else 0.0
+            case "closed_pnl":
+                return self.closed_pnl
         raise ValueError(f"champ de position inconnu : '{name}'")
 
 
@@ -670,6 +709,8 @@ POSITION_FIELDS: Final[tuple[str, ...]] = (
     "entry_price",
     "high_since_entry",
     "low_since_entry",
+    "closed_trade",
+    "closed_pnl",
 )
 
 

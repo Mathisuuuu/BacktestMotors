@@ -117,22 +117,66 @@ def track_positions(
             current.low = min(current.low, bar.low)
 
 
+def trade_ferme_ici(
+    portfolio: Portfolio, symbol: str, index: int
+) -> float | None:
+    """P&L NET du dernier aller-retour ferme sur CETTE barre, ou `None`.
+
+    Remonte la liste par la fin et s'arrete des qu'une barre anterieure
+    apparait : le cout est celui du nombre de trades fermes sur cette barre,
+    pas celui de l'historique.
+
+    Causalite : le trade est ferme a l'etape 3 de la boucle, `on_bar` decide a
+    l'etape 5. Son resultat est donc connu quand la strategie le lit, et il ne
+    dit rien de l'avenir - c'est le meme argument que pour tout
+    `PositionState`.
+
+    Si DEUX trades se ferment sur la meme barre, le dernier gagne. La situation
+    est reelle et non marginale ([[lessons]] L32).
+
+    CONTRAT : `index` doit etre la barre COURANTE du run, c'est-a-dire au
+    moins aussi recente que toute fermeture deja enregistree. Appelee
+    retrospectivement sur une liste complete, la fonction rend `None` des
+    la premiere fermeture plus recente - elle s'arrete, elle ne cherche
+    pas. C'est voulu : chercher couterait l'historique entier a chaque
+    barre, et le runner n'appelle jamais que pour le present.
+    """
+    for trade in reversed(portfolio.closed_trades):
+        if trade.closed_bar != index:
+            return None
+        if trade.symbol == symbol:
+            return trade.gross_pnl - trade.fees
+    return None
+
+
 def position_state(
     tracking: dict[str, _SinceEntry], portfolio: Portfolio, symbol: str, index: int
 ) -> PositionState:
     """Assemble l'etat expose a la strategie. Rien qui vienne d'apres `index`."""
+    pnl = trade_ferme_ici(portfolio, symbol, index)
     held = portfolio.quantity_of(symbol)
     if held == 0:
-        return FLAT
+        # Le cas qui comptait, et qui rendait `FLAT` jusqu'au 2026-09-15 : une
+        # position VIENT de se fermer. Rendre l'etat par defaut faisait
+        # disparaitre son resultat avant que la strategie puisse le lire.
+        if pnl is None:
+            return FLAT
+        return PositionState(closed_trade=True, closed_pnl=pnl)
     since = tracking.get(symbol)
     if since is None:
-        return PositionState(quantity=held)
+        return PositionState(
+            quantity=held,
+            closed_trade=pnl is not None,
+            closed_pnl=pnl if pnl is not None else 0.0,
+        )
     return PositionState(
         quantity=held,
         bars_held=index - since.opened_bar,
         entry_price=portfolio.positions[symbol].avg_entry,
         high_since_entry=since.high,
         low_since_entry=since.low,
+        closed_trade=pnl is not None,
+        closed_pnl=pnl if pnl is not None else 0.0,
     )
 
 

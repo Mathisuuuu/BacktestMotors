@@ -405,7 +405,9 @@
             "bars_held",
             "entry_price",
             "high_since_entry",
-            "low_since_entry"
+            "low_since_entry",
+            "closed_trade",
+            "closed_pnl"
           ],
           "defaut": "quantity",
           "type": "choix"
