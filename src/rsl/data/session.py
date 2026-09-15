@@ -328,6 +328,44 @@ def build_session_index(
     )
 
 
+def barres_de_seance(ts_ns: IntArray, calendar: SessionCalendar) -> BoolArray:
+    """Masque des barres dont la CLOTURE tombe dans la seance declaree.
+
+    Pourquoi ce masque existe
+    --------------------------
+    Une seance declaree court jusqu'a l'ouverture SUIVANTE : les barres
+    d'apres-cloture lui appartiennent encore. C'est correct pour rattacher
+    une barre a un jour, et faux des qu'on veut raisonner sur la seance
+    REGULIERE.
+
+    Mesure du 2026-09-14 sur NQ, seance declaree 09:30-16:00 New York :
+
+    - **1 362 barres par seance** au lieu des 390 du RTH ;
+    - **548 seances de DIMANCHE** sur 3 314, soit 16,5 %, nees de la
+      reouverture du dimanche 18 h. Leur « ouverture de seance » est le
+      prix de reouverture, et leurs barres de rang 30 sont des barres de
+      nuit. Une fenetre de soixante seances en contenait DIX.
+
+    Le masque garde les barres dont la cloture tombe dans
+    `[ouverture, fermeture]` de leur seance. Les seances qui n'en ont
+    aucune disparaissent alors d'elles-memes - les dimanches en font
+    partie.
+
+    Ce n'est pas une supposition : les deux bornes viennent du calendrier
+    DECLARE. Le socle ne devine rien, il applique ce qu'on lui a dit.
+    """
+    if ts_ns.size == 0:
+        return np.zeros(0, dtype=np.bool_)
+    ouverts, fermes = bornes_de_seances(ts_ns, calendar)
+    rang = np.searchsorted(ouverts, ts_ns, side="right") - 1
+    if bool(np.any(rang < 0)):  # pragma: no cover - la marge l'evite
+        raise ConfigurationError(
+            "session : une barre precede la premiere ouverture calculee"
+        )
+    dedans: BoolArray = (ts_ns > ouverts[rang]) & (ts_ns <= fermes[rang])
+    return dedans
+
+
 def lags_meme_rang(
     index: SessionIndex, bar: int, depart: int, nombre: int
 ) -> tuple[int, ...]:

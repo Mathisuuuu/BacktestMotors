@@ -3453,6 +3453,10 @@
             "defaut": null,
             "type": "objet"
           },
+          "session_only": {
+            "defaut": false,
+            "type": "booleen"
+          },
           "timestamp_column": {
             "accepte_null": true,
             "defaut": null,

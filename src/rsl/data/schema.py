@@ -420,6 +420,36 @@ class BarStore:
             None if self.sessions is None else self.sessions.slice(start, stop)
         )
 
+    def filtrer(self, garde: npt.NDArray[np.bool_]) -> BarStore:
+        """Sous-magasin ne gardant que les barres marquees.
+
+        Rend un magasin SANS index de seance : l'index decrit des positions,
+        et un filtrage les renumerote. Le reconstruire est a la charge de
+        l'appelant, qui seul sait sur quel calendrier.
+        """
+        if garde.shape != self.ts_event.shape:
+            raise ConfigurationError(
+                f"filtrer : masque de {garde.shape} pour {self.ts_event.shape} barres"
+            )
+        if not bool(garde.any()):
+            raise ConfigurationError(
+                f"filtrer : aucune barre retenue sur {self.symbol}. Un magasin vide "
+                f"ne produirait aucune erreur au run, seulement un resultat vide."
+            )
+        return BarStore.build(
+            symbol=self.symbol,
+            granularity=self.granularity,
+            ts_event=self.ts_event[garde],
+            open_=self.open[garde],
+            high=self.high[garde],
+            low=self.low[garde],
+            close=self.close[garde],
+            volume=self.volume[garde],
+            is_stale=self.is_stale[garde],
+            ts_close=self.ts_close[garde],
+            source_hash=self.source_hash,
+        )
+
     def with_sessions(self, index: SessionIndex | None) -> BarStore:
         """Copie portant un index de seance. Le magasin reste immuable."""
         if index is None:

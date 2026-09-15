@@ -32,7 +32,11 @@ from rsl.data.schema import (
     Panel,
     ns_to_datetime,
 )
-from rsl.data.session import SessionCalendar, build_session_index
+from rsl.data.session import (
+    SessionCalendar,
+    barres_de_seance,
+    build_session_index,
+)
 from rsl.data.validation import ValidationConfig
 from rsl.engine.cross_sectional import EveryNRows, EveryRow, RebalanceSchedule
 from rsl.engine.execution import (
@@ -112,6 +116,25 @@ def _sans_plafonds_muets(payload: SpecDict) -> None:
     plafonds = risque.get("limits")
     if isinstance(plafonds, dict) and all(v is None for v in plafonds.values()):
         del risque["limits"]
+
+
+def _sans_filtre_muet(payload: SpecDict) -> None:
+    """Retire `session_only: false` de chaque entree `data`.
+
+    Meme regle que `_sans_plafonds_muets`, et meme raison : `false` dit « la
+    seance court jusqu'a l'ouverture suivante », ce qui EST le comportement
+    d'avant l'existence du champ. Deux runs ont recu les memes instructions ;
+    deux hachages differents pretendraient le contraire.
+
+    Verifie le 2026-09-14 : sans ce retrait, ajouter le champ changeait les
+    SEPT `config_hash` archives.
+    """
+    entrees = payload.get("data")
+    if not isinstance(entrees, list):
+        return
+    for entree in entrees:
+        if isinstance(entree, dict) and entree.get("session_only") is False:
+            del entree["session_only"]
 
 
 def _sans_calendriers_muets(payload: SpecDict) -> None:
@@ -219,6 +242,14 @@ class DataSpec(StrictModel):
     close_stamp: CloseStamp = CloseStamp.PERIOD_END
     max_gap_seconds: float | None = Field(default=None, gt=0.0)
     allow_non_positive_prices: bool = True
+    session_only: bool = Field(
+        default=False,
+        description=(
+            "Ne garder que les barres dont la cloture tombe dans la seance "
+            "DECLAREE. Sans lui, une seance court jusqu'a l'ouverture "
+            "suivante et contient les barres de nuit. Exige `session`."
+        ),
+    )
     session: SessionSpec | None = Field(
         default=None,
         description="Calendrier de seance. Sans lui, le noeud `session` leve.",
@@ -748,6 +779,7 @@ class BacktestSpec(StrictModel):
         _sans_plafonds_muets(payload)
         _sans_allegement_muet(payload)
         _sans_calendriers_muets(payload)
+        _sans_filtre_muet(payload)
         propre = _sans_notes(payload)
         assert isinstance(propre, dict)
         return propre
@@ -836,6 +868,16 @@ def load_stores(
 
         if entry.session is not None:
             calendrier = entry.session.build()
+            if entry.session_only:
+                # FILTRER AVANT d'indexer : l'index doit decrire les barres
+                # reellement servies, sinon `bar_index` et `is_last`
+                # designeraient des barres absentes.
+                garde = barres_de_seance(store.ts_close, calendrier)
+                n_avant = store.n_bars
+                store = store.filtrer(garde)
+                transformations.append(
+                    f"session_only({n_avant - store.n_bars} barre(s) hors seance ecartee(s))"
+                )
             store = store.with_sessions(
                 build_session_index(
                     store.ts_close, store.open, store.high, store.low,

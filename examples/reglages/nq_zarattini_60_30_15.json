@@ -1,0 +1,146 @@
+{
+  "note": [
+    "Reglages du run pour la strategie Zarattini 60/30/1,5.",
+    "",
+    "CAPITAL : 500 000. A 100 000, quatre contrats NQ demandent 108 000 de",
+    "marge - la table porte des marges OVERNIGHT - et les ordres sont",
+    "refuses en silence. Mesure du 2026-09-13 : 5 080 refus sur 5 084, et le",
+    "rapport affichait -25,62 % pour DEUX trades (lecon L28). Le taux",
+    "d'execution imprime a cote du rendement le dirait desormais.",
+    "",
+    "La strategie etant strictement intraday, `execution.intraday_margin_",
+    "ratio` permettrait de declarer une marge de JOUR, sensiblement plus",
+    "faible. Il n'est PAS declare ici : ce chiffre est fixe par le courtier,",
+    "et en inventer un serait exactement ce que le socle refuse.",
+    "",
+    "WARMUP : sigma exige 61 seances, le dimensionnement 62. Avec",
+    "`session_only`, une seance fait 390 barres : 62 x 390 = 24 180, et 25 000 couvre avec",
+    "de la marge. Le warmup d'une fenetre comptee en SEANCES ne peut pas se",
+    "declarer automatiquement - le nombre de barres d'une seance depend des",
+    "donnees."
+  ],
+  "initial_cash": 500000.0,
+  "seed": 0,
+  "liquidate_at_end": true,
+  "check_invariant": true,
+  "with_data_hash": true,
+  "min_warmup_bars": 25000,
+  "data": [
+    {
+      "root": "NQ",
+      "path": "indices/NQ_v0_1m.parquet",
+      "granularity_minutes": 1,
+      "close_stamp": "period_end",
+      "session": {
+        "start": "09:30",
+        "end": "16:00",
+        "timezone": "America/New_York"
+      },
+      "note": [
+        "Seance reguliere DECLAREE : c'est elle qui ancre `session`, `cumulative`,",
+        "`minutes_from_open` et les fenetres comptees en seances. Sans elle, la",
+        "sortie de fin de seance dependrait d'une heure UTC qui derive avec l'heure",
+        "d'ete.",
+        "",
+        "`session_only: true` est INDISPENSABLE ici, et voici pourquoi. Le fichier",
+        "porte la seance ELECTRONIQUE complete. Sans filtre, une seance declaree",
+        "court de 09:30 a 09:29 le lendemain :",
+        "",
+        "  - 1 362 barres par seance au lieu des 390 du RTH ;",
+        "  - **548 seances de DIMANCHE sur 3 314**, nees de la reouverture du",
+        "    dimanche 18 h. Leur « ouverture de seance » est le prix de reouverture,",
+        "    et leurs barres de rang 30 sont des barres de nuit.",
+        "",
+        "Or sigma est une moyenne sur 60 seances AU MEME RANG : dix de ces soixante",
+        "auraient ete des soirees de dimanche. La bande aurait ete calibree sur des",
+        "observations qui ne decrivent pas la seance qu'on negocie."
+      ],
+      "session_only": true
+    }
+  ],
+  "execution": {
+    "fees": {
+      "kind": "per_contract"
+    },
+    "slippage": {
+      "kind": "tick",
+      "ticks": 0.5
+    },
+    "lag_bars": 1,
+    "intrabar_priority": "pessimistic",
+    "margin_policy": "reject",
+    "note": [
+      "Un tick d'aller-retour : 0,5 tick a l'entree, 0,5 a la sortie.",
+      "`lag_bars: 1` - la decision prise sur la cloture d'une barre",
+      "s'execute a l'ouverture de la suivante."
+    ]
+  },
+  "risk": {
+    "sizing": {
+      "kind": "signal",
+      "max_contracts": 4,
+      "signal": {
+        "type": "arith",
+        "op": "/",
+        "left": {
+          "type": "constant",
+          "value": 0.02
+        },
+        "right": {
+          "type": "rolling",
+          "stat": "stdev",
+          "window": 60,
+          "across": "sessions",
+          "inner": {
+            "type": "arith",
+            "op": "-",
+            "left": {
+              "type": "arith",
+              "op": "/",
+              "left": {
+                "type": "session",
+                "field": "close",
+                "lag": 1
+              },
+              "right": {
+                "type": "session",
+                "field": "close",
+                "lag": 2
+              }
+            },
+            "right": {
+              "type": "constant",
+              "value": 1.0
+            },
+            "note": "rendement de cloture a cloture de la seance PRECEDENTE"
+          },
+          "note": [
+            "Ecart-type des rendements de cloture sur 60 SEANCES.",
+            "",
+            "`across: sessions` echantillonne une barre par seance : la fenetre",
+            "porte donc 60 rendements de seance, et non 60 rendements de barre.",
+            "C'est la difference qui rend `risk.sizing.kind = vol_target`",
+            "inutilisable ici - sa fenetre se compte en BARRES, et sur des barres",
+            "d'une minute elle mesurerait une volatilite par minute.",
+            "",
+            "Le `lag` de la seance interne DECALE d'une seance : dimensionner avec",
+            "la volatilite du jour meme reviendrait a lire son propre resultat."
+          ]
+        }
+      },
+      "note": [
+        "Ciblage de volatilite a 2 %, plafonne a quatre contrats.",
+        "",
+        "`kind: signal` et non `vol_target` : la regle figee calcule sa",
+        "volatilite sur une fenetre de BARRES, ce qui sur du minute ne veut pas",
+        "dire la meme chose. Ici l'expression est ecrite, donc lisible et",
+        "verifiable.",
+        "",
+        "A SAVOIR : le nombre de contrats est TRONQUE, comme partout dans le",
+        "socle. A une volatilite de seance de 1,3 %, 0,02 / 0,013 = 1,54 devient",
+        "UN contrat. Le papier autorise des fractions ; nous non, et l'ecart",
+        "n'est pas negligeable."
+      ]
+    }
+  }
+}

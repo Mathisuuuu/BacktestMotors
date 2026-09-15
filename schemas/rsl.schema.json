@@ -133,6 +133,12 @@
             "default": null,
             "description": "Calendrier de seance. Sans lui, le noeud `session` leve."
           },
+          "session_only": {
+            "default": false,
+            "description": "Ne garder que les barres dont la cloture tombe dans la seance DECLAREE. Sans lui, une seance court jusqu'a l'ouverture suivante et contient les barres de nuit. Exige `session`.",
+            "title": "Session Only",
+            "type": "boolean"
+          },
           "timestamp_column": {
             "anyOf": [
               {
