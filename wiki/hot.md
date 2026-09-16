@@ -16,18 +16,18 @@ generated: true
 
 | Indicateur | Valeur |
 |---|---|
-| Pages de wiki | 30 |
-| Entrees de log | 235 |
-| Derniere activite | 2026-09-15 |
-| Idees ecartees (ledger) | 25 |
+| Pages de wiki | 31 |
+| Entrees de log | 236 |
+| Derniere activite | 2026-09-16 |
+| Idees ecartees (ledger) | 27 |
 | Idees en attente (ledger) | 7 |
 | Pages `Failed Ideas/` | 1 |
 | Pages `concepts/` | 6 |
 | Pages `experiments/` | 8 |
-| Pages `reference/` | 10 |
+| Pages `reference/` | 11 |
 | Pages `research/` | 1 |
 
-**Activite par type :** note × 92, fix × 46, feat × 46, decision × 20, mesure × 18, essai × 4, experiment × 2, setup × 1, lint × 1, audit × 1, refactor × 1, perf × 1, bug × 1, correction × 1
+**Activite par type :** note × 92, feat × 47, fix × 46, decision × 20, mesure × 18, essai × 4, experiment × 2, setup × 1, lint × 1, audit × 1, refactor × 1, perf × 1, bug × 1, correction × 1
 
 ## Experiences
 
@@ -46,6 +46,7 @@ Le total des essais alimente le Deflated Sharpe : un essai non enregistre gonfle
 
 ## Derniere activite — 8 entree(s)
 
+- **2026-09-16** — feat | `definitions` / `$ref` : factoriser une specification sans changer son empreinte | 984 -> 546 lignes sur Zarattini, `config_hash` IDENTIQUE
 - **2026-09-15** — note | **YAML re-examine sur demande, et re-ecarte** - la condition de reprise du ledger n'est qu'a MOITIE remplie | elle en pose deux. (1) « Le vocabulaire cesse d'utiliser des metacaracteres YAML comme valeurs » : NON, et c'est PIRE qu'en septembre - **6 operateurs sur 11** en portent contre 5, parce que j'ai ajoute `%` ce matin. Le remede tue le benefice : `op: ">"` avec guillemets obligatoires perd la lisibilite qui motivait YAML. (2) « Une raison plus forte que la compacite » : OUI cette fois - les 93 % de recopies ci-dessus, que les ancres YAML resoudraient nativement. **Mais `definitions`/`ref` en JSON resout le MEME probleme** sans dependance nouvelle, sans collision, sans perdre le JSON Schema. La raison nouvelle est reelle et ne designe pas YAML. Mesure a l'appui : JSON indente a 30 espaces au maximum avec 197 lignes de fermeture - ce sont ces fermetures qui disent ou l'on remonte, et YAML n'en a aucune a profondeur 13. PyYAML n'est meme pas installe
 - **2026-09-15** — mesure | **Le JSON exprime tout, mais il se recopie** : 93 % des noeuds de Zarattini ecrits en double ou plus | 984 lignes, 728 pour les seules regles, **164 noeuds pour 51 formes DISTINCTES**, profondeur maximale 13. `sigma` est ecrit QUATRE fois a l'identique (36 lignes chacune), le VWAP quatre fois (44 lignes), la bande quatre fois (40 lignes). Consequence concrete et non theorique : pour tester `sigma` en ecart-type ce matin, je n'ai PAS pu editer a la main - il a fallu un script qui RECONNAIT les quatre occurrences, avec un `assert compte == 4`. **Une definition recopiee quatre fois peut diverger en silence** : c'est la classe de defaut que le depot combat partout ailleurs, et le format de specification la fabrique. Manque identifie : un bloc `definitions` et un noeud `ref`
 - **2026-09-15** — feat | **Le squelette porte enfin les deux choses qu'un AUTEUR ne peut pas deviner** : les pieges, et les recettes de composition | `rsl squelette` disait tout ce qu'on PEUT ecrire - 27 noeuds, 136 primitives, 32 contraintes - et rien de la facon dont on les ASSEMBLE. (1) Les `pieges` declares sur les noeuds y paraissent desormais a cote du champ concerne : une IA qui lisait `is_last` dans une liste de choix n'avait AUCUN moyen de savoir qu'il marque la premiere barre ATTEIGNANT l'heure declaree, ni qu'une demi-journee n'en porte aucune. (2) **Treize recettes de composition** (`rsl/compositions.py`) : les grandeurs qui n'ont PAS de noeud - VWAP ancre, rendement, adv, opening range, grille horaire, dispersion au meme rang, pertes nettes de la seance. Il n'existe aucun noeud `vwap` ; personne ne trouve le quotient de deux `cumulative` en lisant que `cumulative` accepte un `inner`. **Chacune est CONSTRUITE par `build_signal` dans un test** - une forme qui cesserait d'etre exprimable casse la suite, et un test verifie que la forme PUBLIEE est celle qui est testee, parce que c'est la publiee qu'un auteur recopie. Parade directe a [[lessons]] L36. 78 tests
@@ -53,13 +54,39 @@ Le total des essais alimente le Deflated Sharpe : un essai non enregistre gonfle
 - **2026-09-15** — feat | **`rsl check` tourne d'office au debut de `rsl run`** | un garde qu'on n'invoque pas n'existe pas : les controles poses ce matin n'aidaient que si quelqu'un y pensait. Ils paraissent desormais AVANT le calcul, ce qui permet d'abandonner un run de quinze minutes avant qu'il ne commence. Prix : un second chargement des cotations, deux secondes contre les minutes d'un run - et `--sans-controles` les tait. **Ils ne BLOQUENT pas**, et l'exemple qui le justifie est dans le depot : `nq_zarattini_60_30_15` porte une ERREUR reelle - sa cloture forcee ne se declenche pas sur 90 seances - et refuser de le lancer casserait un exemple pour un defaut que son auteur a choisi d'assumer. Le constat parait, la decision reste humaine ; `rsl check` seule garde le code de sortie 2
 - **2026-09-15** — note | Un contrat non ecrit, revele par un test qui cassait a raison | `trade_ferme_ici` ne vaut que pour la barre COURANTE : elle s'arrete a la premiere fermeture plus recente, elle ne cherche pas. Appelee retrospectivement sur la liste finale elle rend `None`. C'est voulu - chercher couterait l'historique entier a chaque barre - mais ce n'etait ecrit nulle part. Le contrat est desormais dans la fonction, et le test rejoue l'etat PARTIEL du portefeuille plutot que d'interroger la liste complete
 - **2026-09-15** — feat | **Un detecteur de PERTE NETTE** : `position.closed_trade` et `position.closed_pnl` | jusqu'ici la seule facon de reperer une perte depuis une REGLE etait `close < entry_price`, qui ignore les FRAIS et le prix du fill de SORTIE - mesure : une garde « une seule perte » plafonnait a QUATRE pertes par seance en P&L net. **Pourquoi DEUX champs** : un seul champ rendant `None` serait inutilisable, une seule valeur absente faisant rendre `None` a toute une fenetre de `cumulative`. `closed_pnl` porte le resultat et vaut zero par REMPLISSAGE ; `closed_trade` dit quand ce zero a un sens - sans lui ce serait la sentinelle que [[lessons]] L30 interdit. S'ecrit `cumulative(count_true, mask=position("closed_trade"), inner=position("closed_pnl") < 0)`. Le trou reel etait dans le runner : `if held == 0: return FLAT` faisait DISPARAITRE le resultat du trade a l'instant meme ou il se fermait. 15 tests
-- **2026-09-15** — mesure | **Les trois exemples intraday REJOUES depuis les correctifs `is_last` et frontiere de trade** | `intraday_momentum_filtre_quotidien` 2 051 trades / 530 215,40 · `intraday_opening_range` 7 639 trades / 471 391,85 · `intraday_vwap_reversion` 1 363 trades / 455 211,45. Les chiffres publies au log du 2026-09-14 etaient ceux d'AVANT les correctifs : ceux-ci les remplacent, et sont desormais tenus par une empreinte. Rappel qui vaut pour les trois : ce sont des FORMES, pas des resultats - leurs seuils viennent de la litterature et aucun n'a d'essai archive
 
 ## Next Actions
 
 <!-- NEXT-ACTIONS:START -->
 > Bloc edite a la main. Le generateur le recopie tel quel a chaque passage :
 > c'est le seul endroit de ce fichier ou ecrire.
+
+## Factorisation du JSON : FAITE (2026-09-16)
+
+`definitions` + `{"$ref": "nom"}`, substitution textuelle faite AVANT toute
+validation. Voir [[reference/definitions]].
+
+- [x] **984 -> 546 lignes sur Zarattini, meme `config_hash`.** C'est la
+      propriete qui rend la chose gratuite : le bloc est `exclude=True`, donc
+      absent de `model_dump`, donc du hachage. Le moteur ne voit jamais un
+      `$ref` - aucun type de noeud nouveau, rien a `warmup_bars`, a la
+      memoisation ni a `describe()`.
+      Motif chiffre : `intraday_vwap_reversion` porte 150 noeuds pour **41**
+      formes distinctes, Zarattini 164 pour **51**. `sigma` y etait recopie
+      quatre fois, et **rien ne verifiait que les quatre copies disaient la
+      meme chose**.
+      Defaut trouve dans ma propre garde : le plafond anti-explosion comptait
+      les appels d'expansion, qui sont memoises - trente-deux mille copies
+      passaient en seize appels. Il somme desormais la taille RECOPIEE.
+- [ ] **Aucun exemple du depot n'est encore factorise.** Les onze empreintes
+      archivees portent les formes recopiees. Le chantier est sans risque -
+      le hash ne bouge pas, `test_definitions.py` le prouve sur Zarattini -
+      mais il touche des fichiers que des pages d'`experiments/` citent.
+- [ ] **Rien n'OBLIGE a factoriser.** Ecrire une grandeur quatre fois reste
+      valide. Un controle `rsl check` qui signalerait les sous-arbres repetes
+      au-dela d'un seuil serait le pendant naturel - il attend une trace datee
+      d'un cas ou la duplication a reellement fait diverger deux copies, comme
+      l'exige le critere d'admission de [[lessons]] L37.
 
 ## Deux moteurs, et le contrat entre eux (2026-09-13)
 

@@ -385,3 +385,49 @@ grep "^## \[" wiki/log.md | tail -5
 ## [2026-09-15] feat | **Le squelette porte enfin les deux choses qu'un AUTEUR ne peut pas deviner** : les pieges, et les recettes de composition | `rsl squelette` disait tout ce qu'on PEUT ecrire - 27 noeuds, 136 primitives, 32 contraintes - et rien de la facon dont on les ASSEMBLE. (1) Les `pieges` declares sur les noeuds y paraissent desormais a cote du champ concerne : une IA qui lisait `is_last` dans une liste de choix n'avait AUCUN moyen de savoir qu'il marque la premiere barre ATTEIGNANT l'heure declaree, ni qu'une demi-journee n'en porte aucune. (2) **Treize recettes de composition** (`rsl/compositions.py`) : les grandeurs qui n'ont PAS de noeud - VWAP ancre, rendement, adv, opening range, grille horaire, dispersion au meme rang, pertes nettes de la seance. Il n'existe aucun noeud `vwap` ; personne ne trouve le quotient de deux `cumulative` en lisant que `cumulative` accepte un `inner`. **Chacune est CONSTRUITE par `build_signal` dans un test** - une forme qui cesserait d'etre exprimable casse la suite, et un test verifie que la forme PUBLIEE est celle qui est testee, parce que c'est la publiee qu'un auteur recopie. Parade directe a [[lessons]] L36. 78 tests
 ## [2026-09-15] mesure | **Le JSON exprime tout, mais il se recopie** : 93 % des noeuds de Zarattini ecrits en double ou plus | 984 lignes, 728 pour les seules regles, **164 noeuds pour 51 formes DISTINCTES**, profondeur maximale 13. `sigma` est ecrit QUATRE fois a l'identique (36 lignes chacune), le VWAP quatre fois (44 lignes), la bande quatre fois (40 lignes). Consequence concrete et non theorique : pour tester `sigma` en ecart-type ce matin, je n'ai PAS pu editer a la main - il a fallu un script qui RECONNAIT les quatre occurrences, avec un `assert compte == 4`. **Une definition recopiee quatre fois peut diverger en silence** : c'est la classe de defaut que le depot combat partout ailleurs, et le format de specification la fabrique. Manque identifie : un bloc `definitions` et un noeud `ref`
 ## [2026-09-15] note | **YAML re-examine sur demande, et re-ecarte** - la condition de reprise du ledger n'est qu'a MOITIE remplie | elle en pose deux. (1) « Le vocabulaire cesse d'utiliser des metacaracteres YAML comme valeurs » : NON, et c'est PIRE qu'en septembre - **6 operateurs sur 11** en portent contre 5, parce que j'ai ajoute `%` ce matin. Le remede tue le benefice : `op: ">"` avec guillemets obligatoires perd la lisibilite qui motivait YAML. (2) « Une raison plus forte que la compacite » : OUI cette fois - les 93 % de recopies ci-dessus, que les ancres YAML resoudraient nativement. **Mais `definitions`/`ref` en JSON resout le MEME probleme** sans dependance nouvelle, sans collision, sans perdre le JSON Schema. La raison nouvelle est reelle et ne designe pas YAML. Mesure a l'appui : JSON indente a 30 espaces au maximum avec 197 lignes de fermeture - ce sont ces fermetures qui disent ou l'on remonte, et YAML n'en a aucune a profondeur 13. PyYAML n'est meme pas installe
+
+## [2026-09-16] feat | `definitions` / `$ref` : factoriser une specification sans changer son empreinte | 984 -> 546 lignes sur Zarattini, `config_hash` IDENTIQUE
+
+Motif chiffre, mesure le jour meme sur les formes DISTINCTES de sous-arbre :
+`intraday_vwap_reversion` 150 noeuds pour 41 distinctes, `nq_zarattini_60_30_15`
+164 pour 51, `intraday_momentum_filtre_quotidien` 113 pour 40. Sur Zarattini,
+`sigma` est recopie quatre fois et le VWAP quatre fois - et **rien ne verifiait
+que les copies disaient la meme chose**, quatre sigmas legerement differents
+formant une specification parfaitement valide.
+
+Forme retenue : un bloc `definitions` a la racine, le marqueur `{"$ref": "nom"}`
+partout ailleurs. L'orthographe est celle de JSON Schema, choisie parce que
+c'est la seule convention de factorisation qu'un generateur de JSON a deja vue
+des milliers de fois - le depot vise un auteur MACHINE. Le dollar ne collisionne
+avec rien : verifie, aucune cle d'aucune specification du depot ne le porte, et
+un test le garde.
+
+**La propriete qui rend la chose gratuite** : la substitution est TEXTUELLE et
+precede toute validation pydantic (`model_validator(mode="before")` sur
+`BacktestSpec` et `StrategyFile`). Le moteur ne voit jamais un `$ref` - aucun
+type de noeud nouveau, aucun changement a `warmup_bars`, a la memoisation ni a
+`describe()`. Le bloc est `exclude=True` comme `note`, donc absent de
+`model_dump`, donc du `config_hash`. Mesure sur Zarattini factorise
+automatiquement en cinq definitions : 984 -> 546 lignes, `config_hash`
+`61b318a98ce9862d...` inchange, et les `strategy.params` developpes identiques
+terme a terme.
+
+Cinq refus, chacun contre un resultat lisible mais faux : nom inconnu, cycle,
+`$ref` accompagne d'autres cles (elles seraient perdues en silence), pointeur
+`#/definitions/x`, et definition JAMAIS referencee - ce dernier etant la copie
+orpheline que le bloc sert a empecher. L'usage se compte depuis le CORPS, jamais
+depuis le bloc : deux definitions qui se citent l'une l'autre sans etre appelees
+sont mortes toutes les deux.
+
+**Defaut trouve dans ma propre garde, et corrige** : le plafond anti-explosion
+comptait les appels d'expansion, qui sont memoises. Une cascade de quinze
+definitions citant chacune deux fois la precedente produisait trente-deux mille
+copies en SEIZE appels - le plafond ne voyait rien. Il somme desormais la taille
+des valeurs RECOPIEES. Un plafond qui ne plafonne pas donne un chiffre lisible
+et faux, exactement la famille L18/L25/L28/L30.
+
+Aucun exemple du depot n'est encore factorise : les onze empreintes archivees
+portent les formes recopiees. Les reecrire est un chantier separe, et sans
+risque puisque le hash ne bouge pas.
+
+Voir [[reference/definitions]].
