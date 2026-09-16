@@ -1,6 +1,6 @@
 ---
 type: hub
-updated: 2026-09-15
+updated: 2026-09-16
 generated: true
 ---
 
@@ -10,7 +10,7 @@ generated: true
 > Produit par [`wiki/update_hot.py`](update_hot.py), relance par le hook
 > `Stop` a chaque fin de session. Toute modification hors du bloc
 > **Next Actions** sera ecrasee sans avertissement.
-> Derniere generation : 2026-09-15.
+> Derniere generation : 2026-09-16.
 
 ## Current State
 
