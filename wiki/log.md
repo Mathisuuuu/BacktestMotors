@@ -476,3 +476,70 @@ formule ecrite ici rendrait un DSR different, plausible et faux (L30). Les 498
 essais anterieurs n'ont pas de serie, et c'est irrattrapable sans les rejouer.
 
 Voir [[reference/independance-des-essais]].
+
+## [2026-09-17] refactor | Les quatre specifications repetitives du depot sont factorisees | -50 % sur Zarattini, les 11 config_hash INCHANGES
+
+La factorisation existait depuis la veille et n'avait aucun utilisateur : 354
+noeuds recopies dormaient dans `examples/`. Un mecanisme sans usage dans le
+depot est une promesse, pas un outil - et c'est en lisant les exemples qu'une IA
+apprend la forme attendue d'elle.
+
+| Specification | lignes | definitions |
+|---|---|---|
+| `nq_zarattini_60_30_15` | 984 -> **491** | sigma_minute, vwap_ancre, bande_haute, bande_basse, points_de_controle, cloture_forcee |
+| `intraday_vwap_reversion` | 731 -> **375** | dispersion, grille_horaire, vwap_ancre |
+| `intraday_momentum_filtre_quotidien` | 582 -> **340** | grille_horaire, filtre_multi, vwap_ancre |
+| `intraday_opening_range` | 343 -> **293** | vwap_ancre |
+
+**Les onze `config_hash` archives sont inchanges**, verifies un par un. C'est la
+propriete pour laquelle le bloc avait ete concu `exclude=True` ; elle est
+desormais eprouvee sur des fichiers reecrits de moitie et non sur des cas
+jouets.
+
+Regle d'extraction retenue : **seuls les sous-arbres DEJA annotes** sont nommes,
+et le nom vient de leur note. Une premiere passe nommait tout ce qui se repetait
+et produisait `arith_2`, `compare_10`, `cumulative_5` - des noms qui ne disent
+rien, dans des fichiers dont tout l'interet est de servir de modele. Trois noms
+ont ete retouches a la main par-dessus le generateur.
+
+**`_moule_universel` n'est PAS factorise**, et c'est un choix : il existe pour
+MONTRER chaque type de noeud. Le factoriser cacherait derriere des noms ce qu'il
+est cense exposer, pour 3 % de lignes - mesure avant de renoncer.
+
+Deux erreurs faites en chemin, toutes deux rattrapees avant commit. (1) La
+premiere ecriture recopiait les sous-arbres sous leur forme TRIEE : `type` se
+retrouvait en derniere cle de chaque noeud, et les fichiers devenaient MOINS
+lisibles qu'avant d'etre factorises. L'identite d'un sous-arbre se calcule sur
+`sort_keys`, mais ce qu'on ecrit doit etre l'objet d'origine. (2) L'indentation
+et les fins de ligne n'etaient pas conservees, ce qui aurait melange
+factorisation et reformatage integral dans le meme diff.
+
+**Trois de mes propres tests ont echoue, et ils avaient raison** :
+`test_aucune_specification_du_depot_ne_porte_de_dollar` affirmait qu'aucun `$`
+n'existait nulle part - devenu faux par construction. Reformule sur ce qu'il
+voulait dire : aucune AUTRE cle que `$ref` ne commence par un dollar. Et la
+classe qui factorisait Zarattini a la volee teste desormais le fichier COMMITE,
+ce qui est strictement plus fort. C'est [[lessons]] L36 qui joue en notre
+faveur : un verdict ecrit a la main se perime, un test le dit.
+
+Voir [[reference/definitions]].
+
+## [2026-09-17] fix | Le schema publie refusait les exemples qu'on venait de factoriser | branche `$ref` ajoutee au `oneOf`, 4 exemples valides
+
+Trouve en verifiant ce qu'un EDITEUR verrait, apres avoir factorise les quatre
+specifications : `signals.schema.json` ne connaissait pas `{"$ref": "nom"}`,
+donc il refusait `entry_long` de Zarattini - et par construction les quatre
+fichiers du depot. Un schema qui refuse les exemples du depot a tort contre le
+socle, ce que `TestExamplesValidate` existe justement pour interdire ; ce test
+passait parce qu'il valide la forme DEVELOPPEE, pas le fichier brut.
+
+Corrige par une branche supplementaire dans le `oneOf` du noeud, avec
+`additionalProperties: false` - la meme regle que `rsl.definitions` : un `$ref`
+accompagne d'autres cles serait un piege silencieux. Ce n'est pas un type de
+noeud : absent de `list_node_types()` et de `describe_node_types()`, invisible
+au moteur.
+
+`test_it_covers_every_registered_node` a echoue et avait raison. Reformule en
+deux : tout type enregistre A une branche, et la SEULE branche etrangere admise
+est la reference - une branche ajoutee par megarde fait toujours echouer la
+suite.

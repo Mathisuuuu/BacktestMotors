@@ -1,6 +1,6 @@
 ---
 type: reference
-updated: 2026-09-16
+updated: 2026-09-17
 autorite: src/rsl/definitions.py
 ---
 
@@ -9,8 +9,8 @@ autorite: src/rsl/definitions.py
 > Page **routeur**. L'autorite est
 > [src/rsl/definitions.py](../../src/rsl/definitions.py) et ses tests,
 > [tests/unit/test_definitions.py](../../tests/unit/test_definitions.py).
-> Les chiffres ci-dessous datent du 2026-09-16 ; le module, lui, ne vieillit
-> pas.
+> Les chiffres ci-dessous ont ete mesures les 2026-09-16 et 2026-09-17 ; le
+> module, lui, ne vieillit pas.
 
 | Question | Reponse faisant autorite |
 |---|---|
@@ -97,6 +97,45 @@ produisait trente-deux mille copies en **seize appels** : le plafond ne voyait
 rien. Corrige en sommant la taille des valeurs RECOPIEES. Un plafond qui ne
 plafonne pas est pire qu'aucun - il donne un chiffre lisible et faux.
 
+## Les exemples factorises (2026-09-17)
+
+Quatre specifications du depot portent desormais un bloc `definitions`, et
+**les onze `config_hash` archives sont inchanges** :
+
+| Specification | lignes | definitions |
+|---|---|---|
+| `nq_zarattini_60_30_15` | 984 -> **491** (-50 %) | `sigma_minute`, `vwap_ancre`, `bande_haute`, `bande_basse`, `points_de_controle`, `cloture_forcee` |
+| `intraday_vwap_reversion` | 731 -> **375** (-48 %) | `dispersion`, `grille_horaire`, `vwap_ancre` |
+| `intraday_momentum_filtre_quotidien` | 582 -> **340** (-41 %) | `grille_horaire`, `filtre_multi`, `vwap_ancre` |
+| `intraday_opening_range` | 343 -> **293** (-14 %) | `vwap_ancre` |
+
+L'`entry_long` de Zarattini se lit maintenant en une phrase - « les points de
+controle, ET la cloture au-dessus de la bande haute, ET au-dessus du VWAP » - la
+ou il fallait descendre douze niveaux.
+
+**Regle d'extraction** : seuls les sous-arbres **deja annotes** sont nommes, et
+le nom vient de leur note. Une definition appelee `arith_7` serait pire que la
+recopie qu'elle remplace - elle donnerait un nom a ce que personne ne sait
+nommer, dans un fichier dont tout l'interet est de servir de modele.
+
+**`_moule_universel` n'est PAS factorise**, deliberement : il existe pour
+MONTRER chaque type de noeud, et le factoriser cacherait derriere des noms ce
+qu'il est cense exposer - pour 3 % de lignes en moins, mesure avant de renoncer.
+
+## Le schema publie accepte `$ref`
+
+Defaut trouve APRES avoir factorise les exemples, et corrige : le
+`signals.schema.json` publie refusait `{"$ref": "nom"}`, donc **un editeur
+branche dessus aurait signale les quatre exemples du depot comme invalides**.
+
+Le schema porte desormais une branche de plus dans son `oneOf` - « reference a
+une definition » - avec `additionalProperties: false`, qui y grave la meme regle
+que le socle : un `$ref` accompagne d'autres cles est refuse.
+
+Ce n'est PAS un type de noeud. Il n'apparait ni dans `list_node_types()`, ni
+dans `describe_node_types()`, et le moteur ne le voit jamais. Un test garde
+l'egalite stricte : la SEULE branche etrangere admise est celle-la.
+
 ## Ce que cela ne fait pas
 
 - **Ce n'est pas un noeud.** Il n'y a rien a evaluer, rien a memoiser, rien
@@ -104,9 +143,11 @@ plafonne pas est pire qu'aucun - il donne un chiffre lisible et faux.
   cette forme ne pose pas la question, elle n'existe plus a l'execution.
 - **Ce n'est pas un parametrage.** `{"$ref": "sigma", "window": 20}` est
   refuse. Pour faire varier une definition, en ecrire deux.
-- **Aucun exemple du depot n'est encore factorise.** Les onze empreintes
-  archivees portent les formes recopiees. Les reecrire est un chantier
-  separe, et sans risque puisque le hash ne bouge pas.
+- **Rien n'OBLIGE a factoriser.** Ecrire une grandeur quatre fois reste une
+  specification valide. Un controle `rsl check` qui signalerait les sous-arbres
+  repetes serait le pendant naturel ; il attend la trace datee d'un cas ou deux
+  copies ont reellement diverge, comme l'exige le critere d'admission de
+  [[lessons]] L37.
 
 ## Voisins
 
