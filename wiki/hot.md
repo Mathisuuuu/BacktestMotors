@@ -16,18 +16,18 @@ generated: true
 
 | Indicateur | Valeur |
 |---|---|
-| Pages de wiki | 31 |
-| Entrees de log | 236 |
-| Derniere activite | 2026-09-16 |
-| Idees ecartees (ledger) | 27 |
+| Pages de wiki | 32 |
+| Entrees de log | 237 |
+| Derniere activite | 2026-09-17 |
+| Idees ecartees (ledger) | 29 |
 | Idees en attente (ledger) | 7 |
 | Pages `Failed Ideas/` | 1 |
 | Pages `concepts/` | 6 |
 | Pages `experiments/` | 8 |
-| Pages `reference/` | 11 |
+| Pages `reference/` | 12 |
 | Pages `research/` | 1 |
 
-**Activite par type :** note × 92, feat × 47, fix × 46, decision × 20, mesure × 18, essai × 4, experiment × 2, setup × 1, lint × 1, audit × 1, refactor × 1, perf × 1, bug × 1, correction × 1
+**Activite par type :** note × 92, feat × 47, fix × 46, decision × 20, mesure × 19, essai × 4, experiment × 2, setup × 1, lint × 1, audit × 1, refactor × 1, perf × 1, bug × 1, correction × 1
 
 ## Experiences
 
@@ -46,6 +46,7 @@ Le total des essais alimente le Deflated Sharpe : un essai non enregistre gonfle
 
 ## Derniere activite — 8 entree(s)
 
+- **2026-09-17** — mesure | Le seuil de deflation s'effondre a cause de la DISPERSION, pas du COMPTE | +66,9 % pour f(N), -78,3 % pour sqrt(V)
 - **2026-09-16** — feat | `definitions` / `$ref` : factoriser une specification sans changer son empreinte | 984 -> 546 lignes sur Zarattini, `config_hash` IDENTIQUE
 - **2026-09-15** — note | **YAML re-examine sur demande, et re-ecarte** - la condition de reprise du ledger n'est qu'a MOITIE remplie | elle en pose deux. (1) « Le vocabulaire cesse d'utiliser des metacaracteres YAML comme valeurs » : NON, et c'est PIRE qu'en septembre - **6 operateurs sur 11** en portent contre 5, parce que j'ai ajoute `%` ce matin. Le remede tue le benefice : `op: ">"` avec guillemets obligatoires perd la lisibilite qui motivait YAML. (2) « Une raison plus forte que la compacite » : OUI cette fois - les 93 % de recopies ci-dessus, que les ancres YAML resoudraient nativement. **Mais `definitions`/`ref` en JSON resout le MEME probleme** sans dependance nouvelle, sans collision, sans perdre le JSON Schema. La raison nouvelle est reelle et ne designe pas YAML. Mesure a l'appui : JSON indente a 30 espaces au maximum avec 197 lignes de fermeture - ce sont ces fermetures qui disent ou l'on remonte, et YAML n'en a aucune a profondeur 13. PyYAML n'est meme pas installe
 - **2026-09-15** — mesure | **Le JSON exprime tout, mais il se recopie** : 93 % des noeuds de Zarattini ecrits en double ou plus | 984 lignes, 728 pour les seules regles, **164 noeuds pour 51 formes DISTINCTES**, profondeur maximale 13. `sigma` est ecrit QUATRE fois a l'identique (36 lignes chacune), le VWAP quatre fois (44 lignes), la bande quatre fois (40 lignes). Consequence concrete et non theorique : pour tester `sigma` en ecart-type ce matin, je n'ai PAS pu editer a la main - il a fallu un script qui RECONNAIT les quatre occurrences, avec un `assert compte == 4`. **Une definition recopiee quatre fois peut diverger en silence** : c'est la classe de defaut que le depot combat partout ailleurs, et le format de specification la fabrique. Manque identifie : un bloc `definitions` et un noeud `ref`
@@ -53,13 +54,36 @@ Le total des essais alimente le Deflated Sharpe : un essai non enregistre gonfle
 - **2026-09-15** — fix | **Le hook `Stop` passe en `$WikiOnly = $true`, sur incident** | le `git add -A` automatique a commite `tests/fixtures/empreintes_attendues.json` EN COURS D'ECRITURE par un run de fond : l'entree Zarattini ne portait que son symbole, et `test_composition` echouait sur un clone frais. Le hook ne peut pas savoir qu'un fichier est a moitie ecrit, et une session qui lance des runs en arriere-plan en produit regulierement. Ce qui change : `src/`, `tests/` et `examples/` ne partent plus tout seuls - ils se commitent a la main, avec un message qui dit ce qui a ete fait, ce que les douze `sync automatique` de la journee ne faisaient pas. CLAUDE.md signalait ce risque et proposait deja la bascule
 - **2026-09-15** — feat | **`rsl check` tourne d'office au debut de `rsl run`** | un garde qu'on n'invoque pas n'existe pas : les controles poses ce matin n'aidaient que si quelqu'un y pensait. Ils paraissent desormais AVANT le calcul, ce qui permet d'abandonner un run de quinze minutes avant qu'il ne commence. Prix : un second chargement des cotations, deux secondes contre les minutes d'un run - et `--sans-controles` les tait. **Ils ne BLOQUENT pas**, et l'exemple qui le justifie est dans le depot : `nq_zarattini_60_30_15` porte une ERREUR reelle - sa cloture forcee ne se declenche pas sur 90 seances - et refuser de le lancer casserait un exemple pour un defaut que son auteur a choisi d'assumer. Le constat parait, la decision reste humaine ; `rsl check` seule garde le code de sortie 2
 - **2026-09-15** — note | Un contrat non ecrit, revele par un test qui cassait a raison | `trade_ferme_ici` ne vaut que pour la barre COURANTE : elle s'arrete a la premiere fermeture plus recente, elle ne cherche pas. Appelee retrospectivement sur la liste finale elle rend `None`. C'est voulu - chercher couterait l'historique entier a chaque barre - mais ce n'etait ecrit nulle part. Le contrat est desormais dans la fonction, et le test rejoue l'etat PARTIEL du portefeuille plutot que d'interroger la liste complete
-- **2026-09-15** — feat | **Un detecteur de PERTE NETTE** : `position.closed_trade` et `position.closed_pnl` | jusqu'ici la seule facon de reperer une perte depuis une REGLE etait `close < entry_price`, qui ignore les FRAIS et le prix du fill de SORTIE - mesure : une garde « une seule perte » plafonnait a QUATRE pertes par seance en P&L net. **Pourquoi DEUX champs** : un seul champ rendant `None` serait inutilisable, une seule valeur absente faisant rendre `None` a toute une fenetre de `cumulative`. `closed_pnl` porte le resultat et vaut zero par REMPLISSAGE ; `closed_trade` dit quand ce zero a un sens - sans lui ce serait la sentinelle que [[lessons]] L30 interdit. S'ecrit `cumulative(count_true, mask=position("closed_trade"), inner=position("closed_pnl") < 0)`. Le trou reel etait dans le runner : `if held == 0: return FLAT` faisait DISPARAITRE le resultat du trade a l'instant meme ou il se fermait. 15 tests
 
 ## Next Actions
 
 <!-- NEXT-ACTIONS:START -->
 > Bloc edite a la main. Le generateur le recopie tel quel a chaque passage :
 > c'est le seul endroit de ce fichier ou ecrire.
+
+## Independance des essais : MESUREE, pas corrigee (2026-09-17)
+
+Voir [[reference/independance-des-essais]].
+
+- [x] **Le diagnostic d'avant designait le mauvais terme.** Le seuil est un
+      PRODUIT `sqrt(V) x f(N)`. De 17 a 498 essais : **f(N) +66,9 %** - le
+      compte se comporte bien - et **sqrt(V) -78,3 %**. C'est la dispersion qui
+      s'effondre, parce que 481 essais de la grille SMA ont un ecart-type de
+      Sharpe de 0,0093 contre 0,1011 pour les autres.
+- [x] **Publie la ou le chiffre se lit** : `0.0669 = dispersion 0.0219 x compte
+      3.0513`. Une variance a 0,00048 ne se lit pas comme « vos 481 essais n'en
+      sont qu'un ».
+- [x] **`rsl essais --familles`** : 462 essais sur 498 sur le meme echantillon,
+      soit **92,8 %**.
+- [x] **La serie quotidienne est archivee** (`essais/series/*.npz`, 21 Ko
+      piece). Elle seule distingue +0,9920 entre deux voisins de la grille de
+      +0,1617 entre deux strategies differentes - la vue par famille
+      SUR-REGROUPE.
+- [ ] **Le DSR n'est pas corrige, et ne doit pas l'etre sans la source.**
+      [[research/bailey-lopez-de-prado-dsr]] est encore `a-ingerer`. C'est
+      maintenant le SEUL point bloquant : les donnees, elles, sont la.
+- [ ] **Les 498 essais anterieurs n'ont pas de serie.** Irrattrapable sans une
+      reprise assumee du registre - motif au [[Failed Ideas/ledger]].
 
 ## Factorisation du JSON : FAITE (2026-09-16)
 

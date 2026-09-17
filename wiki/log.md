@@ -431,3 +431,48 @@ portent les formes recopiees. Les reecrire est un chantier separe, et sans
 risque puisque le hash ne bouge pas.
 
 Voir [[reference/definitions]].
+
+## [2026-09-17] mesure | Le seuil de deflation s'effondre a cause de la DISPERSION, pas du COMPTE | +66,9 % pour f(N), -78,3 % pour sqrt(V)
+
+Il etait consigne depuis le 2026-09-12 qu'ajouter des essais correles degradait
+le DSR, et que « ce qu'il faudrait est une notion de distance entre essais ». Le
+diagnostic designait le mauvais terme.
+
+Le seuil est un PRODUIT : `E[max SR] = sqrt(V) * f(N)`. Decompose sur le
+registre, le passage de 17 a 498 essais donne **f(N) : 1,8281 -> 3,0513, soit
++66,9 %** - le compte se comporte correctement, ajouter des essais monte bien la
+barre - et **sqrt(V) : 0,1011 -> 0,0219, soit -78,3 %**. C'est cette chute qui
+fait tomber le seuil de 0,1848 a 0,0669.
+
+La cause est chiffree : les 481 essais de la grille SMA ont un ecart-type de
+Sharpe de **0,0093** contre 0,1011 pour les dix-sept autres, un facteur onze.
+Ce ne sont pas 481 mesures, c'est une mesure repetee 481 fois, et
+`variance_of_sharpes` l'estime comme si c'etaient 481 tirages.
+
+**Trois livrables, aucune correction du DSR.** (1) La `Decomposition` est
+publiee dans le rapport et dans le JSON : `0.0669 = dispersion 0.0219 x compte
+3.0513`, parce qu'une variance affichee a 0,00048 ne se lit pas comme « vos 481
+essais n'en sont qu'un ». Elle demande le seuil A VARIANCE UNITE plutot que de
+reecrire la formule - deux ecritures finiraient par diverger. (2)
+`rsl essais --familles` groupe les essais par echantillon : **462 sur 498 dans
+une seule famille, 92,8 %**. (3) `rsl run --archive` ecrit desormais la SERIE
+QUOTIDIENNE de l'essai (`essais/series/*.npz`, 21 Ko piece), seule chose qui
+rende deux essais comparables autrement que par leur echantillon.
+
+Le choix de la serie quotidienne n'est pas un compromis : `to_daily` l'agrege
+deja ainsi quelle que soit la granularite des barres, donc un run a la minute et
+un run quotidien produisent des series de meme nature **sans qu'aucun
+reechantillonnage n'ait a etre invente**. Les DATES sont archivees avec, la
+correlation se calculant sur l'intersection et jamais sur des series recadrees.
+
+Ce que la serie apporte et que la famille ne peut pas dire, mesure sur quatre
+essais reels : SMA(20,100) vs SMA(22,100) = **+0,9920**, vs SMA(2,20) = +0,4907,
+vs RSI hors lundi = +0,1617. La vue par famille met les trois SMA dans un seul
+groupe : elle SUR-REGROUPE, et c'est pourquoi la serie est archivee.
+
+**Le DSR publie n'a pas change d'un chiffre**, et c'est delibere. Decider ce
+qu'est un essai effectif appartient a la source, encore `a-ingerer` ; une
+formule ecrite ici rendrait un DSR different, plausible et faux (L30). Les 498
+essais anterieurs n'ont pas de serie, et c'est irrattrapable sans les rejouer.
+
+Voir [[reference/independance-des-essais]].
