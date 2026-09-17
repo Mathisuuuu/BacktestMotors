@@ -27,6 +27,305 @@
     "Elle dure plus longtemps que l'origine - 209 minutes de mediane contre",
     "89. La bande elargie eloigne le stop, donc les trades survivent."
   ],
+  "definitions": {
+    "bande_haute": {
+      "type": "arith",
+      "op": "*",
+      "left": {
+        "type": "max_of",
+        "operands": [
+          {
+            "type": "session",
+            "field": "open",
+            "lag": 0
+          },
+          {
+            "type": "session",
+            "field": "close",
+            "lag": 1
+          }
+        ],
+        "note": [
+          "Le max (resp. min) enjambe le GAP d'ouverture : si la nuit a ete agitee,",
+          "l'enveloppe englobe l'ecart au lieu de se faire traverser des la premiere",
+          "minute."
+        ]
+      },
+      "right": {
+        "type": "arith",
+        "op": "+",
+        "left": {
+          "type": "constant",
+          "value": 1.0
+        },
+        "right": {
+          "type": "arith",
+          "op": "*",
+          "left": {
+            "type": "constant",
+            "value": 1.5
+          },
+          "right": {
+            "$ref": "sigma_minute"
+          }
+        }
+      },
+      "note": "bande haute = max(ouverture, cloture de la veille) x (1 + 1,5 sigma)"
+    },
+    "bande_basse": {
+      "type": "arith",
+      "op": "*",
+      "left": {
+        "type": "min_of",
+        "operands": [
+          {
+            "type": "session",
+            "field": "open",
+            "lag": 0
+          },
+          {
+            "type": "session",
+            "field": "close",
+            "lag": 1
+          }
+        ],
+        "note": [
+          "Le max (resp. min) enjambe le GAP d'ouverture : si la nuit a ete agitee,",
+          "l'enveloppe englobe l'ecart au lieu de se faire traverser des la premiere",
+          "minute."
+        ]
+      },
+      "right": {
+        "type": "arith",
+        "op": "-",
+        "left": {
+          "type": "constant",
+          "value": 1.0
+        },
+        "right": {
+          "type": "arith",
+          "op": "*",
+          "left": {
+            "type": "constant",
+            "value": 1.5
+          },
+          "right": {
+            "$ref": "sigma_minute"
+          }
+        }
+      },
+      "note": "bande basse = min(ouverture, cloture de la veille) x (1 - 1,5 sigma)"
+    },
+    "sigma_minute": {
+      "type": "rolling",
+      "stat": "mean",
+      "window": 60,
+      "across": "sessions",
+      "inner": {
+        "type": "session_lag",
+        "sessions": 1,
+        "inner": {
+          "type": "math",
+          "op": "abs",
+          "inner": {
+            "type": "arith",
+            "op": "-",
+            "left": {
+              "type": "arith",
+              "op": "/",
+              "left": {
+                "type": "price",
+                "field": "close",
+                "lag": 0
+              },
+              "right": {
+                "type": "session",
+                "field": "open",
+                "lag": 0
+              }
+            },
+            "right": {
+              "type": "constant",
+              "value": 1.0
+            }
+          }
+        }
+      },
+      "note": [
+        "SIGMA[minute] - le coeur de la strategie.",
+        "",
+        "Moyenne, sur les 60 seances PRECEDENTES, de",
+        "  |cloture[jour, minute] / ouverture[jour] - 1|",
+        "prise AU MEME RANG de seance.",
+        "",
+        "Le prix s'ecarte peu de son ouverture a 10:00 et beaucoup a 15:00 :",
+        "l'enveloppe est donc etroite le matin et large l'apres-midi, sans",
+        "qu'aucun parametre ne le regle.",
+        "",
+        "`across: sessions` compte la fenetre en SEANCES, au meme rang, par le",
+        "calendrier declare. C'est ce qui remplace le `stride: 390` des",
+        "ecritures precedentes : un pas fixe suppose des seances de longueur",
+        "egale, et les cotations NQ portent la seance ELECTRONIQUE - 1 362",
+        "barres les jours pleins, 435 le vendredi. Le pas de 390 ne tombait donc",
+        "JAMAIS sur le rang voulu (lecon L29).",
+        "",
+        "`session_lag: 1` exclut la seance EN COURS : sans lui on calibrerait la",
+        "bande sur le mouvement qu'on s'apprete a lui comparer.",
+        "",
+        "Ce que cette ecriture refuse : une seance ECOURTEE n'a pas de barre au",
+        "rang demande, et la fenetre rend alors `None` plutot qu'une barre",
+        "voisine. Mesure : sigma est defini a 88 % des points de controle."
+      ]
+    },
+    "points_de_controle": {
+      "type": "all_of",
+      "operands": [
+        {
+          "type": "compare",
+          "op": ">=",
+          "left": {
+            "type": "session",
+            "field": "minutes_from_open",
+            "lag": 0
+          },
+          "right": {
+            "type": "constant",
+            "value": 30.0
+          }
+        },
+        {
+          "type": "compare",
+          "op": "<=",
+          "left": {
+            "type": "session",
+            "field": "minutes_from_open",
+            "lag": 0
+          },
+          "right": {
+            "type": "constant",
+            "value": 360.0
+          }
+        },
+        {
+          "type": "compare",
+          "op": "==",
+          "left": {
+            "type": "arith",
+            "op": "%",
+            "left": {
+              "type": "session",
+              "field": "minutes_from_open",
+              "lag": 0
+            },
+            "right": {
+              "type": "constant",
+              "value": 30.0
+            }
+          },
+          "right": {
+            "type": "constant",
+            "value": 0.0
+          }
+        }
+      ],
+      "note": [
+        "Les douze points de controle semi-horaires : 10:00, 10:30, ... 15:30.",
+        "",
+        "Delgado les enonce comme une REGLE, pas un reglage : « The strategy",
+        "only evaluates signals at semi-hourly checkpoints ». Le pas de 30",
+        "minutes n'a donc pas ete balaye.",
+        "",
+        "Ecrit avec `arith %` : trois noeuds au lieu de douze comparaisons.",
+        "",
+        "Attention a la convention : une barre est horodatee a sa CLOTURE, donc",
+        "`minutes_from_open` parcourt 1..N et jamais 0. Le point « 30 minutes",
+        "apres l'ouverture » est la barre qui SE FERME a 10:00 - le choix causal",
+        "correct, celle qui s'ouvre a 10:00 n'etant pas encore connue.",
+        "",
+        "Mesure en minutes depuis l'ouverture DECLAREE, jamais en heure UTC :",
+        "une heure UTC derive d'une heure avec l'heure d'ete."
+      ]
+    },
+    "vwap_ancre": {
+      "type": "arith",
+      "op": "/",
+      "left": {
+        "type": "cumulative",
+        "stat": "sum",
+        "inner": {
+          "type": "arith",
+          "op": "*",
+          "left": {
+            "type": "arith",
+            "op": "/",
+            "left": {
+              "type": "arith",
+              "op": "+",
+              "left": {
+                "type": "arith",
+                "op": "+",
+                "left": {
+                  "type": "price",
+                  "field": "high",
+                  "lag": 0
+                },
+                "right": {
+                  "type": "price",
+                  "field": "low",
+                  "lag": 0
+                }
+              },
+              "right": {
+                "type": "price",
+                "field": "close",
+                "lag": 0
+              }
+            },
+            "right": {
+              "type": "constant",
+              "value": 3.0
+            }
+          },
+          "right": {
+            "type": "price",
+            "field": "volume",
+            "lag": 0
+          }
+        }
+      },
+      "right": {
+        "type": "cumulative",
+        "stat": "sum",
+        "inner": {
+          "type": "price",
+          "field": "volume",
+          "lag": 0
+        }
+      },
+      "note": [
+        "VWAP ANCRE sur la seance declaree, sur le prix typique (h+b+c)/3.",
+        "Recommence chaque matin. Il sert DEUX fois : filtre a l'entree, et",
+        "stop a la sortie."
+      ]
+    },
+    "cloture_forcee": {
+      "type": "compare",
+      "op": "==",
+      "left": {
+        "type": "session",
+        "field": "is_last",
+        "lag": 0
+      },
+      "right": {
+        "type": "constant",
+        "value": 1.0
+      },
+      "note": [
+        "Cloture forcee : rien ne passe la nuit. C'est ce qui fait de cette",
+        "strategie une strategie INTRADAY."
+      ]
+    }
+  },
   "strategy": {
     "ref": "rules@1",
     "params": {
@@ -42,73 +341,7 @@
           "type": "all_of",
           "operands": [
             {
-              "type": "all_of",
-              "operands": [
-                {
-                  "type": "compare",
-                  "op": ">=",
-                  "left": {
-                    "type": "session",
-                    "field": "minutes_from_open",
-                    "lag": 0
-                  },
-                  "right": {
-                    "type": "constant",
-                    "value": 30.0
-                  }
-                },
-                {
-                  "type": "compare",
-                  "op": "<=",
-                  "left": {
-                    "type": "session",
-                    "field": "minutes_from_open",
-                    "lag": 0
-                  },
-                  "right": {
-                    "type": "constant",
-                    "value": 360.0
-                  }
-                },
-                {
-                  "type": "compare",
-                  "op": "==",
-                  "left": {
-                    "type": "arith",
-                    "op": "%",
-                    "left": {
-                      "type": "session",
-                      "field": "minutes_from_open",
-                      "lag": 0
-                    },
-                    "right": {
-                      "type": "constant",
-                      "value": 30.0
-                    }
-                  },
-                  "right": {
-                    "type": "constant",
-                    "value": 0.0
-                  }
-                }
-              ],
-              "note": [
-                "Les douze points de controle semi-horaires : 10:00, 10:30, ... 15:30.",
-                "",
-                "Delgado les enonce comme une REGLE, pas un reglage : « The strategy",
-                "only evaluates signals at semi-hourly checkpoints ». Le pas de 30",
-                "minutes n'a donc pas ete balaye.",
-                "",
-                "Ecrit avec `arith %` : trois noeuds au lieu de douze comparaisons.",
-                "",
-                "Attention a la convention : une barre est horodatee a sa CLOTURE, donc",
-                "`minutes_from_open` parcourt 1..N et jamais 0. Le point « 30 minutes",
-                "apres l'ouverture » est la barre qui SE FERME a 10:00 - le choix causal",
-                "correct, celle qui s'ouvre a 10:00 n'etant pas encore connue.",
-                "",
-                "Mesure en minutes depuis l'ouverture DECLAREE, jamais en heure UTC :",
-                "une heure UTC derive d'une heure avec l'heure d'ete."
-              ]
+              "$ref": "points_de_controle"
             },
             {
               "type": "compare",
@@ -119,106 +352,7 @@
                 "lag": 0
               },
               "right": {
-                "type": "arith",
-                "op": "*",
-                "left": {
-                  "type": "max_of",
-                  "operands": [
-                    {
-                      "type": "session",
-                      "field": "open",
-                      "lag": 0
-                    },
-                    {
-                      "type": "session",
-                      "field": "close",
-                      "lag": 1
-                    }
-                  ],
-                  "note": [
-                    "Le max (resp. min) enjambe le GAP d'ouverture : si la nuit a ete agitee,",
-                    "l'enveloppe englobe l'ecart au lieu de se faire traverser des la premiere",
-                    "minute."
-                  ]
-                },
-                "right": {
-                  "type": "arith",
-                  "op": "+",
-                  "left": {
-                    "type": "constant",
-                    "value": 1.0
-                  },
-                  "right": {
-                    "type": "arith",
-                    "op": "*",
-                    "left": {
-                      "type": "constant",
-                      "value": 1.5
-                    },
-                    "right": {
-                      "type": "rolling",
-                      "stat": "mean",
-                      "window": 60,
-                      "across": "sessions",
-                      "inner": {
-                        "type": "session_lag",
-                        "sessions": 1,
-                        "inner": {
-                          "type": "math",
-                          "op": "abs",
-                          "inner": {
-                            "type": "arith",
-                            "op": "-",
-                            "left": {
-                              "type": "arith",
-                              "op": "/",
-                              "left": {
-                                "type": "price",
-                                "field": "close",
-                                "lag": 0
-                              },
-                              "right": {
-                                "type": "session",
-                                "field": "open",
-                                "lag": 0
-                              }
-                            },
-                            "right": {
-                              "type": "constant",
-                              "value": 1.0
-                            }
-                          }
-                        }
-                      },
-                      "note": [
-                        "SIGMA[minute] - le coeur de la strategie.",
-                        "",
-                        "Moyenne, sur les 60 seances PRECEDENTES, de",
-                        "  |cloture[jour, minute] / ouverture[jour] - 1|",
-                        "prise AU MEME RANG de seance.",
-                        "",
-                        "Le prix s'ecarte peu de son ouverture a 10:00 et beaucoup a 15:00 :",
-                        "l'enveloppe est donc etroite le matin et large l'apres-midi, sans",
-                        "qu'aucun parametre ne le regle.",
-                        "",
-                        "`across: sessions` compte la fenetre en SEANCES, au meme rang, par le",
-                        "calendrier declare. C'est ce qui remplace le `stride: 390` des",
-                        "ecritures precedentes : un pas fixe suppose des seances de longueur",
-                        "egale, et les cotations NQ portent la seance ELECTRONIQUE - 1 362",
-                        "barres les jours pleins, 435 le vendredi. Le pas de 390 ne tombait donc",
-                        "JAMAIS sur le rang voulu (lecon L29).",
-                        "",
-                        "`session_lag: 1` exclut la seance EN COURS : sans lui on calibrerait la",
-                        "bande sur le mouvement qu'on s'apprete a lui comparer.",
-                        "",
-                        "Ce que cette ecriture refuse : une seance ECOURTEE n'a pas de barre au",
-                        "rang demande, et la fenetre rend alors `None` plutot qu'une barre",
-                        "voisine. Mesure : sigma est defini a 88 % des points de controle."
-                      ]
-                    }
-                  }
-                },
-                "note": "bande haute = max(ouverture, cloture de la veille) x (1 + 1,5 sigma)"
+                "$ref": "bande_haute"
               }
             },
             {
@@ -230,66 +364,7 @@
                 "lag": 0
               },
               "right": {
-                "type": "arith",
-                "op": "/",
-                "left": {
-                  "type": "cumulative",
-                  "stat": "sum",
-                  "inner": {
-                    "type": "arith",
-                    "op": "*",
-                    "left": {
-                      "type": "arith",
-                      "op": "/",
-                      "left": {
-                        "type": "arith",
-                        "op": "+",
-                        "left": {
-                          "type": "arith",
-                          "op": "+",
-                          "left": {
-                            "type": "price",
-                            "field": "high",
-                            "lag": 0
-                          },
-                          "right": {
-                            "type": "price",
-                            "field": "low",
-                            "lag": 0
-                          }
-                        },
-                        "right": {
-                          "type": "price",
-                          "field": "close",
-                          "lag": 0
-                        }
-                      },
-                      "right": {
-                        "type": "constant",
-                        "value": 3.0
-                      }
-                    },
-                    "right": {
-                      "type": "price",
-                      "field": "volume",
-                      "lag": 0
-                    }
-                  }
-                },
-                "right": {
-                  "type": "cumulative",
-                  "stat": "sum",
-                  "inner": {
-                    "type": "price",
-                    "field": "volume",
-                    "lag": 0
-                  }
-                },
-                "note": [
-                  "VWAP ANCRE sur la seance declaree, sur le prix typique (h+b+c)/3.",
-                  "Recommence chaque matin. Il sert DEUX fois : filtre a l'entree, et",
-                  "stop a la sortie."
-                ]
+                "$ref": "vwap_ancre"
               }
             }
           ],
@@ -315,168 +390,10 @@
                 "type": "max_of",
                 "operands": [
                   {
-                    "type": "arith",
-                    "op": "*",
-                    "left": {
-                      "type": "min_of",
-                      "operands": [
-                        {
-                          "type": "session",
-                          "field": "open",
-                          "lag": 0
-                        },
-                        {
-                          "type": "session",
-                          "field": "close",
-                          "lag": 1
-                        }
-                      ],
-                      "note": [
-                        "Le max (resp. min) enjambe le GAP d'ouverture : si la nuit a ete agitee,",
-                        "l'enveloppe englobe l'ecart au lieu de se faire traverser des la premiere",
-                        "minute."
-                      ]
-                    },
-                    "right": {
-                      "type": "arith",
-                      "op": "-",
-                      "left": {
-                        "type": "constant",
-                        "value": 1.0
-                      },
-                      "right": {
-                        "type": "arith",
-                        "op": "*",
-                        "left": {
-                          "type": "constant",
-                          "value": 1.5
-                        },
-                        "right": {
-                          "type": "rolling",
-                          "stat": "mean",
-                          "window": 60,
-                          "across": "sessions",
-                          "inner": {
-                            "type": "session_lag",
-                            "sessions": 1,
-                            "inner": {
-                              "type": "math",
-                              "op": "abs",
-                              "inner": {
-                                "type": "arith",
-                                "op": "-",
-                                "left": {
-                                  "type": "arith",
-                                  "op": "/",
-                                  "left": {
-                                    "type": "price",
-                                    "field": "close",
-                                    "lag": 0
-                                  },
-                                  "right": {
-                                    "type": "session",
-                                    "field": "open",
-                                    "lag": 0
-                                  }
-                                },
-                                "right": {
-                                  "type": "constant",
-                                  "value": 1.0
-                                }
-                              }
-                            }
-                          },
-                          "note": [
-                            "SIGMA[minute] - le coeur de la strategie.",
-                            "",
-                            "Moyenne, sur les 60 seances PRECEDENTES, de",
-                            "  |cloture[jour, minute] / ouverture[jour] - 1|",
-                            "prise AU MEME RANG de seance.",
-                            "",
-                            "Le prix s'ecarte peu de son ouverture a 10:00 et beaucoup a 15:00 :",
-                            "l'enveloppe est donc etroite le matin et large l'apres-midi, sans",
-                            "qu'aucun parametre ne le regle.",
-                            "",
-                            "`across: sessions` compte la fenetre en SEANCES, au meme rang, par le",
-                            "calendrier declare. C'est ce qui remplace le `stride: 390` des",
-                            "ecritures precedentes : un pas fixe suppose des seances de longueur",
-                            "egale, et les cotations NQ portent la seance ELECTRONIQUE - 1 362",
-                            "barres les jours pleins, 435 le vendredi. Le pas de 390 ne tombait donc",
-                            "JAMAIS sur le rang voulu (lecon L29).",
-                            "",
-                            "`session_lag: 1` exclut la seance EN COURS : sans lui on calibrerait la",
-                            "bande sur le mouvement qu'on s'apprete a lui comparer.",
-                            "",
-                            "Ce que cette ecriture refuse : une seance ECOURTEE n'a pas de barre au",
-                            "rang demande, et la fenetre rend alors `None` plutot qu'une barre",
-                            "voisine. Mesure : sigma est defini a 88 % des points de controle."
-                          ]
-                        }
-                      }
-                    },
-                    "note": "bande basse = min(ouverture, cloture de la veille) x (1 - 1,5 sigma)"
+                    "$ref": "bande_basse"
                   },
                   {
-                    "type": "arith",
-                    "op": "/",
-                    "left": {
-                      "type": "cumulative",
-                      "stat": "sum",
-                      "inner": {
-                        "type": "arith",
-                        "op": "*",
-                        "left": {
-                          "type": "arith",
-                          "op": "/",
-                          "left": {
-                            "type": "arith",
-                            "op": "+",
-                            "left": {
-                              "type": "arith",
-                              "op": "+",
-                              "left": {
-                                "type": "price",
-                                "field": "high",
-                                "lag": 0
-                              },
-                              "right": {
-                                "type": "price",
-                                "field": "low",
-                                "lag": 0
-                              }
-                            },
-                            "right": {
-                              "type": "price",
-                              "field": "close",
-                              "lag": 0
-                            }
-                          },
-                          "right": {
-                            "type": "constant",
-                            "value": 3.0
-                          }
-                        },
-                        "right": {
-                          "type": "price",
-                          "field": "volume",
-                          "lag": 0
-                        }
-                      }
-                    },
-                    "right": {
-                      "type": "cumulative",
-                      "stat": "sum",
-                      "inner": {
-                        "type": "price",
-                        "field": "volume",
-                        "lag": 0
-                      }
-                    },
-                    "note": [
-                      "VWAP ANCRE sur la seance declaree, sur le prix typique (h+b+c)/3.",
-                      "Recommence chaque matin. Il sert DEUX fois : filtre a l'entree, et",
-                      "stop a la sortie."
-                    ]
+                    "$ref": "vwap_ancre"
                   }
                 ],
                 "note": [
@@ -490,21 +407,7 @@
               }
             },
             {
-              "type": "compare",
-              "op": "==",
-              "left": {
-                "type": "session",
-                "field": "is_last",
-                "lag": 0
-              },
-              "right": {
-                "type": "constant",
-                "value": 1.0
-              },
-              "note": [
-                "Cloture forcee : rien ne passe la nuit. C'est ce qui fait de cette",
-                "strategie une strategie INTRADAY."
-              ]
+              "$ref": "cloture_forcee"
             }
           ]
         },
@@ -512,73 +415,7 @@
           "type": "all_of",
           "operands": [
             {
-              "type": "all_of",
-              "operands": [
-                {
-                  "type": "compare",
-                  "op": ">=",
-                  "left": {
-                    "type": "session",
-                    "field": "minutes_from_open",
-                    "lag": 0
-                  },
-                  "right": {
-                    "type": "constant",
-                    "value": 30.0
-                  }
-                },
-                {
-                  "type": "compare",
-                  "op": "<=",
-                  "left": {
-                    "type": "session",
-                    "field": "minutes_from_open",
-                    "lag": 0
-                  },
-                  "right": {
-                    "type": "constant",
-                    "value": 360.0
-                  }
-                },
-                {
-                  "type": "compare",
-                  "op": "==",
-                  "left": {
-                    "type": "arith",
-                    "op": "%",
-                    "left": {
-                      "type": "session",
-                      "field": "minutes_from_open",
-                      "lag": 0
-                    },
-                    "right": {
-                      "type": "constant",
-                      "value": 30.0
-                    }
-                  },
-                  "right": {
-                    "type": "constant",
-                    "value": 0.0
-                  }
-                }
-              ],
-              "note": [
-                "Les douze points de controle semi-horaires : 10:00, 10:30, ... 15:30.",
-                "",
-                "Delgado les enonce comme une REGLE, pas un reglage : « The strategy",
-                "only evaluates signals at semi-hourly checkpoints ». Le pas de 30",
-                "minutes n'a donc pas ete balaye.",
-                "",
-                "Ecrit avec `arith %` : trois noeuds au lieu de douze comparaisons.",
-                "",
-                "Attention a la convention : une barre est horodatee a sa CLOTURE, donc",
-                "`minutes_from_open` parcourt 1..N et jamais 0. Le point « 30 minutes",
-                "apres l'ouverture » est la barre qui SE FERME a 10:00 - le choix causal",
-                "correct, celle qui s'ouvre a 10:00 n'etant pas encore connue.",
-                "",
-                "Mesure en minutes depuis l'ouverture DECLAREE, jamais en heure UTC :",
-                "une heure UTC derive d'une heure avec l'heure d'ete."
-              ]
+              "$ref": "points_de_controle"
             },
             {
               "type": "compare",
@@ -589,106 +426,7 @@
                 "lag": 0
               },
               "right": {
-                "type": "arith",
-                "op": "*",
-                "left": {
-                  "type": "min_of",
-                  "operands": [
-                    {
-                      "type": "session",
-                      "field": "open",
-                      "lag": 0
-                    },
-                    {
-                      "type": "session",
-                      "field": "close",
-                      "lag": 1
-                    }
-                  ],
-                  "note": [
-                    "Le max (resp. min) enjambe le GAP d'ouverture : si la nuit a ete agitee,",
-                    "l'enveloppe englobe l'ecart au lieu de se faire traverser des la premiere",
-                    "minute."
-                  ]
-                },
-                "right": {
-                  "type": "arith",
-                  "op": "-",
-                  "left": {
-                    "type": "constant",
-                    "value": 1.0
-                  },
-                  "right": {
-                    "type": "arith",
-                    "op": "*",
-                    "left": {
-                      "type": "constant",
-                      "value": 1.5
-                    },
-                    "right": {
-                      "type": "rolling",
-                      "stat": "mean",
-                      "window": 60,
-                      "across": "sessions",
-                      "inner": {
-                        "type": "session_lag",
-                        "sessions": 1,
-                        "inner": {
-                          "type": "math",
-                          "op": "abs",
-                          "inner": {
-                            "type": "arith",
-                            "op": "-",
-                            "left": {
-                              "type": "arith",
-                              "op": "/",
-                              "left": {
-                                "type": "price",
-                                "field": "close",
-                                "lag": 0
-                              },
-                              "right": {
-                                "type": "session",
-                                "field": "open",
-                                "lag": 0
-                              }
-                            },
-                            "right": {
-                              "type": "constant",
-                              "value": 1.0
-                            }
-                          }
-                        }
-                      },
-                      "note": [
-                        "SIGMA[minute] - le coeur de la strategie.",
-                        "",
-                        "Moyenne, sur les 60 seances PRECEDENTES, de",
-                        "  |cloture[jour, minute] / ouverture[jour] - 1|",
-                        "prise AU MEME RANG de seance.",
-                        "",
-                        "Le prix s'ecarte peu de son ouverture a 10:00 et beaucoup a 15:00 :",
-                        "l'enveloppe est donc etroite le matin et large l'apres-midi, sans",
-                        "qu'aucun parametre ne le regle.",
-                        "",
-                        "`across: sessions` compte la fenetre en SEANCES, au meme rang, par le",
-                        "calendrier declare. C'est ce qui remplace le `stride: 390` des",
-                        "ecritures precedentes : un pas fixe suppose des seances de longueur",
-                        "egale, et les cotations NQ portent la seance ELECTRONIQUE - 1 362",
-                        "barres les jours pleins, 435 le vendredi. Le pas de 390 ne tombait donc",
-                        "JAMAIS sur le rang voulu (lecon L29).",
-                        "",
-                        "`session_lag: 1` exclut la seance EN COURS : sans lui on calibrerait la",
-                        "bande sur le mouvement qu'on s'apprete a lui comparer.",
-                        "",
-                        "Ce que cette ecriture refuse : une seance ECOURTEE n'a pas de barre au",
-                        "rang demande, et la fenetre rend alors `None` plutot qu'une barre",
-                        "voisine. Mesure : sigma est defini a 88 % des points de controle."
-                      ]
-                    }
-                  }
-                },
-                "note": "bande basse = min(ouverture, cloture de la veille) x (1 - 1,5 sigma)"
+                "$ref": "bande_basse"
               }
             },
             {
@@ -700,66 +438,7 @@
                 "lag": 0
               },
               "right": {
-                "type": "arith",
-                "op": "/",
-                "left": {
-                  "type": "cumulative",
-                  "stat": "sum",
-                  "inner": {
-                    "type": "arith",
-                    "op": "*",
-                    "left": {
-                      "type": "arith",
-                      "op": "/",
-                      "left": {
-                        "type": "arith",
-                        "op": "+",
-                        "left": {
-                          "type": "arith",
-                          "op": "+",
-                          "left": {
-                            "type": "price",
-                            "field": "high",
-                            "lag": 0
-                          },
-                          "right": {
-                            "type": "price",
-                            "field": "low",
-                            "lag": 0
-                          }
-                        },
-                        "right": {
-                          "type": "price",
-                          "field": "close",
-                          "lag": 0
-                        }
-                      },
-                      "right": {
-                        "type": "constant",
-                        "value": 3.0
-                      }
-                    },
-                    "right": {
-                      "type": "price",
-                      "field": "volume",
-                      "lag": 0
-                    }
-                  }
-                },
-                "right": {
-                  "type": "cumulative",
-                  "stat": "sum",
-                  "inner": {
-                    "type": "price",
-                    "field": "volume",
-                    "lag": 0
-                  }
-                },
-                "note": [
-                  "VWAP ANCRE sur la seance declaree, sur le prix typique (h+b+c)/3.",
-                  "Recommence chaque matin. Il sert DEUX fois : filtre a l'entree, et",
-                  "stop a la sortie."
-                ]
+                "$ref": "vwap_ancre"
               }
             }
           ],
@@ -785,168 +464,10 @@
                 "type": "min_of",
                 "operands": [
                   {
-                    "type": "arith",
-                    "op": "*",
-                    "left": {
-                      "type": "max_of",
-                      "operands": [
-                        {
-                          "type": "session",
-                          "field": "open",
-                          "lag": 0
-                        },
-                        {
-                          "type": "session",
-                          "field": "close",
-                          "lag": 1
-                        }
-                      ],
-                      "note": [
-                        "Le max (resp. min) enjambe le GAP d'ouverture : si la nuit a ete agitee,",
-                        "l'enveloppe englobe l'ecart au lieu de se faire traverser des la premiere",
-                        "minute."
-                      ]
-                    },
-                    "right": {
-                      "type": "arith",
-                      "op": "+",
-                      "left": {
-                        "type": "constant",
-                        "value": 1.0
-                      },
-                      "right": {
-                        "type": "arith",
-                        "op": "*",
-                        "left": {
-                          "type": "constant",
-                          "value": 1.5
-                        },
-                        "right": {
-                          "type": "rolling",
-                          "stat": "mean",
-                          "window": 60,
-                          "across": "sessions",
-                          "inner": {
-                            "type": "session_lag",
-                            "sessions": 1,
-                            "inner": {
-                              "type": "math",
-                              "op": "abs",
-                              "inner": {
-                                "type": "arith",
-                                "op": "-",
-                                "left": {
-                                  "type": "arith",
-                                  "op": "/",
-                                  "left": {
-                                    "type": "price",
-                                    "field": "close",
-                                    "lag": 0
-                                  },
-                                  "right": {
-                                    "type": "session",
-                                    "field": "open",
-                                    "lag": 0
-                                  }
-                                },
-                                "right": {
-                                  "type": "constant",
-                                  "value": 1.0
-                                }
-                              }
-                            }
-                          },
-                          "note": [
-                            "SIGMA[minute] - le coeur de la strategie.",
-                            "",
-                            "Moyenne, sur les 60 seances PRECEDENTES, de",
-                            "  |cloture[jour, minute] / ouverture[jour] - 1|",
-                            "prise AU MEME RANG de seance.",
-                            "",
-                            "Le prix s'ecarte peu de son ouverture a 10:00 et beaucoup a 15:00 :",
-                            "l'enveloppe est donc etroite le matin et large l'apres-midi, sans",
-                            "qu'aucun parametre ne le regle.",
-                            "",
-                            "`across: sessions` compte la fenetre en SEANCES, au meme rang, par le",
-                            "calendrier declare. C'est ce qui remplace le `stride: 390` des",
-                            "ecritures precedentes : un pas fixe suppose des seances de longueur",
-                            "egale, et les cotations NQ portent la seance ELECTRONIQUE - 1 362",
-                            "barres les jours pleins, 435 le vendredi. Le pas de 390 ne tombait donc",
-                            "JAMAIS sur le rang voulu (lecon L29).",
-                            "",
-                            "`session_lag: 1` exclut la seance EN COURS : sans lui on calibrerait la",
-                            "bande sur le mouvement qu'on s'apprete a lui comparer.",
-                            "",
-                            "Ce que cette ecriture refuse : une seance ECOURTEE n'a pas de barre au",
-                            "rang demande, et la fenetre rend alors `None` plutot qu'une barre",
-                            "voisine. Mesure : sigma est defini a 88 % des points de controle."
-                          ]
-                        }
-                      }
-                    },
-                    "note": "bande haute = max(ouverture, cloture de la veille) x (1 + 1,5 sigma)"
+                    "$ref": "bande_haute"
                   },
                   {
-                    "type": "arith",
-                    "op": "/",
-                    "left": {
-                      "type": "cumulative",
-                      "stat": "sum",
-                      "inner": {
-                        "type": "arith",
-                        "op": "*",
-                        "left": {
-                          "type": "arith",
-                          "op": "/",
-                          "left": {
-                            "type": "arith",
-                            "op": "+",
-                            "left": {
-                              "type": "arith",
-                              "op": "+",
-                              "left": {
-                                "type": "price",
-                                "field": "high",
-                                "lag": 0
-                              },
-                              "right": {
-                                "type": "price",
-                                "field": "low",
-                                "lag": 0
-                              }
-                            },
-                            "right": {
-                              "type": "price",
-                              "field": "close",
-                              "lag": 0
-                            }
-                          },
-                          "right": {
-                            "type": "constant",
-                            "value": 3.0
-                          }
-                        },
-                        "right": {
-                          "type": "price",
-                          "field": "volume",
-                          "lag": 0
-                        }
-                      }
-                    },
-                    "right": {
-                      "type": "cumulative",
-                      "stat": "sum",
-                      "inner": {
-                        "type": "price",
-                        "field": "volume",
-                        "lag": 0
-                      }
-                    },
-                    "note": [
-                      "VWAP ANCRE sur la seance declaree, sur le prix typique (h+b+c)/3.",
-                      "Recommence chaque matin. Il sert DEUX fois : filtre a l'entree, et",
-                      "stop a la sortie."
-                    ]
+                    "$ref": "vwap_ancre"
                   }
                 ],
                 "note": [
@@ -960,21 +481,7 @@
               }
             },
             {
-              "type": "compare",
-              "op": "==",
-              "left": {
-                "type": "session",
-                "field": "is_last",
-                "lag": 0
-              },
-              "right": {
-                "type": "constant",
-                "value": 1.0
-              },
-              "note": [
-                "Cloture forcee : rien ne passe la nuit. C'est ce qui fait de cette",
-                "strategie une strategie INTRADAY."
-              ]
+              "$ref": "cloture_forcee"
             }
           ]
         }

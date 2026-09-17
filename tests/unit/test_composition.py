@@ -240,14 +240,45 @@ class TestReconnaitreLeFormat:
 class TestLaStrategieEstPauvre:
     """Elle ne porte QUE la decision : c'est ce qui la rend reutilisable."""
 
-    def test_elle_n_a_que_trois_champs(self):
-        assert set(StrategyFile.model_fields) == {"format", "name", "strategy", "note"}
+    def test_elle_ne_porte_que_la_decision(self):
+        """Les deux champs en plus des trois du debut ne sont pas du montage.
+
+        `note` dit POURQUOI, `definitions` evite de se repeter : tous deux
+        `exclude=True`, donc absents du `config_hash`. Ni l'un ni l'autre ne
+        decrit sur quoi la strategie tourne, ce qui est le critere.
+        """
+        assert set(StrategyFile.model_fields) == {
+            "format", "name", "strategy", "note", "definitions",
+        }
 
     @pytest.mark.parametrize("montage", [
         "initial_cash", "data", "execution", "risk", "seed", "stop",
     ])
     def test_aucun_champ_de_montage_n_y_figure(self, montage):
         assert montage not in StrategyFile.model_fields
+
+    def test_elle_accepte_des_definitions(self):
+        """Factoriser une grandeur fait partie de l'ECRITURE de la decision."""
+        strategie = StrategyFile.model_validate({
+            **STRATEGIE,
+            "definitions": {"vingt": {"type": "constant", "value": 20.0}},
+            "strategy": {
+                "ref": "rules@1",
+                "params": {
+                    "symbol": None,
+                    "quantity": 1,
+                    "rules": {
+                        "entry_long": {
+                            "type": "compare", "op": ">",
+                            "left": {"type": "price", "field": "close"},
+                            "right": {"$ref": "vingt"},
+                        }
+                    },
+                },
+            },
+        })
+        regle = strategie.strategy.params["rules"]["entry_long"]
+        assert regle["right"] == {"type": "constant", "value": 20.0}
 
     def test_elle_accepte_une_note(self):
         """Un `note` reste possible : dire pourquoi fait partie de la decision."""

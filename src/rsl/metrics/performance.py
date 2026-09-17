@@ -105,6 +105,30 @@ class DrawdownStats:
 
 
 @dataclass(frozen=True, slots=True)
+class DailySeries:
+    """Les rendements quotidiens d'un run, avec leurs dates.
+
+    Les DATES sont indispensables et non un confort : deux essais couvrant des
+    periodes differentes ne se comparent que sur leur intersection, et sans
+    horodatage il faudrait supposer qu'ils commencent le meme jour. Le socle
+    ne suppose pas.
+    """
+
+    ts: np.ndarray
+    """Horodatages en nanosecondes UTC, un par point quotidien."""
+
+    returns: np.ndarray
+    """Rendements simples, donc `ts.shape[0] - 1` valeurs."""
+
+    def __post_init__(self) -> None:
+        if self.returns.shape[0] + 1 != self.ts.shape[0]:
+            raise ConfigurationError(
+                f"serie quotidienne incoherente : {self.ts.shape[0]} dates pour "
+                f"{self.returns.shape[0]} rendements ; il en faut une de plus."
+            )
+
+
+@dataclass(frozen=True, slots=True)
 class PerformanceMetrics:
     """Resultat complet, serialisable pour le rapport de run."""
 
@@ -154,6 +178,21 @@ class PerformanceMetrics:
     """L'equity est passee a zero ou en dessous : les ratios n'ont plus de sens."""
 
     warnings: tuple[str, ...] = ()
+
+    serie_quotidienne: DailySeries | None = None
+    """Les dates et les rendements QUOTIDIENS sur lesquels le Sharpe est calcule.
+
+    Deliberement absents de `describe()`, donc du rapport JSON : ce sont des
+    milliers de nombres, et le rapport se lit. Ils servent a une seule chose,
+    l'archivage d'un essai comparable a un autre (`rsl.essais`).
+
+    Pourquoi c'est la SEULE serie qui permette de comparer deux essais : elle
+    est deja agregee au JOUR par `to_daily`, quelle que soit la granularite des
+    barres. Un run a la minute et un run quotidien produisent donc des series
+    de meme nature, sans qu'aucun reechantillonnage n'ait a etre invente pour
+    les rapprocher - et c'est exactement celle dont le `sharpe_per_period` sort,
+    donc celle qui explique la variance des essais.
+    """
 
     def describe(self) -> SpecDict:
         return {
@@ -433,6 +472,7 @@ def compute_performance(
     activity = _activity(result, equity_full, span_years)
 
     return PerformanceMetrics(
+        serie_quotidienne=DailySeries(ts=ts_daily, returns=returns),
         n_bars=int(equity_full.shape[0]),
         n_daily_points=int(equity_daily.shape[0]),
         span_years=span_years,

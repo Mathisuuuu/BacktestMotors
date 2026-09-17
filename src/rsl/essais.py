@@ -49,7 +49,10 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
+import numpy as np
+
 from rsl.errors import ConfigurationError, RslError
+from rsl.metrics.performance import DailySeries
 from rsl.metrics.statistics import TrialLog
 
 SpecDict = dict[str, object]
@@ -57,6 +60,7 @@ SpecDict = dict[str, object]
 DOSSIER = Path("essais")
 REGISTRE = DOSSIER / "registre.jsonl"
 RAPPORTS = DOSSIER / "rapports"
+SERIES = DOSSIER / "series"
 
 CLE = 12
 """Longueur du prefixe de `config_hash` qui nomme un rapport archive.
@@ -94,6 +98,14 @@ class Essai:
     span_years: float
     symbols: tuple[str, ...]
     rapport: str | None = None
+    serie: str | None = None
+    """Chemin de la serie QUOTIDIENNE archivee, ou `None`.
+
+    C'est la seule chose qui rende deux essais comparables autrement que par
+    leur echantillon. Elle vaut `None` pour tous les essais anterieurs au
+    2026-09-17 - irrattrapable sans les rejouer - et pour les essais de
+    BALAYAGE, qui n'ecrivent deja aucun rapport.
+    """
     note: str = ""
 
     @staticmethod
@@ -133,8 +145,10 @@ class Essai:
             note=note,
         )
 
-    def avec_rapport(self, chemin: str) -> Essai:
-        return Essai(**{**self.describe_brut(), "rapport": chemin})  # type: ignore[arg-type]
+    def avec_rapport(self, chemin: str, serie: str | None = None) -> Essai:
+        return Essai(
+            **{**self.describe_brut(), "rapport": chemin, "serie": serie}  # type: ignore[arg-type]
+        )
 
     def describe_brut(self) -> SpecDict:
         return {
@@ -150,6 +164,7 @@ class Essai:
             "span_years": self.span_years,
             "symbols": tuple(self.symbols),
             "rapport": self.rapport,
+            "serie": self.serie,
             "note": self.note,
         }
 
@@ -210,6 +225,27 @@ class Registre:
     @property
     def rapports(self) -> Path:
         return self.racine / RAPPORTS.name
+
+    @property
+    def series(self) -> Path:
+        return self.racine / SERIES.name
+
+    def lire_serie(self, essai: Essai) -> tuple[np.ndarray, np.ndarray] | None:
+        """Les dates et rendements quotidiens d'un essai, s'ils ont ete gardes.
+
+        `None` n'est pas une erreur : aucun essai archive avant le 2026-09-17
+        n'en porte, et un essai de balayage n'en portera jamais.
+        """
+        if essai.serie is None:
+            return None
+        chemin = self.racine / essai.serie
+        if not chemin.exists():
+            raise ConfigurationError(
+                f"l'essai {essai.cle} declare une serie en {essai.serie}, qui "
+                f"n'existe pas. Le registre et le disque se contredisent."
+            )
+        with np.load(chemin) as charge:
+            return charge["ts"], charge["returns"]
 
     def essais(self) -> list[Essai]:
         """Les essais enregistres, dans l'ordre d'archivage.
@@ -305,7 +341,12 @@ class Registre:
         )
 
     def archiver(
-        self, rapport: SpecDict, *, note: str = "", artefact: str | None = None
+        self,
+        rapport: SpecDict,
+        *,
+        note: str = "",
+        artefact: str | None = None,
+        serie: DailySeries | None = None,
     ) -> Essai:
         """Ajoute un essai et ecrit son rapport complet.
 
@@ -357,10 +398,37 @@ class Registre:
                 encoding="utf-8",
             )
             artefact = chemin.relative_to(self.racine).as_posix()
-        essai = essai.avec_rapport(artefact)
+        essai = essai.avec_rapport(artefact, self._ecrire_serie(essai, serie))
         with self.fichier.open("a", encoding="utf-8", newline="\n") as flux:
             flux.write(essai.ligne() + "\n")
         return essai
+
+    def _ecrire_serie(self, essai: Essai, serie: DailySeries | None) -> str | None:
+        """Ecrit la serie quotidienne a cote du rapport, et rend son chemin.
+
+        Pourquoi un `.npz` et non du JSON, contrairement au registre : ce sont
+        des milliers de flottants que personne ne relit ni ne fusionne a la
+        main. Le registre est en JSONL parce qu'un `git diff` doit y rester
+        lisible ; ici il n'y a rien a lire, et le binaire compresse garde les
+        flottants au bit pres la ou un texte imposerait de choisir un format.
+
+        Pourquoi la serie QUOTIDIENNE et pas celle des barres : elle est deja
+        agregee au jour par `to_daily`, donc un run a la minute et un run
+        quotidien produisent des series de meme nature. Aucun
+        reechantillonnage n'a a etre invente pour les rapprocher - et c'est
+        celle dont sort le `sharpe_per_period`, donc celle qui explique la
+        variance des essais.
+        """
+        if serie is None:
+            return None
+        self.series.mkdir(parents=True, exist_ok=True)
+        chemin = self.series / f"{essai.cle}-{essai.result_fingerprint[:CLE]}.npz"
+        np.savez_compressed(
+            chemin,
+            ts=np.asarray(serie.ts, dtype=np.int64),
+            returns=np.asarray(serie.returns, dtype=np.float64),
+        )
+        return chemin.relative_to(self.racine).as_posix()
 
     def describe(self) -> SpecDict:
         journal = self.journal()

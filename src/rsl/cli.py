@@ -35,9 +35,16 @@ from rsl.controles import Gravite, controler, render
 from rsl.data.instruments import INSTRUMENTS, get_instrument
 from rsl.data.loader import validate_file
 from rsl.errors import ConfigurationError, RslError
-from rsl.essais import EssaiDejaArchiveError, Registre, registre_par_defaut
+from rsl.essais import Essai, EssaiDejaArchiveError, Registre, registre_par_defaut
+from rsl.independance import familles
 from rsl.manifest import canonical_hash
-from rsl.metrics.statistics import AnchoredWalkForward, RollingWalkForward
+from rsl.metrics.performance import DailySeries
+from rsl.metrics.statistics import (
+    AnchoredWalkForward,
+    Decomposition,
+    RollingWalkForward,
+    TrialLog,
+)
 from rsl.metrics.surapprentissage import ResultatPBO
 from rsl.pbo import Grille, construire_grille
 from rsl.primitives.registry import describe_registry
@@ -277,6 +284,14 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     essais.add_argument(
         "--json", action="store_true", help="sortie JSON plutot que tableau"
+    )
+    essais.add_argument(
+        "--familles",
+        action="store_true",
+        help=(
+            "structure de la population d'essais : qui porte sur le MEME "
+            "echantillon, et avec quelle dispersion de Sharpe"
+        ),
     )
     essais.set_defaults(handler=_cmd_essais)
 
@@ -640,7 +655,8 @@ def _cmd_run(args: argparse.Namespace) -> int:
     )
     _emit(report, as_json=args.json, out=args.out)
     if registre is not None:
-        _archiver(registre, report.to_dict(), note=args.note)
+        _archiver(registre, report.to_dict(), note=args.note,
+                  serie=report.metrics.serie_quotidienne)
     if args.gui:
         # Import tardif : tkinter peut manquer sur une machine sans interface,
         # et `rsl run` sans `--gui` doit continuer d'y fonctionner.
@@ -650,7 +666,13 @@ def _cmd_run(args: argparse.Namespace) -> int:
     return EXIT_OK
 
 
-def _archiver(registre: Registre, rapport: SpecDict, *, note: str) -> None:
+def _archiver(
+    registre: Registre,
+    rapport: SpecDict,
+    *,
+    note: str,
+    serie: DailySeries | None = None,
+) -> None:
     """Ajoute l'essai au registre, ou dit pourquoi il ne l'a pas ete.
 
     Un doublon n'est PAS une erreur de l'utilisateur : relancer un backtest
@@ -658,13 +680,55 @@ def _archiver(registre: Registre, rapport: SpecDict, *, note: str) -> None:
     La commande le dit et rend `EXIT_OK`.
     """
     try:
-        essai = registre.archiver(rapport, note=note)
+        essai = registre.archiver(rapport, note=note, serie=serie)
     except EssaiDejaArchiveError as deja:
         print(f"\nessai deja enregistre : {deja}")
         return
     print(f"\nessai archive     {essai.render()}")
     print(f"rapport           {essai.rapport}")
+    if essai.serie is not None:
+        print(f"serie quotidienne {essai.serie}")
     print(f"registre          {registre.fichier} ({registre.journal().n_trials} essai(s))")
+
+
+def _rendre_les_familles(
+    registre: Registre, essais: list[Essai], journal: TrialLog
+) -> int:
+    """La structure de la population d'essais, sans la corriger.
+
+    Ce que cette vue montre et que le total cachait : le seuil de deflation
+    est un PRODUIT, `sqrt(V) x f(N)`, et c'est `sqrt(V)` qui s'effondre quand
+    on archive des centaines d'essais voisins. Mesure le 2026-09-17 sur ce
+    registre - 462 essais sur 498 sur le meme echantillon, ecart-type de
+    Sharpe 0,0093 contre 0,0723 pour les 36 autres.
+
+    Elle ne corrige RIEN. Decider ce qu'est un essai effectif demande la
+    source du Deflated Sharpe, encore `a-ingerer` ; une formule inventee ici
+    rendrait un DSR different, plausible et faux.
+    """
+    groupes = familles(essais)
+    decomposition = Decomposition(journal.n_trials, journal.variance_of_sharpes)
+    print(f"Seuil de deflation   {decomposition.render()}")
+    print(f"\n{len(groupes)} famille(s) pour {len(essais)} essai(s) :\n")
+    for famille in groupes:
+        print("  " + famille.render())
+
+    avec_serie = sum(1 for e in essais if e.serie is not None)
+    print(
+        f"\n{avec_serie} essai(s) sur {len(essais)} portent leur serie "
+        f"quotidienne. Sans elle, deux essais ne se comparent que par leur "
+        f"ECHANTILLON - le critere ci-dessus - et non par ce qu'ils ont "
+        f"reellement decide."
+    )
+    if groupes and groupes[0].taille > 1:
+        part = 100.0 * groupes[0].taille / len(essais)
+        print(
+            f"\nLa plus grosse famille porte {part:.1f} % des essais. Une "
+            f"famille nombreuse a faible ecart-type n'est pas N mesures : "
+            f"c'est une mesure repetee N fois, et elle FAIT BAISSER le seuil "
+            f"au lieu de le monter."
+        )
+    return EXIT_OK
 
 
 def _cmd_essais(args: argparse.Namespace) -> int:
@@ -690,9 +754,12 @@ def _cmd_essais(args: argparse.Namespace) -> int:
         )
         return EXIT_OK
 
+    journal = registre.journal()
+    if args.familles:
+        return _rendre_les_familles(registre, essais, journal)
+
     for essai in essais:
         print(essai.render())
-    journal = registre.journal()
     print(
         f"\n{len(essais)} ligne(s), {journal.n_trials} configuration(s) distincte(s), "
         f"variance des Sharpe {journal.variance_of_sharpes:.6f}"

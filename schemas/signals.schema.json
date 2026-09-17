@@ -1228,6 +1228,21 @@
           ],
           "title": "value_when@1",
           "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Renvoie a une entree du bloc `definitions` declare a la racine du document. Substitution purement textuelle, faite avant toute validation : c'est la forme DEVELOPPEE qui est evaluee et hachee.",
+          "properties": {
+            "$ref": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "$ref"
+          ],
+          "title": "reference a une definition",
+          "type": "object"
         }
       ]
     }

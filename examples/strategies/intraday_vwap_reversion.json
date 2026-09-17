@@ -17,6 +17,164 @@
     "",
     "Aucun essai archive. Forme, pas resultat."
   ],
+  "definitions": {
+    "dispersion": {
+      "type": "rolling",
+      "stat": "stdev",
+      "window": 20,
+      "across": "sessions",
+      "inner": {
+        "type": "session_lag",
+        "sessions": 1,
+        "inner": {
+          "type": "arith",
+          "op": "-",
+          "left": {
+            "type": "arith",
+            "op": "/",
+            "left": {
+              "type": "price",
+              "field": "close",
+              "lag": 0
+            },
+            "right": {
+              "$ref": "vwap_ancre"
+            }
+          },
+          "right": {
+            "type": "constant",
+            "value": 1.0
+          }
+        }
+      },
+      "note": [
+        "Dispersion de l'ecart au VWAP AU MEME RANG de seance, sur 20 seances.",
+        "",
+        "`across: sessions` et non `stride` : les seances n'ont pas toutes la",
+        "meme longueur - 1 362 barres les jours pleins sur NQ, 435 le vendredi -",
+        "et un pas fixe tomberait a une heure arbitraire (lecon L29)."
+      ]
+    },
+    "grille_horaire": {
+      "type": "all_of",
+      "operands": [
+        {
+          "type": "compare",
+          "op": ">=",
+          "left": {
+            "type": "session",
+            "field": "minutes_from_open",
+            "lag": 0
+          },
+          "right": {
+            "type": "constant",
+            "value": 30.0
+          }
+        },
+        {
+          "type": "compare",
+          "op": "<=",
+          "left": {
+            "type": "session",
+            "field": "minutes_from_open",
+            "lag": 0
+          },
+          "right": {
+            "type": "constant",
+            "value": 330.0
+          }
+        },
+        {
+          "type": "compare",
+          "op": "==",
+          "left": {
+            "type": "arith",
+            "op": "%",
+            "left": {
+              "type": "session",
+              "field": "minutes_from_open",
+              "lag": 0
+            },
+            "right": {
+              "type": "constant",
+              "value": 15.0
+            }
+          },
+          "right": {
+            "type": "constant",
+            "value": 0.0
+          }
+        }
+      ],
+      "note": [
+        "Grille horaire : une decision toutes les 15 minutes, de la",
+        "minute 30 a la minute 330 depuis l'ouverture DECLAREE.",
+        "",
+        "`arith %` remplace ici douze comparaisons `any_of`. Attention a la",
+        "convention : une barre est horodatee a sa CLOTURE, donc",
+        "`minutes_from_open` parcourt 1..N et jamais 0. Le point « 30 minutes",
+        "apres l'ouverture » est la barre qui SE FERME a cette minute."
+      ]
+    },
+    "vwap_ancre": {
+      "type": "arith",
+      "op": "/",
+      "left": {
+        "type": "cumulative",
+        "stat": "sum",
+        "inner": {
+          "type": "arith",
+          "op": "*",
+          "left": {
+            "type": "arith",
+            "op": "/",
+            "left": {
+              "type": "arith",
+              "op": "+",
+              "left": {
+                "type": "arith",
+                "op": "+",
+                "left": {
+                  "type": "price",
+                  "field": "high",
+                  "lag": 0
+                },
+                "right": {
+                  "type": "price",
+                  "field": "low",
+                  "lag": 0
+                }
+              },
+              "right": {
+                "type": "price",
+                "field": "close",
+                "lag": 0
+              }
+            },
+            "right": {
+              "type": "constant",
+              "value": 3.0
+            }
+          },
+          "right": {
+            "type": "price",
+            "field": "volume",
+            "lag": 0
+          }
+        }
+      },
+      "right": {
+        "type": "cumulative",
+        "stat": "sum",
+        "inner": {
+          "type": "price",
+          "field": "volume",
+          "lag": 0
+        }
+      },
+      "note": "VWAP ANCRE sur la seance declaree, sur le prix typique."
+    }
+  },
   "strategy": {
     "ref": "rules@1",
     "params": {
@@ -27,65 +185,7 @@
           "type": "all_of",
           "operands": [
             {
-              "type": "all_of",
-              "operands": [
-                {
-                  "type": "compare",
-                  "op": ">=",
-                  "left": {
-                    "type": "session",
-                    "field": "minutes_from_open",
-                    "lag": 0
-                  },
-                  "right": {
-                    "type": "constant",
-                    "value": 30.0
-                  }
-                },
-                {
-                  "type": "compare",
-                  "op": "<=",
-                  "left": {
-                    "type": "session",
-                    "field": "minutes_from_open",
-                    "lag": 0
-                  },
-                  "right": {
-                    "type": "constant",
-                    "value": 330.0
-                  }
-                },
-                {
-                  "type": "compare",
-                  "op": "==",
-                  "left": {
-                    "type": "arith",
-                    "op": "%",
-                    "left": {
-                      "type": "session",
-                      "field": "minutes_from_open",
-                      "lag": 0
-                    },
-                    "right": {
-                      "type": "constant",
-                      "value": 15.0
-                    }
-                  },
-                  "right": {
-                    "type": "constant",
-                    "value": 0.0
-                  }
-                }
-              ],
-              "note": [
-                "Grille horaire : une decision toutes les 15 minutes, de la",
-                "minute 30 a la minute 330 depuis l'ouverture DECLAREE.",
-                "",
-                "`arith %` remplace ici douze comparaisons `any_of`. Attention a la",
-                "convention : une barre est horodatee a sa CLOTURE, donc",
-                "`minutes_from_open` parcourt 1..N et jamais 0. Le point « 30 minutes",
-                "apres l'ouverture » est la barre qui SE FERME a cette minute."
-              ]
+              "$ref": "grille_horaire"
             },
             {
               "type": "compare",
@@ -102,62 +202,7 @@
                     "lag": 0
                   },
                   "right": {
-                    "type": "arith",
-                    "op": "/",
-                    "left": {
-                      "type": "cumulative",
-                      "stat": "sum",
-                      "inner": {
-                        "type": "arith",
-                        "op": "*",
-                        "left": {
-                          "type": "arith",
-                          "op": "/",
-                          "left": {
-                            "type": "arith",
-                            "op": "+",
-                            "left": {
-                              "type": "arith",
-                              "op": "+",
-                              "left": {
-                                "type": "price",
-                                "field": "high",
-                                "lag": 0
-                              },
-                              "right": {
-                                "type": "price",
-                                "field": "low",
-                                "lag": 0
-                              }
-                            },
-                            "right": {
-                              "type": "price",
-                              "field": "close",
-                              "lag": 0
-                            }
-                          },
-                          "right": {
-                            "type": "constant",
-                            "value": 3.0
-                          }
-                        },
-                        "right": {
-                          "type": "price",
-                          "field": "volume",
-                          "lag": 0
-                        }
-                      }
-                    },
-                    "right": {
-                      "type": "cumulative",
-                      "stat": "sum",
-                      "inner": {
-                        "type": "price",
-                        "field": "volume",
-                        "lag": 0
-                      }
-                    },
-                    "note": "VWAP ANCRE sur la seance declaree, sur le prix typique."
+                    "$ref": "vwap_ancre"
                   }
                 },
                 "right": {
@@ -173,96 +218,7 @@
                   "value": -2.0
                 },
                 "right": {
-                  "type": "rolling",
-                  "stat": "stdev",
-                  "window": 20,
-                  "across": "sessions",
-                  "inner": {
-                    "type": "session_lag",
-                    "sessions": 1,
-                    "inner": {
-                      "type": "arith",
-                      "op": "-",
-                      "left": {
-                        "type": "arith",
-                        "op": "/",
-                        "left": {
-                          "type": "price",
-                          "field": "close",
-                          "lag": 0
-                        },
-                        "right": {
-                          "type": "arith",
-                          "op": "/",
-                          "left": {
-                            "type": "cumulative",
-                            "stat": "sum",
-                            "inner": {
-                              "type": "arith",
-                              "op": "*",
-                              "left": {
-                                "type": "arith",
-                                "op": "/",
-                                "left": {
-                                  "type": "arith",
-                                  "op": "+",
-                                  "left": {
-                                    "type": "arith",
-                                    "op": "+",
-                                    "left": {
-                                      "type": "price",
-                                      "field": "high",
-                                      "lag": 0
-                                    },
-                                    "right": {
-                                      "type": "price",
-                                      "field": "low",
-                                      "lag": 0
-                                    }
-                                  },
-                                  "right": {
-                                    "type": "price",
-                                    "field": "close",
-                                    "lag": 0
-                                  }
-                                },
-                                "right": {
-                                  "type": "constant",
-                                  "value": 3.0
-                                }
-                              },
-                              "right": {
-                                "type": "price",
-                                "field": "volume",
-                                "lag": 0
-                              }
-                            }
-                          },
-                          "right": {
-                            "type": "cumulative",
-                            "stat": "sum",
-                            "inner": {
-                              "type": "price",
-                              "field": "volume",
-                              "lag": 0
-                            }
-                          },
-                          "note": "VWAP ANCRE sur la seance declaree, sur le prix typique."
-                        }
-                      },
-                      "right": {
-                        "type": "constant",
-                        "value": 1.0
-                      }
-                    }
-                  },
-                  "note": [
-                    "Dispersion de l'ecart au VWAP AU MEME RANG de seance, sur 20 seances.",
-                    "",
-                    "`across: sessions` et non `stride` : les seances n'ont pas toutes la",
-                    "meme longueur - 1 362 barres les jours pleins sur NQ, 435 le vendredi -",
-                    "et un pas fixe tomberait a une heure arbitraire (lecon L29)."
-                  ]
+                  "$ref": "dispersion"
                 }
               }
             }
@@ -286,62 +242,7 @@
                     "lag": 0
                   },
                   "right": {
-                    "type": "arith",
-                    "op": "/",
-                    "left": {
-                      "type": "cumulative",
-                      "stat": "sum",
-                      "inner": {
-                        "type": "arith",
-                        "op": "*",
-                        "left": {
-                          "type": "arith",
-                          "op": "/",
-                          "left": {
-                            "type": "arith",
-                            "op": "+",
-                            "left": {
-                              "type": "arith",
-                              "op": "+",
-                              "left": {
-                                "type": "price",
-                                "field": "high",
-                                "lag": 0
-                              },
-                              "right": {
-                                "type": "price",
-                                "field": "low",
-                                "lag": 0
-                              }
-                            },
-                            "right": {
-                              "type": "price",
-                              "field": "close",
-                              "lag": 0
-                            }
-                          },
-                          "right": {
-                            "type": "constant",
-                            "value": 3.0
-                          }
-                        },
-                        "right": {
-                          "type": "price",
-                          "field": "volume",
-                          "lag": 0
-                        }
-                      }
-                    },
-                    "right": {
-                      "type": "cumulative",
-                      "stat": "sum",
-                      "inner": {
-                        "type": "price",
-                        "field": "volume",
-                        "lag": 0
-                      }
-                    },
-                    "note": "VWAP ANCRE sur la seance declaree, sur le prix typique."
+                    "$ref": "vwap_ancre"
                   }
                 },
                 "right": {
@@ -378,65 +279,7 @@
           "type": "all_of",
           "operands": [
             {
-              "type": "all_of",
-              "operands": [
-                {
-                  "type": "compare",
-                  "op": ">=",
-                  "left": {
-                    "type": "session",
-                    "field": "minutes_from_open",
-                    "lag": 0
-                  },
-                  "right": {
-                    "type": "constant",
-                    "value": 30.0
-                  }
-                },
-                {
-                  "type": "compare",
-                  "op": "<=",
-                  "left": {
-                    "type": "session",
-                    "field": "minutes_from_open",
-                    "lag": 0
-                  },
-                  "right": {
-                    "type": "constant",
-                    "value": 330.0
-                  }
-                },
-                {
-                  "type": "compare",
-                  "op": "==",
-                  "left": {
-                    "type": "arith",
-                    "op": "%",
-                    "left": {
-                      "type": "session",
-                      "field": "minutes_from_open",
-                      "lag": 0
-                    },
-                    "right": {
-                      "type": "constant",
-                      "value": 15.0
-                    }
-                  },
-                  "right": {
-                    "type": "constant",
-                    "value": 0.0
-                  }
-                }
-              ],
-              "note": [
-                "Grille horaire : une decision toutes les 15 minutes, de la",
-                "minute 30 a la minute 330 depuis l'ouverture DECLAREE.",
-                "",
-                "`arith %` remplace ici douze comparaisons `any_of`. Attention a la",
-                "convention : une barre est horodatee a sa CLOTURE, donc",
-                "`minutes_from_open` parcourt 1..N et jamais 0. Le point « 30 minutes",
-                "apres l'ouverture » est la barre qui SE FERME a cette minute."
-              ]
+              "$ref": "grille_horaire"
             },
             {
               "type": "compare",
@@ -453,62 +296,7 @@
                     "lag": 0
                   },
                   "right": {
-                    "type": "arith",
-                    "op": "/",
-                    "left": {
-                      "type": "cumulative",
-                      "stat": "sum",
-                      "inner": {
-                        "type": "arith",
-                        "op": "*",
-                        "left": {
-                          "type": "arith",
-                          "op": "/",
-                          "left": {
-                            "type": "arith",
-                            "op": "+",
-                            "left": {
-                              "type": "arith",
-                              "op": "+",
-                              "left": {
-                                "type": "price",
-                                "field": "high",
-                                "lag": 0
-                              },
-                              "right": {
-                                "type": "price",
-                                "field": "low",
-                                "lag": 0
-                              }
-                            },
-                            "right": {
-                              "type": "price",
-                              "field": "close",
-                              "lag": 0
-                            }
-                          },
-                          "right": {
-                            "type": "constant",
-                            "value": 3.0
-                          }
-                        },
-                        "right": {
-                          "type": "price",
-                          "field": "volume",
-                          "lag": 0
-                        }
-                      }
-                    },
-                    "right": {
-                      "type": "cumulative",
-                      "stat": "sum",
-                      "inner": {
-                        "type": "price",
-                        "field": "volume",
-                        "lag": 0
-                      }
-                    },
-                    "note": "VWAP ANCRE sur la seance declaree, sur le prix typique."
+                    "$ref": "vwap_ancre"
                   }
                 },
                 "right": {
@@ -524,96 +312,7 @@
                   "value": 2.0
                 },
                 "right": {
-                  "type": "rolling",
-                  "stat": "stdev",
-                  "window": 20,
-                  "across": "sessions",
-                  "inner": {
-                    "type": "session_lag",
-                    "sessions": 1,
-                    "inner": {
-                      "type": "arith",
-                      "op": "-",
-                      "left": {
-                        "type": "arith",
-                        "op": "/",
-                        "left": {
-                          "type": "price",
-                          "field": "close",
-                          "lag": 0
-                        },
-                        "right": {
-                          "type": "arith",
-                          "op": "/",
-                          "left": {
-                            "type": "cumulative",
-                            "stat": "sum",
-                            "inner": {
-                              "type": "arith",
-                              "op": "*",
-                              "left": {
-                                "type": "arith",
-                                "op": "/",
-                                "left": {
-                                  "type": "arith",
-                                  "op": "+",
-                                  "left": {
-                                    "type": "arith",
-                                    "op": "+",
-                                    "left": {
-                                      "type": "price",
-                                      "field": "high",
-                                      "lag": 0
-                                    },
-                                    "right": {
-                                      "type": "price",
-                                      "field": "low",
-                                      "lag": 0
-                                    }
-                                  },
-                                  "right": {
-                                    "type": "price",
-                                    "field": "close",
-                                    "lag": 0
-                                  }
-                                },
-                                "right": {
-                                  "type": "constant",
-                                  "value": 3.0
-                                }
-                              },
-                              "right": {
-                                "type": "price",
-                                "field": "volume",
-                                "lag": 0
-                              }
-                            }
-                          },
-                          "right": {
-                            "type": "cumulative",
-                            "stat": "sum",
-                            "inner": {
-                              "type": "price",
-                              "field": "volume",
-                              "lag": 0
-                            }
-                          },
-                          "note": "VWAP ANCRE sur la seance declaree, sur le prix typique."
-                        }
-                      },
-                      "right": {
-                        "type": "constant",
-                        "value": 1.0
-                      }
-                    }
-                  },
-                  "note": [
-                    "Dispersion de l'ecart au VWAP AU MEME RANG de seance, sur 20 seances.",
-                    "",
-                    "`across: sessions` et non `stride` : les seances n'ont pas toutes la",
-                    "meme longueur - 1 362 barres les jours pleins sur NQ, 435 le vendredi -",
-                    "et un pas fixe tomberait a une heure arbitraire (lecon L29)."
-                  ]
+                  "$ref": "dispersion"
                 }
               }
             }
@@ -637,62 +336,7 @@
                     "lag": 0
                   },
                   "right": {
-                    "type": "arith",
-                    "op": "/",
-                    "left": {
-                      "type": "cumulative",
-                      "stat": "sum",
-                      "inner": {
-                        "type": "arith",
-                        "op": "*",
-                        "left": {
-                          "type": "arith",
-                          "op": "/",
-                          "left": {
-                            "type": "arith",
-                            "op": "+",
-                            "left": {
-                              "type": "arith",
-                              "op": "+",
-                              "left": {
-                                "type": "price",
-                                "field": "high",
-                                "lag": 0
-                              },
-                              "right": {
-                                "type": "price",
-                                "field": "low",
-                                "lag": 0
-                              }
-                            },
-                            "right": {
-                              "type": "price",
-                              "field": "close",
-                              "lag": 0
-                            }
-                          },
-                          "right": {
-                            "type": "constant",
-                            "value": 3.0
-                          }
-                        },
-                        "right": {
-                          "type": "price",
-                          "field": "volume",
-                          "lag": 0
-                        }
-                      }
-                    },
-                    "right": {
-                      "type": "cumulative",
-                      "stat": "sum",
-                      "inner": {
-                        "type": "price",
-                        "field": "volume",
-                        "lag": 0
-                      }
-                    },
-                    "note": "VWAP ANCRE sur la seance declaree, sur le prix typique."
+                    "$ref": "vwap_ancre"
                   }
                 },
                 "right": {

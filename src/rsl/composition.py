@@ -63,9 +63,10 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any, Final, Literal
 
-from pydantic import Field
+from pydantic import Field, model_validator
 
 from rsl.config import BacktestSpec, SpecDict, StrategySpec, StrictModel
+from rsl.definitions import expanser
 from rsl.errors import ConfigurationError
 from rsl.strategies.base import get_strategy
 
@@ -87,7 +88,27 @@ class StrategyFile(StrictModel):
 
     format: Literal["rsl-strategy@1"]
     name: str = Field(min_length=1)
+    definitions: dict[str, Any] = Field(
+        default_factory=dict,
+        exclude=True,
+        description=(
+            "Grandeurs nommees, ecrites UNE fois et referencees par "
+            '`{"$ref": "nom"}`. Voir `rsl.definitions`.'
+        ),
+    )
     strategy: StrategySpec
+
+    @model_validator(mode="before")
+    @classmethod
+    def _developper_les_definitions(cls, charge: Any) -> Any:
+        """Meme dispositif que sur `BacktestSpec`, et il est necessaire ici.
+
+        Une strategie SEULE est le fichier qu'on ecrit le plus souvent, et
+        c'est la que vivent les regles - donc la duplication. La factorisation
+        survit a `compose()` sans precaution : quand celui-ci recolle la
+        strategie et son montage, les `params` sont deja developpes.
+        """
+        return expanser(charge) if isinstance(charge, dict) else charge
 
     @staticmethod
     def parse(texte: str) -> StrategyFile:

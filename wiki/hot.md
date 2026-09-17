@@ -200,11 +200,10 @@ coexistence, et `tests/test_nautilus_coexistence.py` la garde.
       Les trois pistes ecartees en chemin sont consignees au log ; retenir que
       `cumulative` sur `position` est SAIN - 360/360 justes sur trajectoire
       controlee, le tampon vivant a toutes les profondeurs.
-- [ ] **Un detecteur de PERTE, et pas seulement de fin de trade.**
-      `close < entry_price` a la derniere barre en position ignore les frais et
-      le prix du fill de sortie. Mesure : une garde « une perte » plafonne a
-      QUATRE pertes par seance comptees en P&L net. Ce qu'il faudrait : un champ
-      `position` portant le P&L latent net, ou un acces au dernier trade ferme.
+- [x] **Un detecteur de PERTE : FAIT le 2026-09-15.** `position.closed_trade`
+      et `position.closed_pnl`, tous deux dans `POSITION_FIELDS`. La case etait
+      restee vide alors que le travail etait consigne au log le jour meme -
+      constate le 2026-09-17.
 - [ ] **Les trois exemples intraday n'ont pas ete rejoues** depuis les deux
       correctifs. Leurs chiffres publies au log du 2026-09-14 sont ceux d'AVANT.
 

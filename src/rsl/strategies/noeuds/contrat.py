@@ -21,6 +21,7 @@ from enum import StrEnum
 from typing import Any, Final, Protocol, runtime_checkable
 
 from rsl.data.feed import Context
+from rsl.definitions import MARQUEUR
 from rsl.errors import ConfigurationError, RegistryError
 
 TRUE: Final[float] = 1.0
@@ -370,9 +371,43 @@ def signal_json_schema() -> SpecDict:
         "$ref": NODE_REF,
         "$defs": {
             "node": {
-                "oneOf": [node.json_schema() for node in list_node_types()],
+                "oneOf": [
+                    *[node.json_schema() for node in list_node_types()],
+                    _schema_de_reference(),
+                ],
             }
         },
+    }
+
+
+def _schema_de_reference() -> SpecDict:
+    """`{"$ref": "nom"}` est un emplacement de noeud VALIDE, et le schema doit
+    le dire.
+
+    Sans cette variante, un editeur qui valide une specification factorisee
+    contre le schema publie la refuse - y compris les quatre exemples du depot,
+    factorises le 2026-09-17. Le schema aurait alors tort contre le socle, et
+    c'est exactement le cas que `TestExamplesValidate` existe pour interdire.
+
+    Ce n'est PAS un type de noeud : il n'apparait ni dans `list_node_types()`,
+    ni dans `describe_node_types()`, ni dans le squelette comme un noeud. Le
+    moteur ne le voit jamais - la substitution a lieu avant toute validation.
+
+    `additionalProperties: false` porte la meme regle que `rsl.definitions` :
+    un `$ref` accompagne d'autres cles est refuse, parce qu'elles seraient
+    perdues en silence.
+    """
+    return {
+        "type": "object",
+        "title": "reference a une definition",
+        "description": (
+            "Renvoie a une entree du bloc `definitions` declare a la racine du "
+            "document. Substitution purement textuelle, faite avant toute "
+            "validation : c'est la forme DEVELOPPEE qui est evaluee et hachee."
+        ),
+        "properties": {MARQUEUR: {"type": "string", "minLength": 1}},
+        "required": [MARQUEUR],
+        "additionalProperties": False,
     }
 
 

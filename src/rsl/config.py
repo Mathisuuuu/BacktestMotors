@@ -39,6 +39,7 @@ from rsl.data.session import (
     build_session_index,
 )
 from rsl.data.validation import ValidationConfig
+from rsl.definitions import expanser
 from rsl.engine.cross_sectional import EveryNRows, EveryRow, RebalanceSchedule
 from rsl.engine.execution import (
     BpsSlippage,
@@ -715,6 +716,30 @@ class BacktestSpec(StrictModel):
     """Tout ce qu'il faut pour lancer un run, et rien d'autre."""
 
     name: str = Field(min_length=1)
+    definitions: dict[str, Any] = Field(
+        default_factory=dict,
+        exclude=True,
+        description=(
+            "Grandeurs nommees, ecrites UNE fois et referencees par "
+            '`{"$ref": "nom"}` a toute profondeur du document. Substitution '
+            "purement textuelle, faite avant toute validation : le moteur "
+            "recoit la forme DEVELOPPEE, et c'est elle qui est hachee. Une "
+            "definition jamais referencee est refusee."
+        ),
+    )
+    """Le bloc que `rsl.definitions` consomme, garde ici pour deux raisons.
+
+    `exclude=True` est la premiere et la plus importante : le champ ne figure
+    pas dans `model_dump`, donc pas dans `canonical()`, donc pas dans le
+    `config_hash`. Une specification factorisee et son equivalent recopie a la
+    main sont le MEME run et portent la MEME empreinte - sans quoi factoriser
+    aurait invalide les essais archives, exactement comme l'aurait fait un bloc
+    `risk.limits` muet (voir `_sans_plafonds_muets`).
+
+    La seconde : un champ DECLARE entre dans le JSON Schema engendre, donc dans
+    le squelette. Une machine qui ecrit une specification doit savoir qu'elle a
+    le droit de se repeter moins.
+    """
     initial_cash: float = Field(gt=0.0)
     data: list[DataSpec] = Field(min_length=1)
     events: list[EventSourceSpec] = Field(
@@ -750,6 +775,23 @@ class BacktestSpec(StrictModel):
             "exploration mais rend le manifeste incomplet, et le rapport le signale."
         ),
     )
+
+    @model_validator(mode="before")
+    @classmethod
+    def _developper_les_definitions(cls, charge: Any) -> Any:
+        """Remplace les `$ref` AVANT que quoi que ce soit ne soit type.
+
+        Avant, et non apres : les definitions doivent pouvoir servir dans les
+        blocs TYPES - `risk.sizing.signal` en porte un - et pas seulement dans
+        la region libre `strategy.params.rules`. Un validateur `mode="after"`
+        arriverait quand pydantic a deja refuse l'objet `{"$ref": ...}` qu'il
+        ne sait pas construire.
+
+        Place ici plutot qu'au chargement de fichier, pour que TOUTE voie soit
+        couverte : `rsl run`, la fenetre de `rsl gui`, `compose()`, et le
+        `model_validate` d'un test.
+        """
+        return expanser(charge) if isinstance(charge, dict) else charge
 
     @model_validator(mode="after")
     def _refuse_un_panneau_intraday_a_seances_differentes(self) -> BacktestSpec:

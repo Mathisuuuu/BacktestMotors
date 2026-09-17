@@ -172,6 +172,20 @@ class DeflatedSharpeResult:
         """Convention usuelle : DSR > 0,95."""
         return self.deflated_sharpe is not None and self.deflated_sharpe > 0.95
 
+    @property
+    def decomposition(self) -> Decomposition:
+        """Les deux facteurs du seuil. Une seule ecriture, partagee avec
+        `rsl essais --familles`."""
+        return Decomposition(self.n_trials, self.variance_of_trial_sharpes)
+
+    @property
+    def dispersion_of_trials(self) -> float:
+        return self.decomposition.dispersion
+
+    @property
+    def count_factor(self) -> float:
+        return self.decomposition.count_factor
+
     def describe(self) -> SpecDict:
         return {
             "deflated_sharpe": self.deflated_sharpe,
@@ -181,6 +195,8 @@ class DeflatedSharpeResult:
             "n_observations": self.n_observations,
             "n_trials": self.n_trials,
             "variance_of_trial_sharpes": self.variance_of_trial_sharpes,
+            "dispersion_of_trials": self.dispersion_of_trials,
+            "count_factor": self.count_factor,
             "skewness": self.skewness,
             "kurtosis": self.kurtosis,
             "is_significant": self.is_significant,
@@ -194,7 +210,8 @@ class DeflatedSharpeResult:
         lines = [
             f"Sharpe observe (par periode)  {self.observed_sharpe_per_period:.4f}",
             f"Maximum attendu sous H0       {self.expected_max_sharpe:.4f} "
-            f"({self.n_trials} essai(s), variance {self.variance_of_trial_sharpes:.5f})",
+            f"= dispersion {self.dispersion_of_trials:.4f} x compte "
+            f"{self.count_factor:.4f}  ({self.n_trials} essai(s))",
             f"PSR (contre zero)             {prob(self.probabilistic_sharpe)}",
             f"DSR (contre le maximum)       {prob(self.deflated_sharpe)}"
             f"{'  SIGNIFICATIF' if self.is_significant else ''}",
@@ -232,6 +249,53 @@ def probabilistic_sharpe_ratio(
         return None
     statistic = (sharpe_per_period - benchmark_sharpe) * math.sqrt(n_observations - 1)
     return float(_NORMAL.cdf(statistic / math.sqrt(variance)))
+
+
+@dataclass(frozen=True, slots=True)
+class Decomposition:
+    """Les deux facteurs du seuil de deflation, separes.
+
+    `E[max SR] = sqrt(V) * f(N)`. Le rapport n'imprimait que leur PRODUIT, et
+    a cote la variance brute. Mesure le 2026-09-17 sur le registre : en passant
+    de 17 a 498 essais, `f(N)` monte de **+66,9 %** - le compte se comporte
+    correctement - tandis que `sqrt(V)` tombe de **-78,3 %**, et c'est cette
+    chute qui fait passer le seuil de 0,1848 a 0,0669.
+
+    Une variance affichee a 0,00048 ne se lit pas comme « vos 481 essais n'en
+    sont qu'un ». Les deux facteurs cote a cote, si.
+    """
+
+    n_trials: int
+    variance: float
+
+    @property
+    def dispersion(self) -> float:
+        """`sqrt(V)` : ce que la population d'essais dit de sa propre etendue."""
+        return math.sqrt(max(self.variance, 0.0))
+
+    @property
+    def count_factor(self) -> float:
+        """`f(N)` : ce que le NOMBRE d'essais impose, a dispersion donnee.
+
+        Obtenu en demandant le seuil A VARIANCE UNITE plutot qu'en reecrivant
+        la formule : deux ecritures finiraient par diverger, et une
+        decomposition qui ne decompose plus le bon nombre est pire qu'aucune.
+        """
+        if self.n_trials < 2:
+            return 0.0
+        return expected_max_sharpe(self.n_trials, 1.0)
+
+    @property
+    def seuil(self) -> float:
+        """Le seuil, pris a sa source. Le produit des deux facteurs vaut la
+        meme chose aux derniers bits pres ; c'est celui-ci qui fait foi."""
+        return expected_max_sharpe(self.n_trials, self.variance)
+
+    def render(self) -> str:
+        return (
+            f"{self.seuil:.4f} = dispersion {self.dispersion:.4f} "
+            f"x compte {self.count_factor:.4f} ({self.n_trials} essai(s))"
+        )
 
 
 def expected_max_sharpe(n_trials: int, variance_of_trial_sharpes: float) -> float:

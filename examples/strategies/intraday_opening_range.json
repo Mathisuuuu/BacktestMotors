@@ -15,6 +15,66 @@
     "a 330 - sont les valeurs usuelles de la litterature, pas un choix",
     "mesure. Elle sert de FORME, pas de resultat."
   ],
+  "definitions": {
+    "vwap_ancre": {
+      "type": "arith",
+      "op": "/",
+      "left": {
+        "type": "cumulative",
+        "stat": "sum",
+        "inner": {
+          "type": "arith",
+          "op": "*",
+          "left": {
+            "type": "arith",
+            "op": "/",
+            "left": {
+              "type": "arith",
+              "op": "+",
+              "left": {
+                "type": "arith",
+                "op": "+",
+                "left": {
+                  "type": "price",
+                  "field": "high",
+                  "lag": 0
+                },
+                "right": {
+                  "type": "price",
+                  "field": "low",
+                  "lag": 0
+                }
+              },
+              "right": {
+                "type": "price",
+                "field": "close",
+                "lag": 0
+              }
+            },
+            "right": {
+              "type": "constant",
+              "value": 3.0
+            }
+          },
+          "right": {
+            "type": "price",
+            "field": "volume",
+            "lag": 0
+          }
+        }
+      },
+      "right": {
+        "type": "cumulative",
+        "stat": "sum",
+        "inner": {
+          "type": "price",
+          "field": "volume",
+          "lag": 0
+        }
+      },
+      "note": "VWAP ANCRE sur la seance declaree, sur le prix typique."
+    }
+  },
   "strategy": {
     "ref": "rules@1",
     "params": {
@@ -101,62 +161,7 @@
                 "lag": 0
               },
               "right": {
-                "type": "arith",
-                "op": "/",
-                "left": {
-                  "type": "cumulative",
-                  "stat": "sum",
-                  "inner": {
-                    "type": "arith",
-                    "op": "*",
-                    "left": {
-                      "type": "arith",
-                      "op": "/",
-                      "left": {
-                        "type": "arith",
-                        "op": "+",
-                        "left": {
-                          "type": "arith",
-                          "op": "+",
-                          "left": {
-                            "type": "price",
-                            "field": "high",
-                            "lag": 0
-                          },
-                          "right": {
-                            "type": "price",
-                            "field": "low",
-                            "lag": 0
-                          }
-                        },
-                        "right": {
-                          "type": "price",
-                          "field": "close",
-                          "lag": 0
-                        }
-                      },
-                      "right": {
-                        "type": "constant",
-                        "value": 3.0
-                      }
-                    },
-                    "right": {
-                      "type": "price",
-                      "field": "volume",
-                      "lag": 0
-                    }
-                  }
-                },
-                "right": {
-                  "type": "cumulative",
-                  "stat": "sum",
-                  "inner": {
-                    "type": "price",
-                    "field": "volume",
-                    "lag": 0
-                  }
-                },
-                "note": "VWAP ANCRE sur la seance declaree, sur le prix typique."
+                "$ref": "vwap_ancre"
               }
             },
             {
@@ -259,62 +264,7 @@
                 "lag": 0
               },
               "right": {
-                "type": "arith",
-                "op": "/",
-                "left": {
-                  "type": "cumulative",
-                  "stat": "sum",
-                  "inner": {
-                    "type": "arith",
-                    "op": "*",
-                    "left": {
-                      "type": "arith",
-                      "op": "/",
-                      "left": {
-                        "type": "arith",
-                        "op": "+",
-                        "left": {
-                          "type": "arith",
-                          "op": "+",
-                          "left": {
-                            "type": "price",
-                            "field": "high",
-                            "lag": 0
-                          },
-                          "right": {
-                            "type": "price",
-                            "field": "low",
-                            "lag": 0
-                          }
-                        },
-                        "right": {
-                          "type": "price",
-                          "field": "close",
-                          "lag": 0
-                        }
-                      },
-                      "right": {
-                        "type": "constant",
-                        "value": 3.0
-                      }
-                    },
-                    "right": {
-                      "type": "price",
-                      "field": "volume",
-                      "lag": 0
-                    }
-                  }
-                },
-                "right": {
-                  "type": "cumulative",
-                  "stat": "sum",
-                  "inner": {
-                    "type": "price",
-                    "field": "volume",
-                    "lag": 0
-                  }
-                },
-                "note": "VWAP ANCRE sur la seance declaree, sur le prix typique."
+                "$ref": "vwap_ancre"
               }
             },
             {

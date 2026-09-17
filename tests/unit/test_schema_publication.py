@@ -19,7 +19,7 @@ import json
 import pathlib
 
 import pytest
-from jsonschema import Draft202012Validator
+from jsonschema import Draft202012Validator, ValidationError
 
 from fixtures.exemples import noms
 from rsl.config import BacktestSpec
@@ -65,7 +65,35 @@ class TestSchemaDocument:
     def test_it_covers_every_registered_node(self):
         branches = signal_json_schema()["$defs"]["node"]["oneOf"]  # type: ignore[index]
         titles = {branch["title"] for branch in branches}
-        assert titles == {node.ref for node in list_node_types()}
+        assert {node.ref for node in list_node_types()} <= titles
+
+    def test_the_only_branch_that_is_not_a_node_is_the_reference(self):
+        """Depuis le 2026-09-17, un emplacement de noeud accepte aussi
+        `{"$ref": "nom"}`.
+
+        Ce n'est PAS un type de noeud - le moteur ne le voit jamais, la
+        substitution ayant lieu avant toute validation - mais le schema publie
+        doit l'accepter, sinon il refuserait les quatre exemples factorises du
+        depot et aurait tort contre le socle.
+
+        L'egalite stricte est conservee ici plutot que dans le test precedent :
+        une branche ajoutee par megarde doit toujours faire echouer la suite.
+        """
+        branches = signal_json_schema()["$defs"]["node"]["oneOf"]  # type: ignore[index]
+        titles = {branch["title"] for branch in branches}
+        etrangeres = titles - {node.ref for node in list_node_types()}
+        assert etrangeres == {"reference a une definition"}
+
+    def test_a_reference_validates_where_a_node_is_expected(self):
+        Draft202012Validator(signal_json_schema()).validate({"$ref": "sigma"})
+
+    def test_a_reference_with_siblings_is_refused(self):
+        """Meme regle que `rsl.definitions` : les cles voisines seraient
+        perdues en silence, la definition remplacant l'objet entier."""
+        with pytest.raises(ValidationError):
+            Draft202012Validator(signal_json_schema()).validate(
+                {"$ref": "sigma", "window": 20}
+            )
 
     def test_it_is_json_serialisable(self):
         schema = signal_json_schema()
